@@ -1,0 +1,2490 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SecureInbox — Security Posture & Telemetry Hub (Concept B)</title>
+  <style>
+    /* ─── Design Tokens & CSS Custom Properties ────────────────────────── */
+    :root {
+      --bg-canvas: #090d16;
+      --bg-surface-lowest: #0b111c;
+      --bg-surface: #0e1524;
+      --bg-surface-raised: #131c30;
+      --bg-surface-highlight: #17243c;
+      
+      --border-subtle: #151d2f;
+      --border-default: #1a2234;
+      --border-active: #283550;
+      --border-accent: #3b82f6;
+
+      --text-primary: #f1f5f9;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --text-dim: #475569;
+
+      --emerald-500: #10b981;
+      --emerald-400: #34d399;
+      --emerald-bg: rgba(16, 185, 129, 0.08);
+      --emerald-border: rgba(16, 185, 129, 0.24);
+
+      --indigo-500: #6366f1;
+      --indigo-400: #818cf8;
+      --indigo-bg: rgba(99, 102, 241, 0.08);
+      --indigo-border: rgba(99, 102, 241, 0.24);
+
+      --amber-500: #f59e0b;
+      --amber-400: #fbbf24;
+      --amber-bg: rgba(245, 158, 11, 0.08);
+      --amber-border: rgba(245, 158, 11, 0.22);
+
+      --crimson-500: #f43f5e;
+      --crimson-400: #fb7185;
+      --crimson-bg: rgba(244, 63, 94, 0.08);
+      --crimson-border: rgba(244, 63, 94, 0.22);
+
+      --font-sans: -apple-system, BlinkMacSystemFont, "Inter", "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", "Cascadia Code", "Roboto Mono", Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 13.5px;
+      line-height: 1.5;
+      letter-spacing: -0.006em;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      min-height: 100vh;
+    }
+
+    /* ─── Scrollbar ────────────────────────────────────────────────────── */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: var(--bg-canvas);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: var(--border-default);
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: var(--border-active);
+    }
+
+    /* ─── Shell Layout ─────────────────────────────────────────────────── */
+    .app-shell {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    /* ─── Global Top Navigation Bar ────────────────────────────────────── */
+    .nav-bar {
+      height: 52px;
+      border-bottom: 1px solid var(--border-default);
+      background-color: rgba(9, 13, 22, 0.88);
+      backdrop-filter: blur(12px);
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+    }
+
+    .nav-left {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .brand-group {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .brand-icon {
+      width: 22px;
+      height: 22px;
+      background: linear-gradient(135deg, #4f46e5 0%, #06b6d4 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 0 12px rgba(79, 70, 229, 0.35);
+    }
+
+    .brand-icon svg {
+      width: 13px;
+      height: 13px;
+      stroke: #ffffff;
+    }
+
+    .brand-name {
+      font-weight: 600;
+      font-size: 14px;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .nav-divider {
+      width: 1px;
+      height: 16px;
+      background: var(--border-default);
+    }
+
+    .nav-breadcrumbs {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .nav-badge {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 1px 7px;
+      border-radius: 4px;
+      background: var(--bg-surface-raised);
+      border: 1px solid var(--border-default);
+      color: var(--text-secondary);
+    }
+
+    .nav-right {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .telemetry-status-pill {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 11.5px;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--bg-surface-lowest);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .status-dot {
+      width: 6.5px;
+      height: 6.5px;
+      border-radius: 50%;
+      background: var(--emerald-400);
+      box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+      animation: pulse-dot 2.5s infinite ease-in-out;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.55; transform: scale(0.9); }
+    }
+
+    .quick-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .btn-secondary {
+      height: 30px;
+      padding: 0 12px;
+      border-radius: 5px;
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--bg-surface-raised);
+      border: 1px solid var(--border-default);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 120ms ease;
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-surface-highlight);
+      color: var(--text-primary);
+      border-color: var(--border-active);
+    }
+
+    /* ─── Main Content Container ───────────────────────────────────────── */
+    .dashboard-container {
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      padding: 24px 28px 48px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+
+    /* ─── Top Control Bar: Context & Time Switcher ─────────────────────── */
+    .header-control-bar {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 20px;
+      flex-wrap: wrap;
+    }
+
+    .header-title-block h1 {
+      font-size: 20px;
+      font-weight: 600;
+      letter-spacing: -0.025em;
+      color: var(--text-primary);
+      margin-bottom: 3px;
+    }
+
+    .header-title-block p {
+      font-size: 12.5px;
+      color: var(--text-muted);
+    }
+
+    .controls-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    /* ─── Time Range Switcher ──────────────────────────────────────────── */
+    .time-switcher {
+      display: inline-flex;
+      background: var(--bg-surface-lowest);
+      border: 1px solid var(--border-default);
+      border-radius: 6px;
+      padding: 2px;
+      gap: 2px;
+    }
+
+    .time-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 500;
+      padding: 4px 11px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 130ms ease;
+    }
+
+    .time-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .time-btn.active {
+      background: var(--bg-surface-raised);
+      color: var(--text-primary);
+      border: 1px solid var(--border-active);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+    }
+
+    /* ─── Section 1: Posture Hero Banner ──────────────────────────────── */
+    .posture-hero-card {
+      background: linear-gradient(180deg, rgba(14, 21, 36, 0.95) 0%, rgba(11, 17, 28, 0.98) 100%);
+      border: 1px solid var(--border-default);
+      border-radius: 8px;
+      padding: 22px 26px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .posture-hero-card::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent 0%, rgba(99, 102, 241, 0.35) 30%, rgba(16, 185, 129, 0.45) 70%, transparent 100%);
+    }
+
+    .hero-top-row {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 28px;
+    }
+
+    @media (max-width: 960px) {
+      .hero-top-row {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+    }
+
+    .safe-rate-display {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .safe-rate-num {
+      font-size: 38px;
+      font-weight: 700;
+      letter-spacing: -0.035em;
+      line-height: 1;
+      color: #ffffff;
+      font-family: var(--font-sans);
+    }
+
+    .safe-rate-unit {
+      font-size: 22px;
+      font-weight: 500;
+      color: var(--emerald-400);
+      margin-left: -4px;
+    }
+
+    .safe-rate-label-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .safe-rate-title {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .safe-rate-delta {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 11.5px;
+      color: var(--emerald-400);
+      font-family: var(--font-mono);
+      font-weight: 500;
+    }
+
+    .assessment-block {
+      border-left: 1px solid var(--border-default);
+      padding-left: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    @media (max-width: 960px) {
+      .assessment-block {
+        border-left: none;
+        border-top: 1px solid var(--border-default);
+        padding-left: 0;
+        padding-top: 14px;
+      }
+    }
+
+    .assessment-lead {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .posture-tag-stable {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      padding: 1px 7px;
+      border-radius: 4px;
+      background: var(--emerald-bg);
+      border: 1px solid var(--emerald-border);
+      color: var(--emerald-400);
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    .assessment-context {
+      font-size: 12.5px;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .cluster-telemetry-meta {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    @media (max-width: 960px) {
+      .cluster-telemetry-meta {
+        align-items: flex-start;
+      }
+    }
+
+    /* ─── Discrete Stats Strip ────────────────────────────────────────── */
+    .discrete-stats-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      padding-top: 18px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    @media (max-width: 860px) {
+      .discrete-stats-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .discrete-stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 10px 14px;
+      background: rgba(14, 21, 36, 0.5);
+      border: 1px solid var(--border-default);
+      border-radius: 6px;
+    }
+
+    .stat-caption {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 500;
+    }
+
+    .stat-val-group {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .stat-num {
+      font-family: var(--font-mono);
+      font-size: 19px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .stat-subtext {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .stat-subtext.highlight-crimson {
+      color: var(--crimson-400);
+    }
+
+    .stat-subtext.highlight-amber {
+      color: var(--amber-400);
+    }
+
+    /* ─── Section 2: Visual Grid (Distribution + Risk Trendline) ──────── */
+    .visual-grid {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 1120px) {
+      .visual-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: 8px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .card-title-group {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .card-title {
+      font-size: 13.5px;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .card-subtitle {
+      font-size: 11.5px;
+      color: var(--text-muted);
+    }
+
+    /* Threat Vector Distribution */
+    .vector-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      margin-top: 4px;
+    }
+
+    .vector-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      cursor: pointer;
+      padding: 6px 8px;
+      margin: -6px -8px;
+      border-radius: 6px;
+      transition: background 120ms ease;
+    }
+
+    .vector-item:hover {
+      background: var(--bg-surface-raised);
+    }
+
+    .vector-item.active-filter {
+      background: var(--bg-surface-highlight);
+      border: 1px solid var(--border-active);
+    }
+
+    .vector-label-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .vector-name-group {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .vector-pip {
+      width: 7px;
+      height: 7px;
+      border-radius: 2px;
+    }
+
+    .pip-spoofing { background-color: #6366f1; }
+    .pip-credential { background-color: #f59e0b; }
+    .pip-payloads { background-color: #f43f5e; }
+    .pip-impersonation { background-color: #06b6d4; }
+
+    .vector-name {
+      font-size: 12.5px;
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .vector-count-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-family: var(--font-mono);
+      font-size: 12px;
+    }
+
+    .vector-pct {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .vector-qty {
+      color: var(--text-muted);
+      font-size: 11px;
+    }
+
+    .vector-bar-track {
+      height: 5px;
+      background: var(--bg-surface-lowest);
+      border-radius: 3px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .vector-bar-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 400ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .fill-spoofing { background: #6366f1; }
+    .fill-credential { background: #f59e0b; }
+    .fill-payloads { background: #f43f5e; }
+    .fill-impersonation { background: #06b6d4; }
+
+    .vector-subtext {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+    }
+
+    /* ─── 14-Day Risk Over Time Trendline (Interactive SVG) ──────────── */
+    .trend-card {
+      position: relative;
+    }
+
+    .trend-legend {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: var(--text-secondary);
+    }
+
+    .legend-line {
+      width: 14px;
+      height: 2.5px;
+      border-radius: 2px;
+    }
+
+    .legend-safe { background: var(--emerald-400); }
+    .legend-suspicious { background: var(--amber-400); }
+    .legend-blocked { background: var(--crimson-400); }
+
+    .chart-container {
+      position: relative;
+      width: 100%;
+      height: 220px;
+      margin-top: 8px;
+    }
+
+    .svg-chart {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* Chart Scrubber Tooltip */
+    .chart-tooltip {
+      position: absolute;
+      top: 12px;
+      left: 0;
+      background: rgba(14, 21, 36, 0.95);
+      border: 1px solid var(--border-active);
+      border-radius: 6px;
+      padding: 8px 12px;
+      pointer-events: none;
+      display: none;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(8px);
+      z-index: 20;
+      min-width: 160px;
+    }
+
+    .tooltip-date {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      margin-bottom: 4px;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 3px;
+    }
+
+    .tooltip-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      font-size: 11.5px;
+      margin-top: 2px;
+    }
+
+    .tooltip-row-val {
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    /* ─── Security Protocol Health Checklist Strip ─────────────────────── */
+    .health-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 12px;
+    }
+
+    @media (max-width: 1024px) {
+      .health-strip {
+        grid-template-columns: repeat(3, 1fr);
+      }
+    }
+    @media (max-width: 640px) {
+      .health-strip {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    .health-badge-item {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-default);
+      border-radius: 6px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .health-icon {
+      width: 24px;
+      height: 24px;
+      border-radius: 5px;
+      background: var(--emerald-bg);
+      border: 1px solid var(--emerald-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--emerald-400);
+      flex-shrink: 0;
+    }
+
+    .health-info {
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      min-width: 0;
+    }
+
+    .health-name {
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      font-weight: 600;
+    }
+
+    .health-val {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ─── Telemetry Table & Feed Split ─────────────────────────────────── */
+    .telemetry-tables-section {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    /* Common Table Styling */
+    .table-container {
+      width: 100%;
+      overflow-x: auto;
+    }
+
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      text-align: left;
+    }
+
+    table.data-table th {
+      padding: 10px 14px;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+      background: var(--bg-surface-lowest);
+      border-bottom: 1px solid var(--border-default);
+      font-weight: 600;
+    }
+
+    table.data-table td {
+      padding: 11px 14px;
+      border-bottom: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      vertical-align: middle;
+    }
+
+    table.data-table tr:hover td {
+      background: var(--bg-surface-raised);
+    }
+
+    .domain-cell {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .domain-name {
+      font-family: var(--font-mono);
+      font-weight: 500;
+      color: var(--text-primary);
+    }
+
+    .domain-homoglyph-mark {
+      color: var(--crimson-400);
+      font-weight: 700;
+      background: rgba(244, 63, 94, 0.12);
+      padding: 0 3px;
+      border-radius: 2px;
+    }
+
+    .tag-brand {
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--bg-surface-raised);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .badge-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .badge-status.fail {
+      background: var(--crimson-bg);
+      border: 1px solid var(--crimson-border);
+      color: var(--crimson-400);
+    }
+
+    .badge-status.warn {
+      background: var(--amber-bg);
+      border: 1px solid var(--amber-border);
+      color: var(--amber-400);
+    }
+
+    .badge-status.pass {
+      background: var(--emerald-bg);
+      border: 1px solid var(--emerald-border);
+      color: var(--emerald-400);
+    }
+
+    .rep-meter-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .rep-bar-bg {
+      width: 50px;
+      height: 4.5px;
+      background: var(--bg-surface-lowest);
+      border-radius: 2px;
+      overflow: hidden;
+      border: 1px solid var(--border-subtle);
+    }
+
+    .rep-bar-fill {
+      height: 100%;
+      border-radius: 2px;
+    }
+
+    .rep-score-val {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      font-weight: 600;
+      min-width: 24px;
+    }
+
+    .rep-low {
+      color: var(--crimson-400);
+      background: var(--crimson-400);
+    }
+
+    .rep-med {
+      color: var(--amber-400);
+      background: var(--amber-400);
+    }
+
+    .action-btn-sm {
+      height: 26px;
+      padding: 0 9px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-family: var(--font-sans);
+      font-weight: 500;
+      color: var(--text-secondary);
+      background: var(--bg-surface-raised);
+      border: 1px solid var(--border-default);
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      transition: all 120ms ease;
+    }
+
+    .action-btn-sm:hover {
+      background: var(--bg-surface-highlight);
+      color: var(--text-primary);
+      border-color: var(--border-active);
+    }
+
+    .action-btn-danger {
+      color: var(--crimson-400);
+      border-color: var(--crimson-border);
+      background: var(--crimson-bg);
+    }
+
+    .action-btn-danger:hover {
+      background: rgba(244, 63, 94, 0.16);
+      border-color: var(--crimson-400);
+      color: #fff;
+    }
+
+    /* ─── Search and Filter Bar in Card Header ─────────────────────────── */
+    .table-filter-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .search-input-wrap {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .search-input-wrap svg {
+      position: absolute;
+      left: 8px;
+      width: 13px;
+      height: 13px;
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-input {
+      height: 28px;
+      background: var(--bg-surface-lowest);
+      border: 1px solid var(--border-default);
+      border-radius: 5px;
+      padding: 0 10px 0 28px;
+      font-size: 11.5px;
+      color: var(--text-primary);
+      width: 180px;
+      outline: none;
+      transition: all 120ms ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--border-active);
+      width: 220px;
+    }
+
+    /* ─── Audit Feed Specifics ─────────────────────────────────────────── */
+    .audit-filter-pills {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pill-filter {
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .pill-filter:hover {
+      color: var(--text-secondary);
+    }
+
+    .pill-filter.active {
+      background: var(--bg-surface-raised);
+      border-color: var(--border-default);
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .timestamp-cell {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      white-space: nowrap;
+    }
+
+    .actor-cell {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: var(--text-primary);
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+    }
+
+    .actor-ip {
+      font-size: 10.5px;
+      color: var(--text-muted);
+    }
+
+    .target-cell {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .trigger-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      padding: 2px 6px;
+      border-radius: 3px;
+      background: var(--bg-surface-raised);
+      border: 1px solid var(--border-default);
+      color: var(--text-secondary);
+    }
+
+    .mitigation-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 4px;
+      letter-spacing: 0.02em;
+    }
+
+    .mitigation-blocked {
+      background: var(--crimson-bg);
+      border: 1px solid var(--crimson-border);
+      color: var(--crimson-400);
+    }
+
+    .mitigation-quarantined {
+      background: var(--amber-bg);
+      border: 1px solid var(--amber-border);
+      color: var(--amber-400);
+    }
+
+    .mitigation-sanitized {
+      background: var(--indigo-bg);
+      border: 1px solid var(--indigo-border);
+      color: var(--indigo-400);
+    }
+
+    /* ─── Drawer / Inspection Modal ────────────────────────────────────── */
+    .drawer-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(5, 8, 14, 0.72);
+      backdrop-filter: blur(4px);
+      z-index: 90;
+      display: none;
+      align-items: center;
+      justify-content: flex-end;
+    }
+
+    .drawer-overlay.open {
+      display: flex;
+    }
+
+    .drawer-panel {
+      width: 540px;
+      max-width: 90vw;
+      height: 100vh;
+      background: var(--bg-surface);
+      border-left: 1px solid var(--border-default);
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.5);
+      display: flex;
+      flex-direction: column;
+      animation: slide-in 180ms cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes slide-in {
+      from { transform: translateX(100%); }
+      to { transform: translateX(0); }
+    }
+
+    .drawer-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border-default);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .drawer-header h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .drawer-close {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 18px;
+      line-height: 1;
+      padding: 4px;
+    }
+
+    .drawer-close:hover {
+      color: var(--text-primary);
+    }
+
+    .drawer-body {
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .raw-code-block {
+      background: var(--bg-surface-lowest);
+      border: 1px solid var(--border-default);
+      border-radius: 6px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #cbd5e1;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* ─── Footer ───────────────────────────────────────────────────────── */
+    .dashboard-footer {
+      border-top: 1px solid var(--border-subtle);
+      padding: 16px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-dim);
+      font-size: 11.5px;
+      margin-top: auto;
+    }
+
+    .footer-left {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .footer-right {
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Global Nav -->
+    <header class="nav-bar">
+      <div class="nav-left">
+        <a href="#" class="brand-group">
+          <div class="brand-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+          </div>
+          <span class="brand-name">SecureInbox</span>
+        </a>
+        <div class="nav-divider"></div>
+        <div class="nav-breadcrumbs">
+          <span>Enterprise Telemetry</span>
+          <span>/</span>
+          <span style="color: var(--text-primary);">Security Posture Hub</span>
+          <span class="nav-badge">Concept B</span>
+        </div>
+      </div>
+
+      <div class="nav-right">
+        <div class="telemetry-status-pill">
+          <div class="status-dot"></div>
+          <span>Edge Filter Ingest Active</span>
+          <span style="color: var(--text-dim); font-family: var(--font-mono);">• 8ms</span>
+        </div>
+        <div class="quick-actions">
+          <button class="btn-secondary" id="refresh-telemetry-btn">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="23 4 23 10 17 10"></polyline>
+              <polyline points="1 20 1 14 7 14"></polyline>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+            </svg>
+            <span>Sync</span>
+          </button>
+          <button class="btn-secondary" onclick="alert('Exporting forensic telemetry bundle (JSON/STIX)...')">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            <span>Export STIX</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Dashboard Container -->
+    <main class="dashboard-container">
+      
+      <!-- Top Title & Time Controls -->
+      <section class="header-control-bar">
+        <div class="header-title-block">
+          <h1>Security Posture & Telemetry Hub</h1>
+          <p>Real-time edge inspection, domain spoofing heuristics, and mitigation stream</p>
+        </div>
+
+        <div class="controls-group">
+          <!-- Time Range Switcher -->
+          <div class="time-switcher" role="tablist" aria-label="Time range selector">
+            <button class="time-btn active" data-range="24h" role="tab">24h</button>
+            <button class="time-btn" data-range="7d" role="tab">7d</button>
+            <button class="time-btn" data-range="30d" role="tab">30d</button>
+            <button class="time-btn" data-range="90d" role="tab">90d</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 1: Posture Hero Card -->
+      <section class="posture-hero-card" aria-label="Executive Security Posture">
+        <div class="hero-top-row">
+          <!-- Safe Rate Trajectory -->
+          <div class="safe-rate-display">
+            <div>
+              <span class="safe-rate-num" id="hero-safe-rate">98.2</span>
+              <span class="safe-rate-unit">%</span>
+            </div>
+            <div class="safe-rate-label-block">
+              <span class="safe-rate-title">Safe Rate Trajectory</span>
+              <span class="safe-rate-delta" id="hero-safe-delta">
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="18 15 12 9 6 15"></polyline>
+                </svg>
+                +0.4% vs prev window
+              </span>
+            </div>
+          </div>
+
+          <!-- Natural Language Security Assessment -->
+          <div class="assessment-block">
+            <div class="assessment-lead">
+              <span class="posture-tag-stable" id="hero-status-tag">STABLE POSTURE</span>
+              <span id="hero-assessment-headline">Mail routing integrity within nominal tolerances.</span>
+            </div>
+            <p class="assessment-context" id="hero-assessment-detail">
+              Inbox posture is stable. 3 phishing attempts blocked in the last 24 hours. Zero zero-day attachment detonations leaked to inbox endpoints.
+            </p>
+          </div>
+
+          <!-- Cluster Details -->
+          <div class="cluster-telemetry-meta">
+            <span>Cluster: us-east-edge-04</span>
+            <span>SPF / DKIM Strict Enforcement</span>
+            <span>Policy: p=reject</span>
+          </div>
+        </div>
+
+        <!-- Discrete Stats Strip -->
+        <div class="discrete-stats-strip">
+          <div class="discrete-stat-item">
+            <span class="stat-caption">Inbound Scanned</span>
+            <div class="stat-val-group">
+              <span class="stat-num" id="stat-scanned">1,420</span>
+              <span class="stat-subtext" id="stat-scanned-sub">100% inspected</span>
+            </div>
+          </div>
+
+          <div class="discrete-stat-item">
+            <span class="stat-caption">Quarantined</span>
+            <div class="stat-val-group">
+              <span class="stat-num" id="stat-quarantined">14</span>
+              <span class="stat-subtext highlight-amber" id="stat-quarantined-sub">0.98% volume</span>
+            </div>
+          </div>
+
+          <div class="discrete-stat-item">
+            <span class="stat-caption">Auth Failures</span>
+            <div class="stat-val-group">
+              <span class="stat-num" id="stat-auth-fails">28</span>
+              <span class="stat-subtext highlight-crimson" id="stat-auth-fails-sub">SPF/DMARC hardfail</span>
+            </div>
+          </div>
+
+          <div class="discrete-stat-item">
+            <span class="stat-caption">Mean Filter Latency</span>
+            <div class="stat-val-group">
+              <span class="stat-num" id="stat-latency">34<span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">ms</span></span>
+              <span class="stat-subtext" id="stat-latency-sub">p99: 68ms</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 2: Security Protocol Health Strip -->
+      <section class="health-strip" aria-label="Protocol Authentication Health">
+        <div class="health-badge-item">
+          <div class="health-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="health-info">
+            <span class="health-name">SPF Alignment</span>
+            <span class="health-val" id="health-spf">99.1% Pass</span>
+          </div>
+        </div>
+
+        <div class="health-badge-item">
+          <div class="health-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="health-info">
+            <span class="health-name">DKIM Signature</span>
+            <span class="health-val" id="health-dkim">98.7% Valid</span>
+          </div>
+        </div>
+
+        <div class="health-badge-item">
+          <div class="health-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="health-info">
+            <span class="health-name">DMARC Enforcement</span>
+            <span class="health-val">p=reject (100%)</span>
+          </div>
+        </div>
+
+        <div class="health-badge-item">
+          <div class="health-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="health-info">
+            <span class="health-name">MTA-STS Transport</span>
+            <span class="health-val">TLS 1.3 Enforced</span>
+          </div>
+        </div>
+
+        <div class="health-badge-item">
+          <div class="health-icon">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+          </div>
+          <div class="health-info">
+            <span class="health-name">DNSSEC Validation</span>
+            <span class="health-val">Active • RRSIG OK</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 3: Visual Grid (Threat Vector Distribution + Interactive Risk Trendline) -->
+      <section class="visual-grid">
+        <!-- Threat Vector Distribution Grid -->
+        <div class="card" aria-label="Threat Vector Breakdown">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2 class="card-title">Threat Vector Distribution</h2>
+              <span class="card-subtitle">Heuristic categorizations across ingress</span>
+            </div>
+            <span class="nav-badge" id="vector-total-count">42 Events</span>
+          </div>
+
+          <div class="vector-list" id="vector-list">
+            <!-- Domain Spoofing -->
+            <div class="vector-item" data-vector="spoofing" title="Click to filter tables by Domain Spoofing">
+              <div class="vector-label-row">
+                <div class="vector-name-group">
+                  <span class="vector-pip pip-spoofing"></span>
+                  <span class="vector-name">Domain Spoofing</span>
+                </div>
+                <div class="vector-count-group">
+                  <span class="vector-pct" id="pct-spoofing">42%</span>
+                  <span class="vector-qty" id="qty-spoofing">(18)</span>
+                </div>
+              </div>
+              <div class="vector-bar-track">
+                <div class="vector-bar-fill fill-spoofing" id="bar-spoofing" style="width: 42%;"></div>
+              </div>
+              <div class="vector-subtext">
+                <span>Homoglyphs, punycode, display-name spoofing</span>
+                <span style="color: var(--indigo-400);">Primary</span>
+              </div>
+            </div>
+
+            <!-- Credential Harvesting -->
+            <div class="vector-item" data-vector="credential" title="Click to filter tables by Credential Harvesting">
+              <div class="vector-label-row">
+                <div class="vector-name-group">
+                  <span class="vector-pip pip-credential"></span>
+                  <span class="vector-name">Credential Harvesting</span>
+                </div>
+                <div class="vector-count-group">
+                  <span class="vector-pct" id="pct-credential">31%</span>
+                  <span class="vector-qty" id="qty-credential">(13)</span>
+                </div>
+              </div>
+              <div class="vector-bar-track">
+                <div class="vector-bar-fill fill-credential" id="bar-credential" style="width: 31%;"></div>
+              </div>
+              <div class="vector-subtext">
+                <span>Fake login portals, Cloudflare tunnel pivots</span>
+                <span style="color: var(--amber-400);">High</span>
+              </div>
+            </div>
+
+            <!-- Malicious Payloads -->
+            <div class="vector-item" data-vector="payloads" title="Click to filter tables by Malicious Payloads">
+              <div class="vector-label-row">
+                <div class="vector-name-group">
+                  <span class="vector-pip pip-payloads"></span>
+                  <span class="vector-name">Malicious Payloads</span>
+                </div>
+                <div class="vector-count-group">
+                  <span class="vector-pct" id="pct-payloads">18%</span>
+                  <span class="vector-qty" id="qty-payloads">(8)</span>
+                </div>
+              </div>
+              <div class="vector-bar-track">
+                <div class="vector-bar-fill fill-payloads" id="bar-payloads" style="width: 18%;"></div>
+              </div>
+              <div class="vector-subtext">
+                <span>Weaponized PDFs, obfuscated macros, ISO drops</span>
+                <span style="color: var(--crimson-400);">Critical</span>
+              </div>
+            </div>
+
+            <!-- Impersonation (BEC) -->
+            <div class="vector-item" data-vector="impersonation" title="Click to filter tables by Impersonation">
+              <div class="vector-label-row">
+                <div class="vector-name-group">
+                  <span class="vector-pip pip-impersonation"></span>
+                  <span class="vector-name">Executive Impersonation</span>
+                </div>
+                <div class="vector-count-group">
+                  <span class="vector-pct" id="pct-impersonation">9%</span>
+                  <span class="vector-qty" id="qty-impersonation">(3)</span>
+                </div>
+              </div>
+              <div class="vector-bar-track">
+                <div class="vector-bar-fill fill-impersonation" id="bar-impersonation" style="width: 9%;"></div>
+              </div>
+              <div class="vector-subtext">
+                <span>VIP display fraud, supplier payment reroutes</span>
+                <span style="color: #06b6d4;">Elevated</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 14-Day Risk Over Time Trendline -->
+        <div class="card trend-card" aria-label="14-Day Inbound Risk Telemetry">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2 class="card-title">14-Day Risk Over Time</h2>
+              <span class="card-subtitle">Volume categorization trend (Safe vs Suspicious vs Blocked)</span>
+            </div>
+            <div class="trend-legend">
+              <div class="legend-item">
+                <div class="legend-line legend-safe"></div>
+                <span>Safe</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-line legend-suspicious"></div>
+                <span>Suspicious</span>
+              </div>
+              <div class="legend-item">
+                <div class="legend-line legend-blocked"></div>
+                <span>Blocked</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Interactive SVG Chart Area -->
+          <div class="chart-container" id="chart-wrapper">
+            <svg class="svg-chart" id="trend-svg" viewBox="0 0 740 210" preserveAspectRatio="none">
+              <defs>
+                <linearGradient id="grad-safe" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#10b981" stop-opacity="0.22" />
+                  <stop offset="100%" stop-color="#10b981" stop-opacity="0.0" />
+                </linearGradient>
+                <linearGradient id="grad-suspicious" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.25" />
+                  <stop offset="100%" stop-color="#f59e0b" stop-opacity="0.0" />
+                </linearGradient>
+                <linearGradient id="grad-blocked" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#f43f5e" stop-opacity="0.3" />
+                  <stop offset="100%" stop-color="#f43f5e" stop-opacity="0.0" />
+                </linearGradient>
+              </defs>
+
+              <!-- Gridlines -->
+              <g stroke="#161f31" stroke-width="1" stroke-dasharray="3,3">
+                <line x1="30" y1="35" x2="730" y2="35" />
+                <line x1="30" y1="85" x2="730" y2="85" />
+                <line x1="30" y1="135" x2="730" y2="135" />
+                <line x1="30" y1="180" x2="730" y2="180" />
+              </g>
+
+              <!-- Y Axis Labels -->
+              <g font-family="ui-monospace, monospace" font-size="9" fill="#475569" text-anchor="end">
+                <text x="24" y="38">1.5k</text>
+                <text x="24" y="88">1.0k</text>
+                <text x="24" y="138">500</text>
+                <text x="24" y="183">0</text>
+              </g>
+
+              <!-- Safe Area and Line -->
+              <path id="path-safe-area" fill="url(#grad-safe)" d="" />
+              <path id="path-safe-line" fill="none" stroke="#10b981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="" />
+
+              <!-- Suspicious Area and Line -->
+              <path id="path-susp-area" fill="url(#grad-suspicious)" d="" />
+              <path id="path-susp-line" fill="none" stroke="#f59e0b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="" />
+
+              <!-- Blocked Area and Line -->
+              <path id="path-blocked-area" fill="url(#grad-blocked)" d="" />
+              <path id="path-blocked-line" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="" />
+
+              <!-- Interactive Hover Vertical Scrubber line -->
+              <line id="scrubber-line" x1="0" y1="15" x2="0" y2="185" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2,2" opacity="0" />
+              <circle id="scrubber-dot-safe" r="4" fill="#10b981" stroke="#0e1524" stroke-width="2" opacity="0" />
+              <circle id="scrubber-dot-susp" r="4" fill="#f59e0b" stroke="#0e1524" stroke-width="2" opacity="0" />
+              <circle id="scrubber-dot-blocked" r="4" fill="#f43f5e" stroke="#0e1524" stroke-width="2" opacity="0" />
+
+              <!-- Invisible overlay for pointer events -->
+              <rect id="chart-overlay" x="30" y="10" width="700" height="180" fill="transparent" style="cursor: crosshair;" />
+            </svg>
+
+            <!-- Floating Scrubber Tooltip -->
+            <div class="chart-tooltip" id="chart-tooltip">
+              <div class="tooltip-date" id="tt-date">Aug 28</div>
+              <div class="tooltip-row" style="color: var(--emerald-400);">
+                <span>Safe:</span>
+                <span class="tooltip-row-val" id="tt-safe">1,412</span>
+              </div>
+              <div class="tooltip-row" style="color: var(--amber-400);">
+                <span>Suspicious:</span>
+                <span class="tooltip-row-val" id="tt-susp">18</span>
+              </div>
+              <div class="tooltip-row" style="color: var(--crimson-400);">
+                <span>Blocked:</span>
+                <span class="tooltip-row-val" id="tt-blocked">4</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4: Key Telemetry Tables -->
+      <section class="telemetry-tables-section">
+        
+        <!-- Table 1: Top Attacking & Lookalike Domains -->
+        <div class="card" aria-label="Attacking & Lookalike Domains">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2 class="card-title">Top Attacking & Lookalike Domains</h2>
+              <span class="card-subtitle">Reputation degradation index & targeted brand lookalikes</span>
+            </div>
+            <div class="table-filter-group">
+              <div class="search-input-wrap">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"></circle>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input type="text" class="search-input" id="domain-search" placeholder="Search domain or brand..." />
+              </div>
+              <button class="action-btn-sm" onclick="alert('Added domain exclusion policy!')">
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <line x1="12" y1="5" x2="12" y2="19"></line>
+                  <line x1="5" y1="12" x2="19" y2="12"></line>
+                </svg>
+                <span>Add Edge Block</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table" id="domains-table">
+              <thead>
+                <tr>
+                  <th>Attacking Domain</th>
+                  <th>Impersonated Brand</th>
+                  <th>Auth Vector</th>
+                  <th>Attempts</th>
+                  <th>Reputation Score</th>
+                  <th style="text-align: right;">Mitigation Action</th>
+                </tr>
+              </thead>
+              <tbody id="domains-tbody">
+                <!-- Dynamically populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Table 2: Recent Security Events Audit Feed -->
+        <div class="card" aria-label="Security Events Audit Feed">
+          <div class="card-header">
+            <div class="card-title-group">
+              <h2 class="card-title">Recent Security Events Audit Feed</h2>
+              <span class="card-subtitle">Chronological raw telemetry stream from ingress MTA nodes</span>
+            </div>
+            <div class="audit-filter-pills">
+              <button class="pill-filter active" data-event-filter="all">All Events</button>
+              <button class="pill-filter" data-event-filter="spoof">Spoofing</button>
+              <button class="pill-filter" data-event-filter="phish">Phishing</button>
+              <button class="pill-filter" data-event-filter="malware">Malware</button>
+              <button class="pill-filter" data-event-filter="auth">Auth Fails</button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="data-table" id="events-table">
+              <thead>
+                <tr>
+                  <th>Timestamp (UTC)</th>
+                  <th>Actor / Origin Envelope</th>
+                  <th>Target Recipient</th>
+                  <th>Detection Trigger</th>
+                  <th>Mitigation Result</th>
+                  <th style="text-align: right;">Forensics</th>
+                </tr>
+              </thead>
+              <tbody id="events-tbody">
+                <!-- Dynamically populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+      </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="dashboard-footer">
+      <div class="footer-left">
+        <span>SecureInbox Enterprise Telemetry Engine v4.9.2</span>
+        <span>•</span>
+        <span>RFC 5321/5322 Compliant Edge Parser</span>
+        <span>•</span>
+        <span>FIPS 140-3 Validated</span>
+      </div>
+      <div class="footer-right">
+        Node: <span style="color: var(--text-secondary);">edge-gw-04b.iad</span> | Latency: <span style="color: var(--emerald-400);">7.4ms</span>
+      </div>
+    </footer>
+  </div>
+
+  <!-- Forensics Envelope Detail Drawer Modal -->
+  <div class="drawer-overlay" id="forensics-drawer">
+    <div class="drawer-panel">
+      <div class="drawer-header">
+        <div>
+          <h3 id="drawer-title">Envelope Forensic Inspection</h3>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);" id="drawer-id">MSG-ID: &lt;20260906-edge-84920@us-east&gt;</span>
+        </div>
+        <button class="drawer-close" id="drawer-close-btn">&times;</button>
+      </div>
+      <div class="drawer-body">
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <span class="nav-badge" id="drawer-badge-action">QUARANTINED</span>
+          <span class="nav-badge" id="drawer-badge-risk">RISK 94/100</span>
+          <span class="nav-badge" id="drawer-badge-auth">SPF: FAIL</span>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">Heuristic Signature Triggers</div>
+          <div style="display: flex; flex-direction: column; gap: 4px;" id="drawer-triggers-list">
+            <!-- Injected dynamically -->
+          </div>
+        </div>
+
+        <div>
+          <div style="font-size: 11px; font-weight: 600; text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;">RFC 5322 Transport Headers</div>
+          <pre class="raw-code-block" id="drawer-raw-headers">Received: from mail-rel-114.cloudhost.su (unknown [194.26.29.114])
+  by edge-gw-04b.secureinbox.corp (Postfix) with ESMTPS id 4W0rQ62Z...
+Authentication-Results: secureinbox.corp;
+  spf=fail (sender IP 194.26.29.114) smtp.mailfrom=billing@paypa1-notice.com;
+  dkim=permerror (bad signature 1024-bit);
+  dmarc=fail (p=reject action=quarantine) header.from=paypa1-notice.com
+From: "PayPal Billing Verification" &lt;billing@paypa1-notice.com&gt;
+Subject: URGENT: Complete account authorization renewal</pre>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 10px;">
+          <button class="btn-secondary" onclick="alert('Raw MIME bundle copied to clipboard!')">Copy MIME Dump</button>
+          <button class="btn-secondary action-btn-danger" onclick="alert('Attacking IP subnet 194.26.29.0/24 submitted to Edge BGP Blackhole!')">Block Subnet (/24)</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Telemetry Engine & Interactive Script ───────────────────────── -->
+  <script>
+    // ─── Data Models for Multi-Range Telemetry ─────────────────────────
+    const telemetryData = {
+      "24h": {
+        safeRate: "98.2",
+        safeDelta: "+0.4% vs prev window",
+        statusTag: "STABLE POSTURE",
+        assessmentHeadline: "Mail routing integrity within nominal tolerances.",
+        assessmentDetail: "Inbox posture is stable. 3 phishing attempts blocked in the last 24 hours. Zero zero-day attachment detonations leaked to inbox endpoints.",
+        stats: {
+          scanned: "1,420",
+          scannedSub: "100% inspected",
+          quarantined: "14",
+          quarantinedSub: "0.98% volume",
+          authFails: "28",
+          authFailsSub: "SPF/DMARC hardfail",
+          latency: "34",
+          latencySub: "p99: 68ms"
+        },
+        health: {
+          spf: "99.1% Pass",
+          dkim: "98.7% Valid"
+        },
+        vectors: {
+          total: "42 Events",
+          spoofing: { pct: 42, qty: "(18)" },
+          credential: { pct: 31, qty: "(13)" },
+          payloads: { pct: 18, qty: "(8)" },
+          impersonation: { pct: 9, qty: "(3)" }
+        },
+        chart: [
+          { date: "00:00", safe: 1380, susp: 12, blocked: 2 },
+          { date: "02:00", safe: 920, susp: 8, blocked: 1 },
+          { date: "04:00", safe: 740, susp: 6, blocked: 0 },
+          { date: "06:00", safe: 1100, susp: 14, blocked: 3 },
+          { date: "08:00", safe: 1890, susp: 22, blocked: 5 },
+          { date: "10:00", safe: 2150, susp: 29, blocked: 7 },
+          { date: "12:00", safe: 1980, susp: 24, blocked: 4 },
+          { date: "14:00", safe: 2040, susp: 26, blocked: 6 },
+          { date: "16:00", safe: 1840, susp: 19, blocked: 3 },
+          { date: "18:00", safe: 1610, susp: 15, blocked: 2 },
+          { date: "20:00", safe: 1320, susp: 11, blocked: 2 },
+          { date: "22:00", safe: 1150, susp: 9, blocked: 1 },
+          { date: "Now", safe: 1420, susp: 14, blocked: 3 }
+        ]
+      },
+      "7d": {
+        safeRate: "97.8",
+        safeDelta: "+0.2% vs prev 7d",
+        statusTag: "HARDENED",
+        assessmentHeadline: "Elevated credential harvesting campaigns mitigated.",
+        assessmentDetail: "Inbox posture remains hardened across all domains. 24 phishing and 11 spoofing attempts mitigated. Lookalike domains quarantined automatically.",
+        stats: {
+          scanned: "11,840",
+          scannedSub: "Daily avg: 1,691",
+          quarantined: "118",
+          quarantinedSub: "1.00% volume",
+          authFails: "244",
+          authFailsSub: "DNSBL + SPF Fail",
+          latency: "36",
+          latencySub: "p99: 71ms"
+        },
+        health: {
+          spf: "98.9% Pass",
+          dkim: "98.4% Valid"
+        },
+        vectors: {
+          total: "348 Events",
+          spoofing: { pct: 39, qty: "(136)" },
+          credential: { pct: 35, qty: "(122)" },
+          payloads: { pct: 16, qty: "(56)" },
+          impersonation: { pct: 10, qty: "(34)" }
+        },
+        chart: [
+          { date: "Aug 31", safe: 1540, susp: 22, blocked: 5 },
+          { date: "Sep 01", safe: 1620, susp: 28, blocked: 7 },
+          { date: "Sep 02", safe: 1710, susp: 31, blocked: 8 },
+          { date: "Sep 03", safe: 1680, susp: 24, blocked: 6 },
+          { date: "Sep 04", safe: 1820, susp: 33, blocked: 9 },
+          { date: "Sep 05", safe: 1740, susp: 25, blocked: 5 },
+          { date: "Sep 06", safe: 1730, susp: 21, blocked: 4 }
+        ]
+      },
+      "30d": {
+        safeRate: "98.0",
+        safeDelta: "+0.8% vs prior 30d",
+        statusTag: "STABLE",
+        assessmentHeadline: "Consistent edge filtration efficiency sustained.",
+        assessmentDetail: "Total scanned messages exceeded 48k. Threat vector dispersal indicates steady drop in malicious macro payloads following strict sandbox attachment policy.",
+        stats: {
+          scanned: "48,920",
+          scannedSub: "Monthly aggregate",
+          quarantined: "492",
+          quarantinedSub: "1.01% volume",
+          authFails: "980",
+          authFailsSub: "Global enforcement",
+          latency: "35",
+          latencySub: "p99: 69ms"
+        },
+        health: {
+          spf: "99.0% Pass",
+          dkim: "98.8% Valid"
+        },
+        vectors: {
+          total: "1,420 Events",
+          spoofing: { pct: 38, qty: "(540)" },
+          credential: { pct: 34, qty: "(483)" },
+          payloads: { pct: 17, qty: "(241)" },
+          impersonation: { pct: 11, qty: "(156)" }
+        },
+        chart: [
+          { date: "W1", safe: 11200, susp: 140, blocked: 38 },
+          { date: "W2", safe: 12400, susp: 162, blocked: 44 },
+          { date: "W3", safe: 12100, susp: 135, blocked: 32 },
+          { date: "W4", safe: 13220, susp: 155, blocked: 41 }
+        ]
+      },
+      "90d": {
+        safeRate: "97.6",
+        safeDelta: "+1.2% year-over-year",
+        statusTag: "OPTIMIZED",
+        assessmentHeadline: "Quarterly baseline shows zero payload breaches.",
+        assessmentDetail: "90-day telemetry audit demonstrates 99.98% clean delivery rate for authenticated internal peers with continuous zero-hour lookalike blocking.",
+        stats: {
+          scanned: "144,300",
+          scannedSub: "Quarterly volume",
+          quarantined: "1,520",
+          quarantinedSub: "1.05% volume",
+          authFails: "3,110",
+          authFailsSub: "Edge drops",
+          latency: "33",
+          latencySub: "p99: 66ms"
+        },
+        health: {
+          spf: "99.2% Pass",
+          dkim: "99.0% Valid"
+        },
+        vectors: {
+          total: "4,630 Events",
+          spoofing: { pct: 41, qty: "(1,898)" },
+          credential: { pct: 32, qty: "(1,482)" },
+          payloads: { pct: 19, qty: "(880)" },
+          impersonation: { pct: 8, qty: "(370)" }
+        },
+        chart: [
+          { date: "Month 1", safe: 46100, susp: 510, blocked: 122 },
+          { date: "Month 2", safe: 48900, susp: 540, blocked: 138 },
+          { date: "Month 3", safe: 49300, susp: 470, blocked: 110 }
+        ]
+      }
+    };
+
+    // ─── Attacking & Lookalike Domains Dataset ──────────────────────────
+    const domainsData = [
+      {
+        domain: "paypa1-notice.com",
+        homoglyphTarget: "paypa[1]-notice.com",
+        brand: "PayPal Inc.",
+        authStatus: "SPF Hardfail",
+        authBadge: "fail",
+        threatCount: 84,
+        repScore: 12,
+        actionText: "Blocklisted",
+        actionClass: "action-btn-danger"
+      },
+      {
+        domain: "micros0ft-login.auth-sso.net",
+        homoglyphTarget: "micros[0]ft-login.auth-sso.net",
+        brand: "Microsoft 365",
+        authStatus: "DMARC Reject",
+        authBadge: "fail",
+        threatCount: 62,
+        repScore: 18,
+        actionText: "Quarantined",
+        actionClass: ""
+      },
+      {
+        domain: "dhl-express-dispatch.info",
+        homoglyphTarget: "dhl-express-dispatch.info",
+        brand: "DHL Global",
+        authStatus: "DKIM Missing",
+        authBadge: "warn",
+        threatCount: 39,
+        repScore: 26,
+        actionText: "Sandboxed",
+        actionClass: ""
+      },
+      {
+        domain: "goog1e-cloud-verify.org",
+        homoglyphTarget: "goog[1]e-cloud-verify.org",
+        brand: "Google Cloud",
+        authStatus: "SPF Softfail",
+        authBadge: "warn",
+        threatCount: 27,
+        repScore: 31,
+        actionText: "Quarantined",
+        actionClass: ""
+      },
+      {
+        domain: "invoicing-ops-internal.co.uk",
+        homoglyphTarget: "invoicing-ops-internal.co.uk",
+        brand: "Internal Payroll",
+        authStatus: "Reverse DNS Mismatch",
+        authBadge: "fail",
+        threatCount: 16,
+        repScore: 38,
+        actionText: "Under Review",
+        actionClass: ""
+      }
+    ];
+
+    // ─── Recent Security Events Audit Feed Dataset ─────────────────────
+    const auditEventsData = [
+      {
+        id: "EV-89201",
+        timestamp: "14:42:19 UTC",
+        relative: "3m ago",
+        category: "phish",
+        actor: "billing@paypa1-notice.com",
+        actorIp: "194.26.29.114 (AS20473 - RU)",
+        target: "finance-ops@secureinbox.corp",
+        triggerCode: "SPF_FAIL + HOMOGLYPH_LOOKALIKE",
+        mitigationBadge: "BLOCKED_EDGE",
+        mitigationClass: "mitigation-blocked",
+        rawHeaderSnippet: `Received: from mail-rel-114.cloudhost.su (unknown [194.26.29.114])\n  by edge-gw-04b.secureinbox.corp (Postfix) with ESMTPS id 4W0rQ62Z...\nAuthentication-Results: secureinbox.corp;\n  spf=fail (sender IP 194.26.29.114) smtp.mailfrom=billing@paypa1-notice.com;\n  dkim=permerror (bad signature 1024-bit);\n  dmarc=fail (p=reject action=quarantine) header.from=paypa1-notice.com\nFrom: "PayPal Billing Verification" <billing@paypa1-notice.com>\nSubject: URGENT: Complete account authorization renewal`
+      },
+      {
+        id: "EV-89198",
+        timestamp: "14:38:02 UTC",
+        relative: "7m ago",
+        category: "spoof",
+        actor: "security-alert@micros0ft-login.auth-sso.net",
+        actorIp: "45.154.255.82 (AS44050 - NL)",
+        target: "c-suite-execs@secureinbox.corp",
+        triggerCode: "DMARC_REJECT + PHISH_KIT_SIGNATURE",
+        mitigationBadge: "QUARANTINED",
+        mitigationClass: "mitigation-quarantined",
+        rawHeaderSnippet: `Received: from relay-sso82.datapacket.com ([45.154.255.82])\n  by edge-gw-04b.secureinbox.corp with ESMTP\nAuthentication-Results: secureinbox.corp;\n  spf=softfail; dkim=neutral; dmarc=fail (p=reject)\nFrom: "Microsoft Security Center" <security-alert@micros0ft-login.auth-sso.net>\nSubject: Action Required: Mandatory MFA token re-issuance`
+      },
+      {
+        id: "EV-89190",
+        timestamp: "14:24:55 UTC",
+        relative: "20m ago",
+        category: "malware",
+        actor: "shipment-tracking@dhl-express-dispatch.info",
+        actorIp: "185.220.101.4 (AS60729 - DE)",
+        target: "warehouse-dispatch@secureinbox.corp",
+        triggerCode: "ZERO_HOUR_ATTACHMENT_MACRO (.docm)",
+        mitigationBadge: "PAYLOAD_STRIPPED",
+        mitigationClass: "mitigation-sanitized",
+        rawHeaderSnippet: `Received: from mail.tor-exit-node.net ([185.220.101.4])\n  by edge-gw-04b.secureinbox.corp with ESMTPS\nX-Virus-Scanned: SecureInbox ClamAV + Sandbox Heuristics\nX-Attachment-Stripped: DHL_AWB_Receipt_9920.docm (Contains CVE-2023-38831 exploit)\nSubject: DHL Express Delivery Notice: Pending Customs Clearance`
+      },
+      {
+        id: "EV-89182",
+        timestamp: "14:11:40 UTC",
+        relative: "33m ago",
+        category: "auth",
+        actor: "auth-daemon@goog1e-cloud-verify.org",
+        actorIp: "91.240.118.230 (AS48090 - UA)",
+        target: "devops-admins@secureinbox.corp",
+        triggerCode: "REVERSE_DNS_FAILED + BAYESIAN_ANOMALY",
+        mitigationBadge: "BLOCKED_EDGE",
+        mitigationClass: "mitigation-blocked",
+        rawHeaderSnippet: `Received: from vps-91-240-118.static.cloud ([91.240.118.230])\n  by edge-gw-04b.secureinbox.corp with ESMTPS\nAuthentication-Results: secureinbox.corp; rbl=dnsbl.dronebl.org listed\nSubject: Critical Service Termination Notice - Google Cloud Console`
+      },
+      {
+        id: "EV-89175",
+        timestamp: "13:58:12 UTC",
+        relative: "47m ago",
+        category: "spoof",
+        actor: "treasury-wire@invoicing-ops-internal.co.uk",
+        actorIp: "103.152.18.19 (AS136052 - SG)",
+        target: "ap-accounting@secureinbox.corp",
+        triggerCode: "VIP_IMPERSONATION_DISPLAY + SPF_NONE",
+        mitigationBadge: "QUARANTINED",
+        mitigationClass: "mitigation-quarantined",
+        rawHeaderSnippet: `Received: from host-103-152-18-19.asianet.sg ([103.152.18.19])\n  by edge-gw-04b.secureinbox.corp with ESMTPS\nFrom: "David Chen (Chief Financial Officer)" <treasury-wire@invoicing-ops-internal.co.uk>\nSubject: Re: Quick wire payment clearance for vendor invoice #77418`
+      }
+    ];
+
+    // ─── Renderer Functions ─────────────────────────────────────────────
+    let currentRange = "24h";
+
+    function updateRange(range) {
+      currentRange = range;
+      const data = telemetryData[range];
+      if (!data) return;
+
+      // Update Header Posture Card
+      document.getElementById("hero-safe-rate").textContent = data.safeRate;
+      document.getElementById("hero-safe-delta").innerHTML = `
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="18 15 12 9 6 15"></polyline>
+        </svg>
+        ${data.safeDelta}
+      `;
+      document.getElementById("hero-status-tag").textContent = data.statusTag;
+      document.getElementById("hero-assessment-headline").textContent = data.assessmentHeadline;
+      document.getElementById("hero-assessment-detail").textContent = data.assessmentDetail;
+
+      // Update Discrete Stats
+      document.getElementById("stat-scanned").textContent = data.stats.scanned;
+      document.getElementById("stat-scanned-sub").textContent = data.stats.scannedSub;
+      document.getElementById("stat-quarantined").textContent = data.stats.quarantined;
+      document.getElementById("stat-quarantined-sub").textContent = data.stats.quarantinedSub;
+      document.getElementById("stat-auth-fails").textContent = data.stats.authFails;
+      document.getElementById("stat-auth-fails-sub").textContent = data.stats.authFailsSub;
+      document.getElementById("stat-latency").innerHTML = `${data.stats.latency}<span style="font-size: 13px; color: var(--text-muted); font-weight: normal;">ms</span>`;
+      document.getElementById("stat-latency-sub").textContent = data.stats.latencySub;
+
+      // Health
+      document.getElementById("health-spf").textContent = data.health.spf;
+      document.getElementById("health-dkim").textContent = data.health.dkim;
+
+      // Vectors
+      document.getElementById("vector-total-count").textContent = data.vectors.total;
+      
+      document.getElementById("pct-spoofing").textContent = data.vectors.spoofing.pct + "%";
+      document.getElementById("qty-spoofing").textContent = data.vectors.spoofing.qty;
+      document.getElementById("bar-spoofing").style.width = data.vectors.spoofing.pct + "%";
+
+      document.getElementById("pct-credential").textContent = data.vectors.credential.pct + "%";
+      document.getElementById("qty-credential").textContent = data.vectors.credential.qty;
+      document.getElementById("bar-credential").style.width = data.vectors.credential.pct + "%";
+
+      document.getElementById("pct-payloads").textContent = data.vectors.payloads.pct + "%";
+      document.getElementById("qty-payloads").textContent = data.vectors.payloads.qty;
+      document.getElementById("bar-payloads").style.width = data.vectors.payloads.pct + "%";
+
+      document.getElementById("pct-impersonation").textContent = data.vectors.impersonation.pct + "%";
+      document.getElementById("qty-impersonation").textContent = data.vectors.impersonation.qty;
+      document.getElementById("bar-impersonation").style.width = data.vectors.impersonation.pct + "%";
+
+      // Render Trendline Chart
+      renderChart(data.chart);
+    }
+
+    // ─── SVG Trendline Chart Renderer ──────────────────────────────────
+    function renderChart(points) {
+      if (!points || points.length === 0) return;
+
+      const chartW = 700;
+      const chartH = 150;
+      const xStart = 30;
+      const yBase = 180;
+      const yCeil = 30;
+
+      // Find scales
+      const maxSafe = Math.max(...points.map(p => p.safe), 2200);
+      const maxBad = 35; // Suspicious and blocked share secondary scale
+
+      function mapX(index) {
+        return xStart + (index / (points.length - 1)) * chartW;
+      }
+
+      function mapYSafe(val) {
+        return yBase - (val / maxSafe) * (yBase - yCeil);
+      }
+
+      function mapYBad(val) {
+        // scale for suspicious and blocked so they are visible clearly
+        const scaled = Math.min(val, maxBad);
+        return yBase - (scaled / maxBad) * (yBase - (yCeil + 30));
+      }
+
+      // Build smooth path commands or linear
+      function buildPath(pts, yMapper) {
+        let d = `M ${mapX(0)} ${yMapper(pts[0])}`;
+        for (let i = 1; i < pts.length; i++) {
+          const x0 = mapX(i - 1);
+          const y0 = yMapper(pts[i - 1]);
+          const x1 = mapX(i);
+          const y1 = yMapper(pts[i]);
+          const mx = (x0 + x1) / 2;
+          d += ` C ${mx} ${y0}, ${mx} ${y1}, ${x1} ${y1}`;
+        }
+        return d;
+      }
+
+      // Safe
+      const safeLineD = buildPath(points.map(p => p.safe), mapYSafe);
+      const safeAreaD = safeLineD + ` L ${mapX(points.length - 1)} ${yBase} L ${mapX(0)} ${yBase} Z`;
+      document.getElementById("path-safe-line").setAttribute("d", safeLineD);
+      document.getElementById("path-safe-area").setAttribute("d", safeAreaD);
+
+      // Suspicious
+      const suspLineD = buildPath(points.map(p => p.susp), mapYBad);
+      const suspAreaD = suspLineD + ` L ${mapX(points.length - 1)} ${yBase} L ${mapX(0)} ${yBase} Z`;
+      document.getElementById("path-susp-line").setAttribute("d", suspLineD);
+      document.getElementById("path-susp-area").setAttribute("d", suspAreaD);
+
+      // Blocked
+      const blockedLineD = buildPath(points.map(p => p.blocked), mapYBad);
+      const blockedAreaD = blockedLineD + ` L ${mapX(points.length - 1)} ${yBase} L ${mapX(0)} ${yBase} Z`;
+      document.getElementById("path-blocked-line").setAttribute("d", blockedLineD);
+      document.getElementById("path-blocked-area").setAttribute("d", blockedAreaD);
+    }
+
+    // ─── Setup Interactive Chart Hover Tooltip ─────────────────────────
+    function setupChartInteractivity() {
+      const overlay = document.getElementById("chart-overlay");
+      const scrubber = document.getElementById("scrubber-line");
+      const dotSafe = document.getElementById("scrubber-dot-safe");
+      const dotSusp = document.getElementById("scrubber-dot-susp");
+      const dotBlocked = document.getElementById("scrubber-dot-blocked");
+      const tooltip = document.getElementById("chart-tooltip");
+      const container = document.getElementById("chart-wrapper");
+
+      overlay.addEventListener("mousemove", (e) => {
+        const rect = overlay.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const pts = telemetryData[currentRange].chart;
+        const totalW = rect.width;
+
+        const fraction = Math.max(0, Math.min(1, mouseX / totalW));
+        const index = Math.round(fraction * (pts.length - 1));
+        const activePoint = pts[index];
+
+        const svgX = 30 + (index / (pts.length - 1)) * 700;
+        
+        // Update vertical scrubber line & dots
+        scrubber.setAttribute("x1", svgX);
+        scrubber.setAttribute("x2", svgX);
+        scrubber.setAttribute("opacity", "0.8");
+
+        const maxSafe = Math.max(...pts.map(p => p.safe), 2200);
+        const maxBad = 35;
+        const ySafe = 180 - (activePoint.safe / maxSafe) * (180 - 30);
+        const ySusp = 180 - (Math.min(activePoint.susp, maxBad) / maxBad) * (180 - 60);
+        const yBlocked = 180 - (Math.min(activePoint.blocked, maxBad) / maxBad) * (180 - 60);
+
+        dotSafe.setAttribute("cx", svgX);
+        dotSafe.setAttribute("cy", ySafe);
+        dotSafe.setAttribute("opacity", "1");
+
+        dotSusp.setAttribute("cx", svgX);
+        dotSusp.setAttribute("cy", ySusp);
+        dotSusp.setAttribute("opacity", "1");
+
+        dotBlocked.setAttribute("cx", svgX);
+        dotBlocked.setAttribute("cy", yBlocked);
+        dotBlocked.setAttribute("opacity", "1");
+
+        // Tooltip values
+        document.getElementById("tt-date").textContent = activePoint.date;
+        document.getElementById("tt-safe").textContent = activePoint.safe.toLocaleString();
+        document.getElementById("tt-susp").textContent = activePoint.susp.toLocaleString();
+        document.getElementById("tt-blocked").textContent = activePoint.blocked.toLocaleString();
+
+        tooltip.style.display = "block";
+        const containerRect = container.getBoundingClientRect();
+        const tooltipW = 160;
+        let leftPx = e.clientX - containerRect.left + 15;
+        if (leftPx + tooltipW > containerRect.width) {
+          leftPx = e.clientX - containerRect.left - tooltipW - 15;
+        }
+        tooltip.style.left = `${leftPx}px`;
+        tooltip.style.top = `20px`;
+      });
+
+      overlay.addEventListener("mouseleave", () => {
+        scrubber.setAttribute("opacity", "0");
+        dotSafe.setAttribute("opacity", "0");
+        dotSusp.setAttribute("opacity", "0");
+        dotBlocked.setAttribute("opacity", "0");
+        tooltip.style.display = "none";
+      });
+    }
+
+    // ─── Populate Domains Table ─────────────────────────────────────────
+    function renderDomainsTable(domains) {
+      const tbody = document.getElementById("domains-tbody");
+      tbody.innerHTML = "";
+
+      domains.forEach((item) => {
+        const tr = document.createElement("tr");
+
+        // Format homoglyph highlight if applicable
+        let domainHtml = `<span class="domain-name">${item.domain}</span>`;
+        if (item.domain.includes("paypa1")) {
+          domainHtml = `<span class="domain-name">paypa<span class="domain-homoglyph-mark">1</span>-notice.com</span>`;
+        } else if (item.domain.includes("micros0ft")) {
+          domainHtml = `<span class="domain-name">micros<span class="domain-homoglyph-mark">0</span>ft-login.auth-sso.net</span>`;
+        } else if (item.domain.includes("goog1e")) {
+          domainHtml = `<span class="domain-name">goog<span class="domain-homoglyph-mark">1</span>e-cloud-verify.org</span>`;
+        }
+
+        const repColorClass = item.repScore < 20 ? "rep-low" : "rep-med";
+
+        tr.innerHTML = `
+          <td>
+            <div class="domain-cell">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color: var(--crimson-400); flex-shrink: 0;">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="12" y1="8" x2="12" y2="12"></line>
+                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+              </svg>
+              ${domainHtml}
+            </div>
+          </td>
+          <td>
+            <span class="tag-brand">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+              </svg>
+              ${item.brand}
+            </span>
+          </td>
+          <td>
+            <span class="badge-status ${item.authBadge}">${item.authStatus}</span>
+          </td>
+          <td style="font-family: var(--font-mono); font-weight: 600; color: var(--text-primary);">
+            ${item.threatCount}
+          </td>
+          <td>
+            <div class="rep-meter-wrapper">
+              <div class="rep-bar-bg">
+                <div class="rep-bar-fill ${repColorClass}" style="width: ${item.repScore}%;"></div>
+              </div>
+              <span class="rep-score-val ${repColorClass}">${item.repScore}/100</span>
+            </div>
+          </td>
+          <td style="text-align: right;">
+            <button class="action-btn-sm ${item.actionClass}" onclick="inspectDomain('${item.domain}')">
+              <span>${item.actionText}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="9 18 15 12 9 6"></polyline>
+              </svg>
+            </button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ─── Populate Audit Feed Table ──────────────────────────────────────
+    function renderAuditEvents(events) {
+      const tbody = document.getElementById("events-tbody");
+      tbody.innerHTML = "";
+
+      events.forEach((ev) => {
+        const tr = document.createElement("tr");
+
+        tr.innerHTML = `
+          <td>
+            <div class="timestamp-cell">
+              <div>${ev.timestamp}</div>
+              <span style="font-size: 10px; color: var(--text-dim);">${ev.relative}</span>
+            </div>
+          </td>
+          <td>
+            <div class="actor-cell">
+              <span>${ev.actor}</span>
+              <span class="actor-ip">${ev.actorIp}</span>
+            </div>
+          </td>
+          <td>
+            <span class="target-cell">${ev.target}</span>
+          </td>
+          <td>
+            <span class="trigger-badge">
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="color: var(--amber-400);">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+              </svg>
+              ${ev.triggerCode}
+            </span>
+          </td>
+          <td>
+            <span class="mitigation-badge ${ev.mitigationClass}">
+              ${ev.mitigationBadge}
+            </span>
+          </td>
+          <td style="text-align: right;">
+            <button class="action-btn-sm" onclick="openDrawerForEvent('${ev.id}')">
+              <span>Inspect</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+          </td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+    }
+
+    // ─── Drawer Forensics Modal Handlers ────────────────────────────────
+    function openDrawerForEvent(eventId) {
+      const ev = auditEventsData.find(e => e.id === eventId);
+      if (!ev) return;
+
+      document.getElementById("drawer-id").textContent = `EVENT-ID: ${ev.id} • ${ev.timestamp}`;
+      document.getElementById("drawer-badge-action").textContent = ev.mitigationBadge;
+      document.getElementById("drawer-raw-headers").textContent = ev.rawHeaderSnippet;
+
+      const triggerWrap = document.getElementById("drawer-triggers-list");
+      triggerWrap.innerHTML = `
+        <div class="nav-badge" style="width: fit-content; color: var(--crimson-400);">${ev.triggerCode}</div>
+        <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px;">
+          Origin IP <strong>${ev.actorIp}</strong> resolved with mismatched reverse DNS PTR records. Heuristic filter confidence: 99.4%.
+        </div>
+      `;
+
+      document.getElementById("forensics-drawer").classList.add("open");
+    }
+
+    function inspectDomain(domainName) {
+      document.getElementById("drawer-id").textContent = `DOMAIN-AUDIT: ${domainName}`;
+      document.getElementById("drawer-badge-action").textContent = "LOOKALIKE DETECTED";
+      document.getElementById("drawer-raw-headers").textContent = `Domain Intelligence Report: ${domainName}\nWhois Creation Date: 2026-09-04T08:12:00Z (Age: 2 days)\nRegistrar: NameCheap, Inc.\nNameservers: ns1.bulletproof-dns.to, ns2.bulletproof-dns.to\nMX Records: 10 mail.${domainName} [194.26.29.114]\nThreat Category: Brand Spoofing / Typosquatting / Credential Harvest\nAction Policy: Global Edge Drop (Reject code 550 5.7.1)`;
+
+      const triggerWrap = document.getElementById("drawer-triggers-list");
+      triggerWrap.innerHTML = `
+        <div class="nav-badge" style="width: fit-content; color: var(--amber-400);">HOMOGLYPH TYPOSQUAT</div>
+        <div style="font-size: 11.5px; color: var(--text-secondary); margin-top: 4px;">
+          Newly registered domain mimics corporate partner. Automated edge transport rule enforced.
+        </div>
+      `;
+
+      document.getElementById("forensics-drawer").classList.add("open");
+    }
+
+    // ─── Init Event Listeners ──────────────────────────────────────────
+    document.addEventListener("DOMContentLoaded", () => {
+      // Time Switcher
+      const timeBtns = document.querySelectorAll(".time-btn");
+      timeBtns.forEach(btn => {
+        btn.addEventListener("click", () => {
+          timeBtns.forEach(b => b.classList.remove("active"));
+          btn.classList.add("active");
+          const range = btn.getAttribute("data-range");
+          updateRange(range);
+        });
+      });
+
+      // Domain Search Filter
+      const domainSearch = document.getElementById("domain-search");
+      domainSearch.addEventListener("input", (e) => {
+        const query = e.target.value.toLowerCase().trim();
+        const filtered = domainsData.filter(d => 
+          d.domain.toLowerCase().includes(query) || 
+          d.brand.toLowerCase().includes(query)
+        );
+        renderDomainsTable(filtered);
+      });
+
+      // Audit Feed Filters
+      const filterPills = document.querySelectorAll(".pill-filter");
+      filterPills.forEach(pill => {
+        pill.addEventListener("click", () => {
+          filterPills.forEach(p => p.classList.remove("active"));
+          pill.classList.add("active");
+          const category = pill.getAttribute("data-event-filter");
+          if (category === "all") {
+            renderAuditEvents(auditEventsData);
+          } else {
+            const filtered = auditEventsData.filter(e => e.category === category);
+            renderAuditEvents(filtered);
+          }
+        });
+      });
+
+      // Vector items interactive click filter
+      const vectorItems = document.querySelectorAll(".vector-item");
+      vectorItems.forEach(item => {
+        item.addEventListener("click", () => {
+          const isActive = item.classList.contains("active-filter");
+          vectorItems.forEach(v => v.classList.remove("active-filter"));
+          if (!isActive) {
+            item.classList.add("active-filter");
+            const vType = item.getAttribute("data-vector");
+            // Map vector to audit category
+            const map = { spoofing: "spoof", credential: "phish", payloads: "malware", impersonation: "spoof" };
+            const cat = map[vType];
+            const filtered = auditEventsData.filter(e => e.category === cat);
+            renderAuditEvents(filtered);
+          } else {
+            renderAuditEvents(auditEventsData);
+          }
+        });
+      });
+
+      // Drawer Close
+      document.getElementById("drawer-close-btn").addEventListener("click", () => {
+        document.getElementById("forensics-drawer").classList.remove("open");
+      });
+
+      document.getElementById("forensics-drawer").addEventListener("click", (e) => {
+        if (e.target.id === "forensics-drawer") {
+          document.getElementById("forensics-drawer").classList.remove("open");
+        }
+      });
+
+      // Sync button micro-interaction
+      document.getElementById("refresh-telemetry-btn").addEventListener("click", () => {
+        const btn = document.getElementById("refresh-telemetry-btn");
+        const span = btn.querySelector("span");
+        span.textContent = "Syncing...";
+        setTimeout(() => {
+          span.textContent = "Sync";
+          updateRange(currentRange);
+        }, 400);
+      });
+
+      // Initialize
+      updateRange("24h");
+      setupChartInteractivity();
+      renderDomainsTable(domainsData);
+      renderAuditEvents(auditEventsData);
+    });
+  </script>
+</body>
+</html>

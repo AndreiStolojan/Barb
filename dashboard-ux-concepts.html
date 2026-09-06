@@ -1,0 +1,2749 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SecureInbox — Dashboard UX Concepts</title>
+  <style>
+    :root {
+      --bg-canvas: #090d16;
+      --bg-surface: #0f1523;
+      --bg-surface-elevated: #141d30;
+      --bg-surface-card: #101726;
+      --border-subtle: #1a2337;
+      --border-hover: #273552;
+      --border-focus: #38bdf8;
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      --text-dim: #475569;
+      --safe: #10b981;
+      --safe-bg: rgba(16, 185, 129, 0.12);
+      --safe-border: rgba(16, 185, 129, 0.25);
+      --warning: #f59e0b;
+      --warning-bg: rgba(245, 158, 11, 0.12);
+      --warning-border: rgba(245, 158, 11, 0.25);
+      --danger: #f43f5e;
+      --danger-bg: rgba(244, 63, 94, 0.12);
+      --danger-border: rgba(244, 63, 94, 0.25);
+      --accent: #38bdf8;
+      --accent-bg: rgba(56, 189, 248, 0.12);
+      --accent-border: rgba(56, 189, 248, 0.25);
+      --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'SF Mono', SFMono-Regular, ui-monospace, Menlo, Consolas, monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-canvas);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding-top: 72px;
+      min-height: 100vh;
+    }
+
+    /* Top Sticky Navigation with Model Switcher */
+    .app-nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 72px;
+      background: rgba(9, 13, 22, 0.88);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border-subtle);
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 28px;
+    }
+
+    .brand-section {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-shield {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #1e293b, #0f172a);
+      border: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+    }
+
+    .brand-title-wrap {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-size: 0.95rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .brand-status-chip {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--safe);
+      background: var(--safe-bg);
+      border: 1px solid var(--safe-border);
+      padding: 1px 7px;
+      border-radius: 999px;
+    }
+
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--safe);
+      box-shadow: 0 0 6px var(--safe);
+    }
+
+    .brand-sub {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+    }
+
+    /* Switcher Segmented Control */
+    .model-switcher-wrap {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .model-switcher {
+      display: flex;
+      background: #060911;
+      border: 1px solid var(--border-subtle);
+      border-radius: 999px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .model-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-secondary);
+      font-family: inherit;
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 6px 16px;
+      border-radius: 999px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.16s ease;
+    }
+
+    .model-tab-btn:hover {
+      color: var(--text-primary);
+      background: rgba(255, 255, 255, 0.04);
+    }
+
+    .model-tab-btn.active {
+      color: #ffffff;
+      background: #19243a;
+      border: 1px solid var(--border-hover);
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .model-tab-num {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--accent);
+      background: rgba(56, 189, 248, 0.15);
+      border-radius: 50%;
+      width: 17px;
+      height: 17px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .switcher-tagline {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: -0.01em;
+      transition: opacity 0.2s ease;
+    }
+
+    .nav-actions {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .account-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      padding: 6px 12px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+    }
+
+    .account-badge code {
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+    }
+
+    /* Main Container */
+    .main-viewport {
+      max-width: 1380px;
+      margin: 0 auto;
+      padding: 24px 28px 48px;
+    }
+
+    /* Concept Views */
+    .concept-container {
+      display: none;
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.22s ease, transform 0.22s ease;
+    }
+
+    .concept-container.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ==========================================================
+       CONCEPT A: TRIAGE & ACTION QUEUE
+       ========================================================== */
+    .ca-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .ca-topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 18px 24px;
+    }
+
+    .ca-posture-group {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .ca-safe-ring {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .ca-ring-gauge {
+      width: 44px;
+      height: 44px;
+      position: relative;
+    }
+
+    .ca-ring-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .ca-ring-bg {
+      fill: none;
+      stroke: #162033;
+      stroke-width: 4;
+    }
+
+    .ca-ring-bar {
+      fill: none;
+      stroke: var(--safe);
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+      stroke-dashoffset: 3.6;
+    }
+
+    .ca-ring-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .ca-posture-meta h2 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+    }
+
+    .ca-posture-meta p {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .ca-top-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-secondary {
+      background: #141c2c;
+      border: 1px solid var(--border-hover);
+      color: var(--text-secondary);
+      font-size: 0.78rem;
+      font-weight: 500;
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.15s ease;
+    }
+
+    .btn-secondary:hover {
+      background: #1c273e;
+      color: var(--text-primary);
+      border-color: #3b4d70;
+    }
+
+    .btn-primary-danger {
+      background: #e11d48;
+      border: 1px solid #f43f5e;
+      color: #ffffff;
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 7px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-primary-danger:hover {
+      background: #be123c;
+    }
+
+    .ca-grid {
+      display: grid;
+      grid-template-columns: 1fr 320px;
+      gap: 20px;
+    }
+
+    .ca-queue-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .ca-filter-group {
+      display: flex;
+      gap: 6px;
+    }
+
+    .ca-pill-filter {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-size: 0.76rem;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .ca-pill-filter:hover, .ca-pill-filter.active {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      border-color: var(--border-hover);
+    }
+
+    .ca-queue-counter {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+    }
+
+    .ca-cards-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .ca-threat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .ca-threat-card:hover {
+      border-color: var(--border-hover);
+    }
+
+    .ca-threat-card.severity-critical {
+      border-left: 3px solid var(--danger);
+    }
+
+    .ca-threat-card.severity-suspicious {
+      border-left: 3px solid var(--warning);
+    }
+
+    .ca-threat-card.severity-low {
+      border-left: 3px solid var(--accent);
+    }
+
+    .ca-threat-card.dismissing {
+      opacity: 0;
+      transform: scale(0.98);
+      max-height: 0;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+      border: none;
+    }
+
+    .ca-card-body {
+      display: flex;
+      gap: 16px;
+    }
+
+    .ca-score-col {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 6px;
+      min-width: 95px;
+    }
+
+    .ca-score-badge {
+      font-size: 0.76rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+
+    .ca-score-badge.danger {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+    }
+
+    .ca-score-badge.warning {
+      color: var(--warning);
+      background: var(--warning-bg);
+      border: 1px solid var(--warning-border);
+    }
+
+    .ca-score-badge.low {
+      color: var(--accent);
+      background: var(--accent-bg);
+      border: 1px solid var(--accent-border);
+    }
+
+    .ca-type-tag {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      letter-spacing: -0.01em;
+    }
+
+    .ca-detail-col {
+      flex: 1;
+    }
+
+    .ca-card-toprow {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+    }
+
+    .ca-card-subject {
+      font-size: 0.96rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .ca-card-time {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    .ca-card-sender {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+      margin-top: 3px;
+    }
+
+    .ca-card-sender strong {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .ca-card-sender code {
+      color: var(--accent);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+    }
+
+    .ca-card-reason {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+      margin-top: 8px;
+    }
+
+    .ca-card-tags {
+      display: flex;
+      gap: 6px;
+      margin-top: 10px;
+    }
+
+    .ca-chip {
+      font-size: 0.68rem;
+      background: #141c2c;
+      color: var(--text-muted);
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+
+    .ca-card-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 12px;
+      border-top: 1px solid #141c2c;
+    }
+
+    .act-btn {
+      font-size: 0.74rem;
+      font-weight: 500;
+      padding: 5px 12px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      background: transparent;
+      border: 1px solid transparent;
+    }
+
+    .act-btn.quarantine {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border-color: var(--danger-border);
+    }
+
+    .act-btn.quarantine:hover {
+      background: var(--danger);
+      color: #fff;
+    }
+
+    .act-btn.block {
+      background: #192338;
+      border-color: var(--border-hover);
+      color: var(--text-primary);
+    }
+
+    .act-btn.block:hover {
+      background: #23324f;
+    }
+
+    .act-btn.inspect {
+      background: #141c2c;
+      border-color: var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .act-btn.inspect:hover {
+      background: #1e2a40;
+      color: var(--text-primary);
+    }
+
+    .act-btn.safe {
+      color: var(--safe);
+      background: var(--safe-bg);
+      border-color: var(--safe-border);
+    }
+
+    .act-btn.safe:hover {
+      background: var(--safe);
+      color: #fff;
+    }
+
+    .act-btn.dismiss {
+      color: var(--text-muted);
+      margin-left: auto;
+    }
+
+    .act-btn.dismiss:hover {
+      color: var(--text-secondary);
+      background: #141c2c;
+    }
+
+    /* Sidebar telemetry */
+    .ca-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .ca-side-panel {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 18px;
+    }
+
+    .ca-side-title {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 14px;
+    }
+
+    .ca-stat-block {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .ca-stat-number {
+      font-size: 1.35rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .ca-stat-label {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+    }
+
+    .ca-divider {
+      height: 1px;
+      background: #141c2c;
+      margin: 12px 0;
+    }
+
+    .ca-policy-toggle {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      margin-bottom: 10px;
+    }
+
+    .ca-policy-toggle input {
+      accent-color: var(--accent);
+      cursor: pointer;
+    }
+
+    .ca-note-box {
+      background: #090d16;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 12px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      line-height: 1.45;
+    }
+
+    /* ==========================================================
+       CONCEPT B: SECURITY POSTURE & TELEMETRY HUB
+       ========================================================== */
+    .cb-layout {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .cb-posture-banner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 24px;
+    }
+
+    .cb-posture-left {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .cb-radial-wrap {
+      position: relative;
+      width: 76px;
+      height: 76px;
+      flex-shrink: 0;
+    }
+
+    .cb-radial-svg {
+      width: 100%;
+      height: 100%;
+      transform: rotate(-90deg);
+    }
+
+    .cb-radial-bg {
+      fill: none;
+      stroke: #162033;
+      stroke-width: 6;
+    }
+
+    .cb-radial-progress {
+      fill: none;
+      stroke: var(--safe);
+      stroke-width: 6;
+      stroke-linecap: round;
+      stroke-dasharray: 213.6;
+      stroke-dashoffset: 3.8;
+      transition: stroke-dashoffset 0.8s ease;
+    }
+
+    .cb-radial-val {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: baseline;
+      justify-content: center;
+      margin-top: 26px;
+    }
+
+    .cb-radial-number {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .cb-radial-pct {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .cb-posture-narrative {
+      max-width: 640px;
+    }
+
+    .cb-tag-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 6px;
+    }
+
+    .cb-verified-chip {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--safe);
+      background: var(--safe-bg);
+      border: 1px solid var(--safe-border);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .cb-meta-text {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .cb-heading {
+      font-size: 1.15rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      margin-bottom: 4px;
+    }
+
+    .cb-summary {
+      font-size: 0.82rem;
+      color: var(--text-secondary);
+      line-height: 1.45;
+    }
+
+    .cb-time-range {
+      display: flex;
+      background: #090d16;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 3px;
+      gap: 2px;
+    }
+
+    .cb-time-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-family: inherit;
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .cb-time-btn:hover, .cb-time-btn.active {
+      color: var(--text-primary);
+      background: #19243a;
+    }
+
+    .cb-stats-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 10px;
+      padding: 16px 22px;
+    }
+
+    .cb-stat-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .cb-stat-label {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .cb-stat-big {
+      font-size: 1.45rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.02em;
+    }
+
+    .cb-stat-big.danger { color: var(--danger); }
+    .cb-stat-big.warning { color: var(--warning); }
+
+    .cb-stat-sub {
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    .cb-stat-divider {
+      width: 1px;
+      height: 70%;
+      background: #162033;
+      align-self: center;
+    }
+
+    .cb-2col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    .cb-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 20px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .cb-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .cb-card-title {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .cb-card-desc {
+      font-size: 0.76rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    .cb-chart-legend {
+      display: flex;
+      gap: 12px;
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+    }
+
+    .cb-legend-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      display: inline-block;
+      margin-right: 5px;
+    }
+
+    .cb-dot-clean { background: var(--safe); }
+    .cb-dot-sus { background: var(--warning); }
+    .cb-dot-blocked { background: var(--danger); }
+
+    .cb-chart-box {
+      position: relative;
+      margin-top: 10px;
+    }
+
+    .cb-trend-svg {
+      width: 100%;
+      height: 180px;
+    }
+
+    .cb-grid-line {
+      stroke: #162033;
+      stroke-dasharray: 4 4;
+    }
+
+    .cb-line-safe {
+      fill: none;
+      stroke: var(--safe);
+      stroke-width: 2;
+    }
+
+    .cb-line-warning {
+      fill: none;
+      stroke: var(--warning);
+      stroke-width: 1.75;
+    }
+
+    .cb-line-danger {
+      fill: none;
+      stroke: var(--danger);
+      stroke-width: 2;
+    }
+
+    .cb-data-point {
+      fill: #0f1523;
+      stroke: var(--accent);
+      stroke-width: 2;
+      cursor: pointer;
+      transition: r 0.15s ease;
+    }
+
+    .cb-data-point.danger-pt { stroke: var(--danger); }
+    .cb-data-point:hover { r: 6; }
+
+    .cb-chart-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      font-size: 0.72rem;
+      color: var(--text-dim);
+    }
+
+    .cb-chart-tooltip {
+      position: absolute;
+      background: #090d16;
+      border: 1px solid var(--border-hover);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.72rem;
+      color: var(--text-primary);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      white-space: nowrap;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+    }
+
+    .cb-vectors-stack {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 8px;
+    }
+
+    .cb-vector-item {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .cb-vector-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+    }
+
+    .cb-vector-name {
+      color: var(--text-primary);
+      font-weight: 500;
+    }
+
+    .cb-vector-freq {
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-size: 0.74rem;
+    }
+
+    .cb-track {
+      height: 6px;
+      background: #141c2c;
+      border-radius: 3px;
+      overflow: hidden;
+    }
+
+    .cb-fill {
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .cb-fill.rose { background: var(--danger); }
+    .cb-fill.amber { background: var(--warning); }
+    .cb-fill.cyan { background: var(--accent); }
+    .cb-fill.purple { background: #a855f7; }
+
+    .cb-table-box {
+      overflow-x: auto;
+    }
+
+    .cb-telemetry-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.8rem;
+      text-align: left;
+    }
+
+    .cb-telemetry-table th {
+      padding: 10px 8px;
+      color: var(--text-muted);
+      font-weight: 500;
+      font-size: 0.72rem;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cb-telemetry-table td {
+      padding: 12px 8px;
+      border-bottom: 1px solid #141c2c;
+      color: var(--text-secondary);
+    }
+
+    .mono-cell {
+      font-family: var(--font-mono);
+      font-size: 0.76rem;
+      color: var(--text-primary);
+    }
+
+    .chip-status {
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+    .chip-status.fail {
+      color: var(--danger);
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+    }
+    .chip-status.none {
+      color: var(--text-muted);
+      background: rgba(148, 163, 184, 0.12);
+    }
+
+    .rep-danger {
+      font-weight: 600;
+      color: var(--danger);
+      font-family: var(--font-mono);
+    }
+
+    .btn-table-action {
+      background: #141c2c;
+      border: 1px solid var(--border-hover);
+      color: var(--text-secondary);
+      font-size: 0.72rem;
+      padding: 4px 9px;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn-table-action:hover {
+      background: #1e2a40;
+      color: #fff;
+    }
+
+    .cb-audit-feed {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .cb-audit-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px;
+      background: #090d16;
+      border: 1px solid #141c2c;
+      border-radius: 8px;
+    }
+
+    .cb-audit-badge {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.04em;
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-family: var(--font-mono);
+    }
+    .cb-audit-badge.isolated { color: var(--danger); background: var(--danger-bg); }
+    .cb-audit-badge.defanged { color: var(--warning); background: var(--warning-bg); }
+    .cb-audit-badge.rejected { color: var(--accent); background: var(--accent-bg); }
+    .cb-audit-badge.verified { color: var(--safe); background: var(--safe-bg); }
+
+    .cb-audit-info { flex: 1; }
+    .cb-audit-head {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .cb-audit-subhead {
+      font-size: 0.74rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+    .cb-audit-subhead code {
+      font-family: var(--font-mono);
+      color: var(--accent);
+      background: #141c2c;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+    .cb-audit-time {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      white-space: nowrap;
+    }
+
+    /* ==========================================================
+       CONCEPT C: SPLIT-PANE FORENSIC INSPECTOR
+       ========================================================== */
+    .cc-layout {
+      display: grid;
+      grid-template-columns: 390px 1fr;
+      gap: 20px;
+      min-height: 720px;
+    }
+
+    .cc-master-pane {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .cc-pane-head {
+      padding: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cc-head-title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .cc-pane-h3 {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .cc-items-pill {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      background: #141c2c;
+      padding: 2px 7px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+
+    .cc-filter-input {
+      width: 100%;
+      background: #090d16;
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: var(--text-primary);
+      font-size: 0.78rem;
+    }
+    .cc-filter-input:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .cc-stream-list {
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .cc-email-row {
+      padding: 14px 16px;
+      border-bottom: 1px solid #141c2c;
+      cursor: pointer;
+      transition: background 0.15s ease;
+      position: relative;
+    }
+
+    .cc-email-row:hover {
+      background: #131b2e;
+    }
+
+    .cc-email-row.selected {
+      background: #172238;
+      border-left: 3px solid var(--accent);
+    }
+
+    .cc-row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 4px;
+    }
+
+    .cc-risk-pill {
+      font-size: 0.7rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+    }
+    .cc-risk-pill.danger { color: var(--danger); background: var(--danger-bg); }
+    .cc-risk-pill.warning { color: var(--warning); background: var(--warning-bg); }
+    .cc-risk-pill.safe { color: var(--safe); background: var(--safe-bg); }
+
+    .cc-time-lbl {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .cc-row-sender {
+      font-size: 0.76rem;
+      color: var(--text-secondary);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cc-row-subject {
+      font-size: 0.84rem;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-top: 3px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .cc-tags-cluster {
+      display: flex;
+      gap: 5px;
+      margin-top: 6px;
+    }
+
+    .cc-micro-tag {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      background: #0d121c;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: var(--font-mono);
+    }
+
+    /* Detail Inspector Pane */
+    .cc-detail-pane {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 12px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .cc-inspector-banner {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .cc-inspect-meta-id {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    .cc-inspect-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin: 4px 0 6px;
+    }
+
+    .cc-inspect-routing {
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+    .cc-inspect-routing code {
+      color: var(--accent);
+      font-family: var(--font-mono);
+    }
+
+    .cc-score-summary {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+    }
+
+    .cc-score-jumbo {
+      font-size: 1.6rem;
+      font-weight: 800;
+      color: var(--danger);
+      font-family: var(--font-mono);
+      letter-spacing: -0.02em;
+    }
+
+    .cc-score-jumbo.warning { color: var(--warning); }
+    .cc-score-jumbo.safe { color: var(--safe); }
+
+    .cc-score-label {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+
+    .cc-section-card {
+      background: #090d16;
+      border: 1px solid var(--border-subtle);
+      border-radius: 8px;
+      padding: 16px;
+    }
+
+    .cc-section-h4 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+    }
+
+    .cc-auth-quad {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .cc-auth-tile {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: 6px;
+      padding: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .cc-tile-lbl {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+
+    .cc-auth-status {
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      align-self: flex-start;
+      font-family: var(--font-mono);
+    }
+    .cc-auth-status.fail { color: var(--danger); background: var(--danger-bg); }
+    .cc-auth-status.none { color: var(--text-muted); background: rgba(148, 163, 184, 0.12); }
+    .cc-auth-status.pass { color: var(--safe); background: var(--safe-bg); }
+
+    .cc-auth-exp {
+      font-size: 0.68rem;
+      color: var(--text-dim);
+    }
+
+    .cc-ioc-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .cc-ioc-item {
+      display: flex;
+      gap: 12px;
+      align-items: flex-start;
+      padding: 10px;
+      background: var(--bg-surface);
+      border: 1px solid #162033;
+      border-radius: 6px;
+    }
+
+    .cc-ioc-chip {
+      font-size: 0.65rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      flex-shrink: 0;
+      margin-top: 2px;
+      font-family: var(--font-mono);
+    }
+    .cc-ioc-chip.danger { color: var(--danger); background: var(--danger-bg); }
+    .cc-ioc-chip.warning { color: var(--warning); background: var(--warning-bg); }
+    .cc-ioc-chip.safe { color: var(--safe); background: var(--safe-bg); }
+
+    .cc-ioc-text {
+      font-size: 0.78rem;
+      color: var(--text-primary);
+    }
+
+    .cc-ioc-hash {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+      font-family: var(--font-mono);
+    }
+
+    .cc-accordion-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+    }
+
+    .cc-expand-hint {
+      font-size: 0.72rem;
+      color: var(--accent);
+    }
+
+    .cc-rfc-block {
+      margin-top: 10px;
+      background: #05080f;
+      border: 1px solid #141c2c;
+      border-radius: 6px;
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      overflow-x: auto;
+      max-height: 160px;
+    }
+
+    .cc-rfc-block.hidden {
+      display: none;
+    }
+
+    .cc-footer-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: auto;
+      padding-top: 16px;
+      border-top: 1px solid var(--border-subtle);
+    }
+
+    /* Modal slide-over inspector for Concept A */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.65);
+      backdrop-filter: blur(4px);
+      z-index: 2000;
+      display: none;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-overlay.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-hover);
+      border-radius: 12px;
+      width: 580px;
+      max-width: 90vw;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 12px;
+    }
+
+    .modal-head h3 {
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .modal-close-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 1.2rem;
+      line-height: 1;
+    }
+
+    .modal-close-btn:hover {
+      color: var(--text-primary);
+    }
+
+    .modal-body {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* Floating Toast Feedback System */
+    .toast-stack {
+      position: fixed;
+      bottom: 24px;
+      right: 28px;
+      z-index: 3000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast-msg {
+      background: #0f1523;
+      border: 1px solid var(--border-hover);
+      border-radius: 8px;
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 0.8rem;
+      color: var(--text-primary);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+      pointer-events: auto;
+      animation: toastIn 0.2s ease forwards;
+    }
+
+    .toast-msg.danger-toast { border-left: 3px solid var(--danger); }
+    .toast-msg.safe-toast { border-left: 3px solid var(--safe); }
+    .toast-msg.info-toast { border-left: 3px solid var(--accent); }
+
+    .toast-undo {
+      background: transparent;
+      border: none;
+      color: var(--accent);
+      font-size: 0.76rem;
+      font-weight: 600;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+    .toast-undo:hover { text-decoration: underline; }
+
+    @keyframes toastIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Responsive */
+    @media (max-width: 1024px) {
+      .ca-grid { grid-template-columns: 1fr; }
+      .cb-2col { grid-template-columns: 1fr; }
+      .cc-layout { grid-template-columns: 1fr; }
+      .cb-stats-strip { grid-template-columns: 1fr 1fr; gap: 16px; }
+      .cb-stat-divider { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Fixed Application Navigation & Model Switcher -->
+  <header class="app-nav">
+    <div class="brand-section">
+      <div class="brand-shield">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+          <path d="m9 12 2 2 4-4"/>
+        </svg>
+      </div>
+      <div class="brand-title-wrap">
+        <div class="brand-title">
+          SecureInbox
+          <span class="brand-status-chip"><span class="status-dot"></span>Active</span>
+        </div>
+        <span class="brand-sub">Real-time email security gateway</span>
+      </div>
+    </div>
+
+    <!-- Toggle Controls -->
+    <div class="model-switcher-wrap">
+      <div class="model-switcher" role="tablist">
+        <button class="model-tab-btn active" id="btn-model-a" onclick="switchModel('a')">
+          <span class="model-tab-num">1</span>
+          Triage queue
+        </button>
+        <button class="model-tab-btn" id="btn-model-b" onclick="switchModel('b')">
+          <span class="model-tab-num">2</span>
+          Posture & telemetry
+        </button>
+        <button class="model-tab-btn" id="btn-model-c" onclick="switchModel('c')">
+          <span class="model-tab-num">3</span>
+          Split-pane inspector
+        </button>
+      </div>
+      <span class="switcher-tagline" id="switcher-desc">Operator triage queue: 1-click disposition and blast-radius containment.</span>
+    </div>
+
+    <div class="nav-actions">
+      <div class="account-badge">
+        <span>Inbox:</span>
+        <code>security@company.com</code>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Viewport -->
+  <main class="main-viewport">
+
+    <!-- ==========================================================
+         MODEL 1: TRIAGE & ACTION QUEUE
+         ========================================================== -->
+    <section id="view-concept-a" class="concept-container active">
+      <div class="ca-layout">
+        <!-- Top Barometer -->
+        <div class="ca-topbar">
+          <div class="ca-posture-group">
+            <div class="ca-safe-ring">
+              <div class="ca-ring-gauge">
+                <svg class="ca-ring-svg" viewBox="0 0 36 36">
+                  <path class="ca-ring-bg" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                  <path class="ca-ring-bar" stroke-dasharray="96.4, 100" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
+                </svg>
+                <span class="ca-ring-text">96%</span>
+              </div>
+              <div class="ca-posture-meta">
+                <h2>Safe rate at 96.4%</h2>
+                <p id="ca-queue-summary-text"><span id="ca-pending-count">4</span> messages requiring analyst disposition · Auto-quarantine active</p>
+              </div>
+            </div>
+          </div>
+          <div class="ca-top-actions">
+            <button class="btn-secondary" onclick="triggerMailSync()">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"/><path d="M21 21v-5h-5"/></svg>
+              Sync inbox
+            </button>
+            <button class="btn-primary-danger" onclick="bulkQuarantineCritical()">
+              Quarantine critical (<span id="ca-crit-count">2</span>)
+            </button>
+          </div>
+        </div>
+
+        <!-- Layout Grid -->
+        <div class="ca-grid">
+          <!-- Left Queue -->
+          <div class="ca-queue-column">
+            <div class="ca-queue-header">
+              <div class="ca-filter-group">
+                <button class="ca-pill-filter active" onclick="filterQueueCards('all', this)">All (<span id="ca-cnt-all">4</span>)</button>
+                <button class="ca-pill-filter" onclick="filterQueueCards('critical', this)">Critical (<span id="ca-cnt-crit">2</span>)</button>
+                <button class="ca-pill-filter" onclick="filterQueueCards('suspicious', this)">Suspicious (<span id="ca-cnt-sus">1</span>)</button>
+                <button class="ca-pill-filter" onclick="filterQueueCards('low', this)">Low risk (<span id="ca-cnt-low">1</span>)</button>
+              </div>
+              <span class="ca-queue-counter">Sorted by threat severity</span>
+            </div>
+
+            <!-- Threat Cards Stack -->
+            <div class="ca-cards-stack" id="ca-cards-stack">
+              <!-- Card 1: Executable Attachment -->
+              <article class="ca-threat-card severity-critical" id="threat-card-1" data-severity="critical">
+                <div class="ca-card-body">
+                  <div class="ca-score-col">
+                    <span class="ca-score-badge danger">Risk 95</span>
+                    <span class="ca-type-tag">PE32 Payload</span>
+                  </div>
+                  <div class="ca-detail-col">
+                    <div class="ca-card-toprow">
+                      <h3 class="ca-card-subject">Updated Employee Handbook.pdf.exe</h3>
+                      <span class="ca-card-time">4m ago</span>
+                    </div>
+                    <div class="ca-card-sender">
+                      From <strong>HR Portal</strong> &lt;<code>hr-support@external-mail.net</code>&gt;
+                    </div>
+                    <p class="ca-card-reason">
+                      Executable double-extension detected. File entropy reaches 7.84 bits/byte matching packed malware heuristic. Attempted delivery to 14 internal finance staff.
+                    </p>
+                    <div class="ca-card-tags">
+                      <span class="ca-chip">DMARC None</span>
+                      <span class="ca-chip">High Entropy</span>
+                      <span class="ca-chip">Double Extension</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="ca-card-actions">
+                  <button class="act-btn quarantine" onclick="dismissThreatCard('threat-card-1', 'Handbook.pdf.exe quarantined across 14 mailboxes')">Quarantine</button>
+                  <button class="act-btn block" onclick="dismissThreatCard('threat-card-1', 'external-mail.net permanently blocked')">Block sender</button>
+                  <button class="act-btn inspect" onclick="openModal('Updated Employee Handbook.pdf.exe', 'hr-support@external-mail.net', '95', 'Double-extension executable detected. MIME type application/x-dosexec. Memory injection pattern reported by sandbox.')">Inspect headers</button>
+                  <button class="act-btn dismiss" onclick="dismissThreatCard('threat-card-1', 'Dismissed as false positive')">Dismiss</button>
+                </div>
+              </article>
+
+              <!-- Card 2: Lookalike Homoglyph Domain -->
+              <article class="ca-threat-card severity-critical" id="threat-card-2" data-severity="critical">
+                <div class="ca-card-body">
+                  <div class="ca-score-col">
+                    <span class="ca-score-badge danger">Risk 92</span>
+                    <span class="ca-type-tag">Lookalike domain</span>
+                  </div>
+                  <div class="ca-detail-col">
+                    <div class="ca-card-toprow">
+                      <h3 class="ca-card-subject">Urgent: Wire Transfer Verification Required #9281</h3>
+                      <span class="ca-card-time">19m ago</span>
+                    </div>
+                    <div class="ca-card-sender">
+                      From <strong>Intuit Billing</strong> &lt;<code>billing@intuit-quickb00ks.com</code>&gt;
+                    </div>
+                    <p class="ca-card-reason">
+                      Homoglyph domain attack using zeroes (&quot;quickb00ks.com&quot;) impersonating Intuit. DMARC validation failed with envelope return-path mismatch.
+                    </p>
+                    <div class="ca-card-tags">
+                      <span class="ca-chip">DMARC Fail</span>
+                      <span class="ca-chip">Homoglyph Zeroes</span>
+                      <span class="ca-chip">Wire Transfer CTA</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="ca-card-actions">
+                  <button class="act-btn quarantine" onclick="dismissThreatCard('threat-card-2', 'Wire transfer phishing email quarantined')">Quarantine</button>
+                  <button class="act-btn block" onclick="dismissThreatCard('threat-card-2', 'intuit-quickb00ks.com added to perimeter blocklist')">Block domain</button>
+                  <button class="act-btn inspect" onclick="openModal('Wire Transfer Verification #9281', 'billing@intuit-quickb00ks.com', '92', 'SPF fail (IP 194.135.21.90 not permitted for intuit.com). DMARC fail p=reject. Domain registered 48h ago.')">Inspect headers</button>
+                  <button class="act-btn dismiss" onclick="dismissThreatCard('threat-card-2', 'Dismissed')">Dismiss</button>
+                </div>
+              </article>
+
+              <!-- Card 3: Credential Harvester -->
+              <article class="ca-threat-card severity-suspicious" id="threat-card-3" data-severity="suspicious">
+                <div class="ca-card-body">
+                  <div class="ca-score-col">
+                    <span class="ca-score-badge warning">Risk 88</span>
+                    <span class="ca-type-tag">Credential harvest</span>
+                  </div>
+                  <div class="ca-detail-col">
+                    <div class="ca-card-toprow">
+                      <h3 class="ca-card-subject">Password Expiry in 2 Hours - Action Required</h3>
+                      <span class="ca-card-time">45m ago</span>
+                    </div>
+                    <div class="ca-card-sender">
+                      From <strong>Office 365 Admin</strong> &lt;<code>it-support@m1crosoft-office.com</code>&gt;
+                    </div>
+                    <p class="ca-card-reason">
+                      Message contains unverified authentication portal hosted on cloudflare-workers. Lookalike domain with SPF softfail.
+                    </p>
+                    <div class="ca-card-tags">
+                      <span class="ca-chip">SPF Softfail</span>
+                      <span class="ca-chip">Unmasked Redirect</span>
+                      <span class="ca-chip">Phish Tank Hit</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="ca-card-actions">
+                  <button class="act-btn quarantine" onclick="dismissThreatCard('threat-card-3', 'Credential phishing message quarantined')">Quarantine</button>
+                  <button class="act-btn block" onclick="dismissThreatCard('threat-card-3', 'Sender blocked')">Block sender</button>
+                  <button class="act-btn inspect" onclick="openModal('Password Expiry Notice', 'it-support@m1crosoft-office.com', '88', 'Redirect link destination unmasked to hxxps://m1crosoft-office.workers.dev/login. Reverse-proxy credential harvester identified.')">Inspect headers</button>
+                  <button class="act-btn dismiss" onclick="dismissThreatCard('threat-card-3', 'Dismissed')">Dismiss</button>
+                </div>
+              </article>
+
+              <!-- Card 4: Reconnaissance Tracking Pixel -->
+              <article class="ca-threat-card severity-low" id="threat-card-4" data-severity="low">
+                <div class="ca-card-body">
+                  <div class="ca-score-col">
+                    <span class="ca-score-badge low">Risk 44</span>
+                    <span class="ca-type-tag">Tracking beacon</span>
+                  </div>
+                  <div class="ca-detail-col">
+                    <div class="ca-card-toprow">
+                      <h3 class="ca-card-subject">Invoice #89421 Delivery Confirmation</h3>
+                      <span class="ca-card-time">1h 12m ago</span>
+                    </div>
+                    <div class="ca-card-sender">
+                      From <strong>Acme Parts Logistics</strong> &lt;<code>vendor-portal@acmeparts.de</code>&gt;
+                    </div>
+                    <p class="ca-card-reason">
+                      Sender has valid DKIM key but message contains 1x1 zero-opacity reconnaissance tracking beacon resolving to an external marketing intelligence server.
+                    </p>
+                    <div class="ca-card-tags">
+                      <span class="ca-chip">DKIM Pass</span>
+                      <span class="ca-chip">Telemetry Beacon</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="ca-card-actions">
+                  <button class="act-btn safe" onclick="dismissThreatCard('threat-card-4', 'Acme Parts added to verified partner allowlist')">Allowlist sender</button>
+                  <button class="act-btn inspect" onclick="openModal('Invoice #89421', 'vendor-portal@acmeparts.de', '44', 'DKIM pass, SPF pass. Tracking pixel sanitized and stripped from payload automatically.')">Inspect</button>
+                  <button class="act-btn dismiss" onclick="dismissThreatCard('threat-card-4', 'Review completed')">Dismiss</button>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <!-- Right Sidebar: Triage Telemetry & Velocity -->
+          <aside class="ca-sidebar">
+            <div class="ca-side-panel">
+              <div class="ca-side-title">Triage velocity</div>
+              <div class="ca-stat-block">
+                <span class="ca-stat-number">4.2 min</span>
+                <span class="ca-stat-label">Mean time to isolate inbound threats</span>
+              </div>
+              <div class="ca-divider"></div>
+              <div class="ca-stat-block">
+                <span class="ca-stat-number">18</span>
+                <span class="ca-stat-label">Attacks neutralized in 24 hours</span>
+              </div>
+              <div class="ca-divider"></div>
+              <div class="ca-stat-block">
+                <span class="ca-stat-number">0.02%</span>
+                <span class="ca-stat-label">False positive rate</span>
+              </div>
+            </div>
+
+            <div class="ca-side-panel">
+              <div class="ca-side-title">Automated mitigation rules</div>
+              <div class="ca-policy-toggle">
+                <span>Auto-quarantine score &gt; 90</span>
+                <input type="checkbox" checked onchange="showToast('Rule updated: score > 90 quarantine active', 'info')" />
+              </div>
+              <div class="ca-policy-toggle">
+                <span>Sanitize tracking pixels</span>
+                <input type="checkbox" checked onchange="showToast('Rule updated: tracking beacon strip active', 'info')" />
+              </div>
+              <div class="ca-policy-toggle">
+                <span>Drop new domains (&lt;7 days)</span>
+                <input type="checkbox" checked onchange="showToast('Rule updated: newly registered domain filter active', 'info')" />
+              </div>
+              <div class="ca-policy-toggle">
+                <span>Webhook alert on BEC attempts</span>
+                <input type="checkbox" onchange="showToast('Webhook alert toggled', 'info')" />
+              </div>
+            </div>
+
+            <div class="ca-note-box">
+              <strong>SOC Operator Note:</strong> Inbound homoglyph attacks targeting Intuit and Microsoft 365 increased 28% this week. Gateway DMARC enforcement is rejecting spoofed return paths.
+            </div>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ==========================================================
+         MODEL 2: SECURITY POSTURE & TELEMETRY HUB
+         ========================================================== -->
+    <section id="view-concept-b" class="concept-container">
+      <div class="cb-layout">
+        <!-- Posture Banner -->
+        <header class="cb-posture-banner">
+          <div class="cb-posture-left">
+            <div class="cb-radial-wrap">
+              <svg viewBox="0 0 80 80" class="cb-radial-svg">
+                <circle cx="40" cy="40" r="34" class="cb-radial-bg" />
+                <circle cx="40" cy="40" r="34" class="cb-radial-progress" />
+              </svg>
+              <div class="cb-radial-val">
+                <span class="cb-radial-number" id="cb-score-display">98.2</span>
+                <span class="cb-radial-pct">%</span>
+              </div>
+            </div>
+            <div class="cb-posture-narrative">
+              <div class="cb-tag-row">
+                <span class="cb-verified-chip">Verified healthy</span>
+                <span class="cb-meta-text">Mail sync current · 32,841 messages protected</span>
+              </div>
+              <h2 class="cb-heading" id="cb-banner-heading">Safe rate steady at 98.2% across active inboxes.</h2>
+              <p class="cb-summary" id="cb-banner-sub">Inbound verification is steady over the past 7 days. Three lookalike domain attempts were blocked before reaching user mailboxes.</p>
+            </div>
+          </div>
+
+          <!-- Time Range Selector -->
+          <div class="cb-time-range">
+            <button class="cb-time-btn" onclick="selectTimeRange('24h', this)">24h</button>
+            <button class="cb-time-btn active" onclick="selectTimeRange('7d', this)">7 days</button>
+            <button class="cb-time-btn" onclick="selectTimeRange('30d', this)">30 days</button>
+            <button class="cb-time-btn" onclick="selectTimeRange('90d', this)">90 days</button>
+          </div>
+        </header>
+
+        <!-- Metrics Strip -->
+        <div class="cb-stats-strip">
+          <div class="cb-stat-cell">
+            <span class="cb-stat-label">Inbound scanned</span>
+            <span class="cb-stat-big" id="cb-m-scanned">1,420</span>
+            <span class="cb-stat-sub">+8.4% vs previous period</span>
+          </div>
+          <div class="cb-stat-divider"></div>
+          <div class="cb-stat-cell">
+            <span class="cb-stat-label">Isolated in quarantine</span>
+            <span class="cb-stat-big danger" id="cb-m-quarantined">14</span>
+            <span class="cb-stat-sub">100% neutralized</span>
+          </div>
+          <div class="cb-stat-divider"></div>
+          <div class="cb-stat-cell">
+            <span class="cb-stat-label">Auth anomalies (SPF/DKIM)</span>
+            <span class="cb-stat-big warning" id="cb-m-auth">28</span>
+            <span class="cb-stat-sub">Dropped at gateway</span>
+          </div>
+          <div class="cb-stat-divider"></div>
+          <div class="cb-stat-cell">
+            <span class="cb-stat-label">Escape rate</span>
+            <span class="cb-stat-big" id="cb-m-escape">0.01%</span>
+            <span class="cb-stat-sub">Target &lt; 0.1%</span>
+          </div>
+        </div>
+
+        <!-- 2-Column: Risk Trendline + Threat Vectors -->
+        <div class="cb-2col">
+          <div class="cb-card">
+            <div class="cb-card-header">
+              <div>
+                <h3 class="cb-card-title">Risk trend over time</h3>
+                <p class="cb-card-desc">Daily distribution of clean, suspicious, and blocked inbound traffic.</p>
+              </div>
+              <div class="cb-chart-legend">
+                <span><span class="cb-legend-dot cb-dot-clean"></span>Clean</span>
+                <span><span class="cb-legend-dot cb-dot-sus"></span>Suspicious</span>
+                <span><span class="cb-legend-dot cb-dot-blocked"></span>Blocked</span>
+              </div>
+            </div>
+
+            <div class="cb-chart-box">
+              <svg class="cb-trend-svg" viewBox="0 0 540 180" preserveAspectRatio="none">
+                <line x1="0" y1="40" x2="540" y2="40" class="cb-grid-line" />
+                <line x1="0" y1="90" x2="540" y2="90" class="cb-grid-line" />
+                <line x1="0" y1="140" x2="540" y2="140" class="cb-grid-line" />
+
+                <!-- Clean Volume Polyline -->
+                <polyline id="cb-chart-clean" points="0,150 45,145 90,140 135,138 180,135 225,140 270,130 315,132 360,128 405,124 450,130 495,122 540,125" class="cb-line-safe" />
+                <!-- Suspicious Polyline -->
+                <polyline id="cb-chart-sus" points="0,172 45,170 90,173 135,168 180,165 225,169 270,162 315,164 360,160 405,158 450,163 495,157 540,159" class="cb-line-warning" />
+                <!-- Blocked Polyline -->
+                <polyline id="cb-chart-blocked" points="0,178 45,177 90,178 135,175 180,174 225,160 270,176 315,177 360,178 405,171 450,177 495,172 540,177" class="cb-line-danger" />
+
+                <!-- Hitpoints -->
+                <circle cx="225" cy="160" r="4.5" class="cb-data-point danger-pt" onmouseover="showChartTooltip('Nov 18: Attack burst (7 lookalike emails blocked)')" onmouseout="hideChartTooltip()" />
+                <circle cx="405" cy="124" r="4.5" class="cb-data-point" onmouseover="showChartTooltip('Nov 22: Peak clean traffic (218 messages verified)')" onmouseout="hideChartTooltip()" />
+              </svg>
+              <div class="cb-chart-tooltip" id="cb-tooltip">Tooltip text</div>
+              <div class="cb-chart-labels">
+                <span id="cb-date-1">Nov 12</span>
+                <span id="cb-date-2">Nov 15</span>
+                <span id="cb-date-3">Nov 18</span>
+                <span id="cb-date-4">Nov 21</span>
+                <span id="cb-date-5">Nov 25</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Attack Vectors Filtered -->
+          <div class="cb-card">
+            <div class="cb-card-header">
+              <div>
+                <h3 class="cb-card-title">Attack vectors filtered</h3>
+                <p class="cb-card-desc">Primary classification of stopped threats this period.</p>
+              </div>
+              <span class="chip-status fail" id="cb-threat-count-label">42 incidents</span>
+            </div>
+
+            <div class="cb-vectors-stack">
+              <div class="cb-vector-item">
+                <div class="cb-vector-meta">
+                  <span class="cb-vector-name">Domain spoofing & homoglyphs</span>
+                  <span class="cb-vector-freq">18 attempts (42.8%)</span>
+                </div>
+                <div class="cb-track">
+                  <div class="cb-fill rose" style="width: 42.8%;"></div>
+                </div>
+              </div>
+
+              <div class="cb-vector-item">
+                <div class="cb-vector-meta">
+                  <span class="cb-vector-name">Credential harvester links</span>
+                  <span class="cb-vector-freq">13 attempts (31.0%)</span>
+                </div>
+                <div class="cb-track">
+                  <div class="cb-fill amber" style="width: 31.0%;"></div>
+                </div>
+              </div>
+
+              <div class="cb-vector-item">
+                <div class="cb-vector-meta">
+                  <span class="cb-vector-name">Executable & macro attachments</span>
+                  <span class="cb-vector-freq">7 attempts (16.6%)</span>
+                </div>
+                <div class="cb-track">
+                  <div class="cb-fill purple" style="width: 16.6%;"></div>
+                </div>
+              </div>
+
+              <div class="cb-vector-item">
+                <div class="cb-vector-meta">
+                  <span class="cb-vector-name">VIP & executive impersonation</span>
+                  <span class="cb-vector-freq">4 attempts (9.6%)</span>
+                </div>
+                <div class="cb-track">
+                  <div class="cb-fill cyan" style="width: 9.6%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Attacking Domains & Audit Log -->
+        <div class="cb-2col">
+          <div class="cb-card">
+            <div class="cb-card-header">
+              <div>
+                <h3 class="cb-card-title">Top attacking & lookalike domains</h3>
+                <p class="cb-card-desc">Origin domains with repeated authorization or reputation failures.</p>
+              </div>
+            </div>
+
+            <div class="cb-table-box">
+              <table class="cb-telemetry-table">
+                <thead>
+                  <tr>
+                    <th>Origin domain</th>
+                    <th>Target</th>
+                    <th>Auth status</th>
+                    <th>Threats</th>
+                    <th>Reputation</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td class="mono-cell">paypa1-support-notice.com</td>
+                    <td>PayPal</td>
+                    <td><span class="chip-status fail">DMARC FAIL</span></td>
+                    <td>8</td>
+                    <td><span class="rep-danger">9/100</span></td>
+                    <td><button class="btn-table-action" onclick="showToast('Domain paypa1-support-notice.com permanently blocked', 'danger')">Block</button></td>
+                  </tr>
+                  <tr>
+                    <td class="mono-cell">auth-micros0ft-login.net</td>
+                    <td>Microsoft</td>
+                    <td><span class="chip-status fail">SPF FAIL</span></td>
+                    <td>5</td>
+                    <td><span class="rep-danger">12/100</span></td>
+                    <td><button class="btn-table-action" onclick="showToast('Domain auth-micros0ft-login.net permanently blocked', 'danger')">Block</button></td>
+                  </tr>
+                  <tr>
+                    <td class="mono-cell">dhl-express-tracking24.info</td>
+                    <td>DHL</td>
+                    <td><span class="chip-status none">NO DMARC</span></td>
+                    <td>3</td>
+                    <td><span class="rep-danger">21/100</span></td>
+                    <td><button class="btn-table-action" onclick="showToast('dhl-express-tracking24.info quarantined', 'info')">Quarantine</button></td>
+                  </tr>
+                  <tr>
+                    <td class="mono-cell">intuit-quickbooks-cloud.com</td>
+                    <td>Intuit</td>
+                    <td><span class="chip-status fail">DKIM FAIL</span></td>
+                    <td>2</td>
+                    <td><span class="rep-danger">17/100</span></td>
+                    <td><button class="btn-table-action" onclick="showToast('Domain intuit-quickbooks-cloud.com blocked', 'danger')">Block</button></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Mitigation Audit Stream -->
+          <div class="cb-card">
+            <div class="cb-card-header">
+              <div>
+                <h3 class="cb-card-title">Mitigation audit stream</h3>
+                <p class="cb-card-desc">Real-time policy actions executed by SecureInbox.</p>
+              </div>
+              <span class="brand-status-chip"><span class="status-dot"></span>Live feed</span>
+            </div>
+
+            <div class="cb-audit-feed">
+              <div class="cb-audit-row">
+                <div class="cb-audit-badge isolated">ISOLATED</div>
+                <div class="cb-audit-info">
+                  <div class="cb-audit-head">Encrypted ZIP archive stripped</div>
+                  <div class="cb-audit-subhead">From <code>hr-payroll@external-dispatch.cc</code> · Password protected container flagged as evasion technique.</div>
+                </div>
+                <span class="cb-audit-time">14m ago</span>
+              </div>
+
+              <div class="cb-audit-row">
+                <div class="cb-audit-badge defanged">DEFANGED</div>
+                <div class="cb-audit-info">
+                  <div class="cb-audit-head">Redirect link sanitized in inbound invoice</div>
+                  <div class="cb-audit-subhead">Target <code>hxxps://login-office365-verify.cc/token</code> unmasked and blocked.</div>
+                </div>
+                <span class="cb-audit-time">1h 12m ago</span>
+              </div>
+
+              <div class="cb-audit-row">
+                <div class="cb-audit-badge rejected">SPF REJECT</div>
+                <div class="cb-audit-info">
+                  <div class="cb-audit-head">Unauthorized sender IP dropped</div>
+                  <div class="cb-audit-subhead">IP <code>185.220.101.44</code> attempted delivery claiming <code>acme-corp.com</code>.</div>
+                </div>
+                <span class="cb-audit-time">3h 40m ago</span>
+              </div>
+
+              <div class="cb-audit-row">
+                <div class="cb-audit-badge verified">ALLOWLIST</div>
+                <div class="cb-audit-info">
+                  <div class="cb-audit-head">New verified billing partner passed</div>
+                  <div class="cb-audit-subhead">Sender <code>invoices@stripe-eu.com</code> verified via strict DKIM key rotation.</div>
+                </div>
+                <span class="cb-audit-time">5h 02m ago</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ==========================================================
+         MODEL 3: SPLIT-PANE FORENSIC INSPECTOR
+         ========================================================== -->
+    <section id="view-concept-c" class="concept-container">
+      <div class="cc-layout">
+        <!-- Master Stream List (Left) -->
+        <aside class="cc-master-pane">
+          <div class="cc-pane-head">
+            <div class="cc-head-title-row">
+              <h3 class="cc-pane-h3">Flagged security stream</h3>
+              <span class="cc-items-pill">4 items</span>
+            </div>
+            <input type="text" class="cc-filter-input" placeholder="Search by sender, domain, or IOC..." onkeyup="filterForensicList(this.value)" />
+          </div>
+
+          <div class="cc-stream-list" id="cc-stream-list">
+            <!-- Row 1 -->
+            <div class="cc-email-row selected" data-id="1" onclick="selectForensicEmail(1, this)">
+              <div class="cc-row-top">
+                <span class="cc-risk-pill danger">95</span>
+                <span class="cc-time-lbl">14:18</span>
+              </div>
+              <div class="cc-row-sender">HR Portal &lt;hr-support@external-mail.net&gt;</div>
+              <div class="cc-row-subject">Updated Employee Handbook.pdf.exe</div>
+              <div class="cc-tags-cluster">
+                <span class="cc-micro-tag">PE32 Payload</span>
+                <span class="cc-micro-tag">High Entropy</span>
+              </div>
+            </div>
+
+            <!-- Row 2 -->
+            <div class="cc-email-row" data-id="2" onclick="selectForensicEmail(2, this)">
+              <div class="cc-row-top">
+                <span class="cc-risk-pill danger">92</span>
+                <span class="cc-time-lbl">14:02</span>
+              </div>
+              <div class="cc-row-sender">Intuit Billing &lt;billing@intuit-quickb00ks.com&gt;</div>
+              <div class="cc-row-subject">Urgent: Wire Transfer Verification Required #9281</div>
+              <div class="cc-tags-cluster">
+                <span class="cc-micro-tag">Homoglyph</span>
+                <span class="cc-micro-tag">DMARC Fail</span>
+              </div>
+            </div>
+
+            <!-- Row 3 -->
+            <div class="cc-email-row" data-id="3" onclick="selectForensicEmail(3, this)">
+              <div class="cc-row-top">
+                <span class="cc-risk-pill warning">88</span>
+                <span class="cc-time-lbl">13:35</span>
+              </div>
+              <div class="cc-row-sender">Office 365 Admin &lt;it-support@m1crosoft-office.com&gt;</div>
+              <div class="cc-row-subject">Password Expiry in 2 Hours - Action Required</div>
+              <div class="cc-tags-cluster">
+                <span class="cc-micro-tag">Credential Harvest</span>
+                <span class="cc-micro-tag">SPF Softfail</span>
+              </div>
+            </div>
+
+            <!-- Row 4 -->
+            <div class="cc-email-row" data-id="4" onclick="selectForensicEmail(4, this)">
+              <div class="cc-row-top">
+                <span class="cc-risk-pill safe">44</span>
+                <span class="cc-time-lbl">12:10</span>
+              </div>
+              <div class="cc-row-sender">Acme Logistics &lt;vendor-portal@acmeparts.de&gt;</div>
+              <div class="cc-row-subject">Invoice #89421 Delivery Confirmation</div>
+              <div class="cc-tags-cluster">
+                <span class="cc-micro-tag">Tracking Pixel</span>
+                <span class="cc-micro-tag">DKIM Valid</span>
+              </div>
+            </div>
+          </div>
+        </aside>
+
+        <!-- Right Forensic Inspector -->
+        <main class="cc-detail-pane">
+          <div class="cc-inspector-banner">
+            <div>
+              <span class="cc-inspect-meta-id" id="cc-forensic-id">Forensic report ID #sec-894210</span>
+              <h2 class="cc-inspect-title" id="cc-subject-heading">Updated Employee Handbook.pdf.exe</h2>
+              <div class="cc-inspect-routing">
+                From: <code id="cc-from-code">hr-support@external-mail.net</code> · Envelope: <code id="cc-env-code">bounce@node-91.external-mail.net</code>
+              </div>
+            </div>
+            <div class="cc-score-summary">
+              <span class="cc-score-jumbo" id="cc-jumbo-score">95</span>
+              <span class="cc-score-label" id="cc-jumbo-label">Critical threat</span>
+            </div>
+          </div>
+
+          <!-- Authentication Quad -->
+          <div class="cc-section-card">
+            <h4 class="cc-section-h4">Authentication & origin verification</h4>
+            <div class="cc-auth-quad">
+              <div class="cc-auth-tile">
+                <span class="cc-tile-lbl">SPF</span>
+                <span class="cc-auth-status none" id="cc-spf-status">NONE</span>
+                <span class="cc-auth-exp" id="cc-spf-exp">No SPF record for domain</span>
+              </div>
+              <div class="cc-auth-tile">
+                <span class="cc-tile-lbl">DKIM</span>
+                <span class="cc-auth-status fail" id="cc-dkim-status">FAIL</span>
+                <span class="cc-auth-exp" id="cc-dkim-exp">Signature missing</span>
+              </div>
+              <div class="cc-auth-tile">
+                <span class="cc-tile-lbl">DMARC</span>
+                <span class="cc-auth-status fail" id="cc-dmarc-status">FAIL</span>
+                <span class="cc-auth-exp" id="cc-dmarc-exp">Policy p=reject requested</span>
+              </div>
+              <div class="cc-auth-tile">
+                <span class="cc-tile-lbl">Alignment</span>
+                <span class="cc-auth-status fail" id="cc-align-status">MISMATCH</span>
+                <span class="cc-auth-exp" id="cc-align-exp">Header From != Return-Path</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Indicators of Compromise -->
+          <div class="cc-section-card">
+            <h4 class="cc-section-h4">Indicators of compromise (IOCs)</h4>
+            <div class="cc-ioc-list" id="cc-ioc-list">
+              <div class="cc-ioc-item">
+                <span class="cc-ioc-chip danger">ATTACHMENT</span>
+                <div class="cc-ioc-text">
+                  <strong>Handbook.pdf.exe</strong> (428 KB, Entropy: 7.84, Type: Win32 PE executable)
+                  <div class="cc-ioc-hash">SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855</div>
+                </div>
+              </div>
+              <div class="cc-ioc-item">
+                <span class="cc-ioc-chip warning">HEURISTIC</span>
+                <div class="cc-ioc-text">
+                  <strong>Double extension evasion</strong>
+                  <div class="cc-ioc-hash">Executable disguised with trailing .pdf prefix to deceive default Windows UI.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Raw Headers Accordion -->
+          <div class="cc-section-card">
+            <div class="cc-accordion-header" onclick="toggleRawHeaders()">
+              <h4 class="cc-section-h4" style="margin-bottom: 0;">Raw RFC 5322 headers</h4>
+              <span class="cc-expand-hint" id="cc-raw-toggle-hint">Click to expand</span>
+            </div>
+            <pre class="cc-rfc-block hidden" id="cc-raw-rfc-pre">
+Delivered-To: victim@company.com
+Received: by 2002:a05:6e02:18c4:b0:38b:6b9f:7e56 with SMTP id d4csp1204859ilq;
+Return-Path: &lt;bounce@node-91.external-mail.net&gt;
+Authentication-Results: mx.google.com;
+       spf=neutral (google.com: 185.220.101.5 is neither permitted nor denied) smtp.mailfrom=bounce@node-91.external-mail.net;
+       dkim=neutral (bad sig);
+       dmarc=fail (p=REJECT sp=REJECT dis=REJECT) header.from=external-mail.net
+Message-ID: &lt;20260906-handbook-update-89421@external-mail.net&gt;
+From: "HR Portal" &lt;hr-support@external-mail.net&gt;
+Subject: Updated Employee Handbook.pdf.exe
+Content-Type: multipart/mixed; boundary="===============91823712893=="
+            </pre>
+          </div>
+
+          <!-- Sticky Bottom Actions -->
+          <div class="cc-footer-actions">
+            <button class="act-btn quarantine" style="padding: 8px 16px;" onclick="showToast('Message quarantined into secure vault', 'danger')">Quarantine message</button>
+            <button class="act-btn block" style="padding: 8px 16px;" onclick="showToast('Sender domain added to perimeter blocklist', 'danger')">Ban sender domain</button>
+            <button class="act-btn inspect" style="padding: 8px 16px;" onclick="showToast('Exported RFC EML with signature proof', 'info')">Export .EML</button>
+            <button class="act-btn safe" style="padding: 8px 16px;" onclick="showToast('Message verified and marked safe', 'safe')">Mark safe</button>
+          </div>
+        </main>
+      </div>
+    </section>
+  </main>
+
+  <!-- Inspector Slide-Over / Modal for Concept A -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+      <div class="modal-head">
+        <h3 id="modal-title">Header Inspection</h3>
+        <button class="modal-close-btn" onclick="closeModalDirect()">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div><strong>Sender:</strong> <code id="modal-sender" style="color: var(--accent); font-family: var(--font-mono);"></code></div>
+        <div><strong>Threat Score:</strong> <span id="modal-score" style="font-weight: 700; color: var(--danger); font-family: var(--font-mono);"></span></div>
+        <div><strong>Diagnostic Verdict:</strong> <p id="modal-desc" style="margin-top: 4px; line-height: 1.5;"></p></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Stack -->
+  <div class="toast-stack" id="toast-stack"></div>
+
+  <!-- JavaScript Logic -->
+  <script>
+    /* Model Switching */
+    const modelDescriptions = {
+      a: "Operator triage queue: 1-click disposition and blast-radius containment.",
+      b: "Security posture overview: safe rate trajectory, threat vector breakdown, and domain telemetry.",
+      c: "Forensic deep-dive: master-detail inspector with live authentication matrix and sandbox IOCs."
+    };
+
+    function switchModel(modelKey) {
+      document.querySelectorAll('.model-tab-btn').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.concept-container').forEach(el => el.classList.remove('active'));
+
+      const activeBtn = document.getElementById(`btn-model-${modelKey}`);
+      const activeView = document.getElementById(`view-concept-${modelKey}`);
+      const descEl = document.getElementById('switcher-desc');
+
+      if (activeBtn) activeBtn.classList.add('active');
+      if (activeView) activeView.classList.add('active');
+      if (descEl) descEl.textContent = modelDescriptions[modelKey];
+    }
+
+    /* Toast Notifications with Undo */
+    function showToast(message, type = 'info', undoCallback = null) {
+      const stack = document.getElementById('toast-stack');
+      const toast = document.createElement('div');
+      toast.className = `toast-msg ${type}-toast`;
+      
+      let html = `<span>${message}</span>`;
+      if (undoCallback) {
+        html += `<button class="toast-undo">Undo</button>`;
+      }
+      toast.innerHTML = html;
+
+      if (undoCallback) {
+        const undoBtn = toast.querySelector('.toast-undo');
+        undoBtn.addEventListener('click', () => {
+          undoCallback();
+          toast.remove();
+        });
+      }
+
+      stack.appendChild(toast);
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transition = 'opacity 0.25s ease';
+        setTimeout(() => toast.remove(), 250);
+      }, 3600);
+    }
+
+    /* Concept A Logic */
+    let pendingCount = 4;
+    let criticalCount = 2;
+    let suspiciousCount = 1;
+    let lowCount = 1;
+
+    function filterQueueCards(severity, btn) {
+      document.querySelectorAll('.ca-pill-filter').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const cards = document.querySelectorAll('.ca-threat-card');
+      cards.forEach(card => {
+        if (severity === 'all' || card.dataset.severity === severity) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+    }
+
+    function dismissThreatCard(cardId, feedbackText) {
+      const card = document.getElementById(cardId);
+      if (!card) return;
+
+      const severity = card.dataset.severity;
+      card.classList.add('dismissing');
+
+      setTimeout(() => {
+        card.remove();
+        pendingCount--;
+        if (severity === 'critical') criticalCount--;
+        if (severity === 'suspicious') suspiciousCount--;
+        if (severity === 'low') lowCount--;
+
+        updateCounters();
+      }, 200);
+
+      showToast(feedbackText, severity === 'critical' ? 'danger' : 'safe');
+    }
+
+    function updateCounters() {
+      const pendingEl = document.getElementById('ca-pending-count');
+      const critEl = document.getElementById('ca-crit-count');
+      const cntAll = document.getElementById('ca-cnt-all');
+      const cntCrit = document.getElementById('ca-cnt-crit');
+      const cntSus = document.getElementById('ca-cnt-sus');
+      const cntLow = document.getElementById('ca-cnt-low');
+
+      if (pendingEl) pendingEl.textContent = pendingCount;
+      if (critEl) critEl.textContent = criticalCount;
+      if (cntAll) cntAll.textContent = pendingCount;
+      if (cntCrit) cntCrit.textContent = criticalCount;
+      if (cntSus) cntSus.textContent = suspiciousCount;
+      if (cntLow) cntLow.textContent = lowCount;
+    }
+
+    function bulkQuarantineCritical() {
+      const critCards = document.querySelectorAll('.ca-threat-card[data-severity="critical"]');
+      if (critCards.length === 0) {
+        showToast('No critical threats currently pending review', 'info');
+        return;
+      }
+      critCards.forEach(c => c.classList.add('dismissing'));
+      setTimeout(() => {
+        critCards.forEach(c => c.remove());
+        pendingCount -= criticalCount;
+        criticalCount = 0;
+        updateCounters();
+      }, 200);
+      showToast('Bulk quarantine executed: 2 critical attacks isolated', 'danger');
+    }
+
+    function triggerMailSync() {
+      showToast('Polling Microsoft Graph and Google Workspace mailboxes...', 'info');
+      setTimeout(() => {
+        showToast('Sync completed: 0 new threats detected', 'safe');
+      }, 1000);
+    }
+
+    function openModal(title, sender, score, desc) {
+      document.getElementById('modal-title').textContent = title;
+      document.getElementById('modal-sender').textContent = sender;
+      document.getElementById('modal-score').textContent = score + '/100';
+      document.getElementById('modal-desc').textContent = desc;
+      document.getElementById('modal-overlay').classList.add('active');
+    }
+
+    function closeModal(e) {
+      if (e.target.id === 'modal-overlay') closeModalDirect();
+    }
+
+    function closeModalDirect() {
+      document.getElementById('modal-overlay').classList.remove('active');
+    }
+
+    /* Concept B Logic: Time Ranges & Interactive Chart */
+    const timeRangeData = {
+      '24h': {
+        score: '99.1',
+        scanned: '248',
+        quarantined: '3',
+        auth: '5',
+        heading: 'Safe rate at 99.1% in the last 24 hours.',
+        sub: 'Gateway traffic is quiet. 3 lookalike phishing messages were blocked automatically.',
+        cleanPoints: '0,165 90,158 180,150 270,145 360,142 450,138 540,140',
+        susPoints: '0,175 90,172 180,170 270,168 360,169 450,165 540,168',
+        blockPoints: '0,178 90,178 180,164 270,178 360,178 450,178 540,178',
+        dates: ['00:00', '04:00', '08:00', '12:00', '16:00']
+      },
+      '7d': {
+        score: '98.2',
+        scanned: '1,420',
+        quarantined: '14',
+        auth: '28',
+        heading: 'Safe rate steady at 98.2% across active inboxes.',
+        sub: 'Inbound verification is steady over the past 7 days. Three lookalike domain attempts were blocked.',
+        cleanPoints: '0,150 45,145 90,140 135,138 180,135 225,140 270,130 315,132 360,128 405,124 450,130 495,122 540,125',
+        susPoints: '0,172 45,170 90,173 135,168 180,165 225,169 270,162 315,164 360,160 405,158 450,163 495,157 540,159',
+        blockPoints: '0,178 45,177 90,178 135,175 180,174 225,160 270,176 315,177 360,178 405,171 450,177 495,172 540,177',
+        dates: ['Nov 12', 'Nov 15', 'Nov 18', 'Nov 21', 'Nov 25']
+      },
+      '30d': {
+        score: '97.6',
+        scanned: '6,180',
+        quarantined: '62',
+        auth: '114',
+        heading: 'Safe rate at 97.6% over the last 30 days.',
+        sub: 'Overall protection remains above the 97% SLA target. Phishing campaigns peaked around mid-month.',
+        cleanPoints: '0,140 90,135 180,130 270,125 360,130 450,120 540,122',
+        susPoints: '0,168 90,165 180,160 270,162 360,158 450,154 540,156',
+        blockPoints: '0,176 90,172 180,160 270,175 360,170 450,172 540,174',
+        dates: ['Nov 01', 'Nov 08', 'Nov 15', 'Nov 22', 'Nov 29']
+      },
+      '90d': {
+        score: '97.9',
+        scanned: '18,440',
+        quarantined: '194',
+        auth: '342',
+        heading: 'Quarterly safe rate verified at 97.9%.',
+        sub: '194 targeted threats isolated across the quarter with zero successful account takeovers.',
+        cleanPoints: '0,135 90,130 180,128 270,124 360,120 450,118 540,120',
+        susPoints: '0,165 90,162 180,158 270,155 360,150 450,152 540,154',
+        blockPoints: '0,175 90,170 180,168 270,162 360,170 450,165 540,168',
+        dates: ['Sep 01', 'Sep 25', 'Oct 15', 'Nov 05', 'Nov 25']
+      }
+    };
+
+    function selectTimeRange(range, btn) {
+      document.querySelectorAll('.cb-time-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      const data = timeRangeData[range];
+      if (!data) return;
+
+      document.getElementById('cb-score-display').textContent = data.score;
+      document.getElementById('cb-m-scanned').textContent = data.scanned;
+      document.getElementById('cb-m-quarantined').textContent = data.quarantined;
+      document.getElementById('cb-m-auth').textContent = data.auth;
+      document.getElementById('cb-banner-heading').textContent = data.heading;
+      document.getElementById('cb-banner-sub').textContent = data.sub;
+
+      document.getElementById('cb-chart-clean').setAttribute('points', data.cleanPoints);
+      document.getElementById('cb-chart-sus').setAttribute('points', data.susPoints);
+      document.getElementById('cb-chart-blocked').setAttribute('points', data.blockPoints);
+
+      for (let i = 0; i < 5; i++) {
+        const dEl = document.getElementById(`cb-date-${i+1}`);
+        if (dEl && data.dates[i]) dEl.textContent = data.dates[i];
+      }
+
+      showToast(`Telemetry updated to ${range} window`, 'info');
+    }
+
+    function showChartTooltip(msg) {
+      const tt = document.getElementById('cb-tooltip');
+      tt.textContent = msg;
+      tt.style.opacity = '1';
+    }
+
+    function hideChartTooltip() {
+      const tt = document.getElementById('cb-tooltip');
+      tt.style.opacity = '0';
+    }
+
+    /* Concept C: Forensic Master-Detail Switcher */
+    const forensicEmails = {
+      1: {
+        id: 'sec-894210',
+        subject: 'Updated Employee Handbook.pdf.exe',
+        from: 'hr-support@external-mail.net',
+        envelope: 'bounce@node-91.external-mail.net',
+        score: '95',
+        scoreLabel: 'Critical threat',
+        scoreClass: 'danger',
+        spf: { status: 'NONE', text: 'No SPF record for domain', cls: 'none' },
+        dkim: { status: 'FAIL', text: 'Signature missing or corrupt', cls: 'fail' },
+        dmarc: { status: 'FAIL', text: 'Policy p=reject requested', cls: 'fail' },
+        align: { status: 'MISMATCH', text: 'Header From != Return-Path', cls: 'fail' },
+        iocs: [
+          { type: 'ATTACHMENT', badgeCls: 'danger', title: 'Handbook.pdf.exe (428 KB, Entropy 7.84, Win32 PE)', sub: 'SHA256: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
+          { type: 'HEURISTIC', badgeCls: 'warning', title: 'Double extension evasion', sub: 'File disguised with trailing .pdf prefix to deceive Windows Explorer defaults.' }
+        ],
+        rfc: `Delivered-To: victim@company.com\nReceived: from node-91.external-mail.net (185.220.101.5)\nReturn-Path: <bounce@node-91.external-mail.net>\nAuthentication-Results: mx.google.com; spf=neutral; dkim=fail; dmarc=fail (p=REJECT)\nFrom: "HR Portal" <hr-support@external-mail.net>\nSubject: Updated Employee Handbook.pdf.exe\nContent-Type: application/x-msdownload; name="Handbook.pdf.exe"`
+      },
+      2: {
+        id: 'sec-894208',
+        subject: 'Urgent: Wire Transfer Verification Required #9281',
+        from: 'billing@intuit-quickb00ks.com',
+        envelope: 'mailer@intuit-quickb00ks.com',
+        score: '92',
+        scoreLabel: 'Critical threat',
+        scoreClass: 'danger',
+        spf: { status: 'FAIL', text: 'IP 194.135.21.90 not permitted', cls: 'fail' },
+        dkim: { status: 'FAIL', text: 'Key not found in DNS', cls: 'fail' },
+        dmarc: { status: 'FAIL', text: 'Homoglyph alignment rejected', cls: 'fail' },
+        align: { status: 'MISMATCH', text: 'Lookalike punycode domain', cls: 'fail' },
+        iocs: [
+          { type: 'HOMOGLYPH', badgeCls: 'danger', title: 'Domain spoofing Intuit QuickBooks', sub: 'quickb00ks.com registered 48h ago via privacy registrar in Curacao.' },
+          { type: 'URL REDIRECT', badgeCls: 'warning', title: 'hxxps://secure-wire-intuit.cloud/verify-9281', sub: 'Target resolves to known rogue banking destination IP 194.135.21.90.' }
+        ],
+        rfc: `Delivered-To: finance@company.com\nReceived: from rogue-relay.server (194.135.21.90)\nReturn-Path: <mailer@intuit-quickb00ks.com>\nAuthentication-Results: mx.google.com; spf=fail smtp.mailfrom=intuit-quickb00ks.com; dkim=fail; dmarc=fail\nFrom: "Intuit Billing" <billing@intuit-quickb00ks.com>\nSubject: Urgent: Wire Transfer Verification Required #9281`
+      },
+      3: {
+        id: 'sec-894195',
+        subject: 'Password Expiry in 2 Hours - Action Required',
+        from: 'it-support@m1crosoft-office.com',
+        envelope: 'relay@m1crosoft-office.com',
+        score: '88',
+        scoreLabel: 'High threat',
+        scoreClass: 'warning',
+        spf: { status: 'SOFTFAIL', text: 'Domain owner designated ~all', cls: 'fail' },
+        dkim: { status: 'NONE', text: 'No DKIM signature found', cls: 'none' },
+        dmarc: { status: 'FAIL', text: 'DMARC alignment failed', cls: 'fail' },
+        align: { status: 'MISMATCH', text: 'Impersonating Microsoft 365', cls: 'fail' },
+        iocs: [
+          { type: 'CREDENTIAL HARVEST', badgeCls: 'danger', title: 'Reverse-proxy AiTM phishing kit', sub: 'Destination: hxxps://m1crosoft-office.workers.dev/auth/login?session=active' },
+          { type: 'DECEPTIVE FROM', badgeCls: 'warning', title: 'Homoglyph substitution (1 -> i)', sub: 'From header displays "Office 365 Admin" while domain is m1crosoft-office.com.' }
+        ],
+        rfc: `Delivered-To: executive@company.com\nReceived: from mail.m1crosoft-office.com (104.21.44.18)\nReturn-Path: <relay@m1crosoft-office.com>\nAuthentication-Results: mx.google.com; spf=softfail; dmarc=fail\nFrom: "Office 365 Admin" <it-support@m1crosoft-office.com>\nSubject: Password Expiry in 2 Hours - Action Required`
+      },
+      4: {
+        id: 'sec-894172',
+        subject: 'Invoice #89421 Delivery Confirmation',
+        from: 'vendor-portal@acmeparts.de',
+        envelope: 'bounces@acmeparts.de',
+        score: '44',
+        scoreLabel: 'Low threat',
+        scoreClass: 'safe',
+        spf: { status: 'PASS', text: 'IP authorized by SPF record', cls: 'pass' },
+        dkim: { status: 'PASS', text: 'Signature verified (rsa-2048)', cls: 'pass' },
+        dmarc: { status: 'PASS', text: 'DMARC alignment verified', cls: 'pass' },
+        align: { status: 'PASS', text: 'Header From == Return-Path', cls: 'pass' },
+        iocs: [
+          { type: 'BEACON', badgeCls: 'safe', title: 'Invisible 1x1 tracking pixel', sub: 'Endpoint: hxxps://telemetry.acmeparts.de/trk/89421.png (sanitized)' }
+        ],
+        rfc: `Delivered-To: purchasing@company.com\nReceived: from mail.acmeparts.de (195.201.88.14)\nReturn-Path: <bounces@acmeparts.de>\nAuthentication-Results: mx.google.com; spf=pass; dkim=pass header.i=@acmeparts.de; dmarc=pass\nFrom: "Acme Parts Logistics" <vendor-portal@acmeparts.de>\nSubject: Invoice #89421 Delivery Confirmation`
+      }
+    };
+
+    function selectForensicEmail(id, rowEl) {
+      if (rowEl) {
+        document.querySelectorAll('.cc-email-row').forEach(r => r.classList.remove('selected'));
+        rowEl.classList.add('selected');
+      }
+
+      const item = forensicEmails[id];
+      if (!item) return;
+
+      document.getElementById('cc-forensic-id').textContent = 'Forensic report ID #' + item.id;
+      document.getElementById('cc-subject-heading').textContent = item.subject;
+      document.getElementById('cc-from-code').textContent = item.from;
+      document.getElementById('cc-env-code').textContent = item.envelope;
+
+      const jumboScore = document.getElementById('cc-jumbo-score');
+      jumboScore.textContent = item.score;
+      jumboScore.className = `cc-score-jumbo ${item.scoreClass}`;
+      document.getElementById('cc-jumbo-label').textContent = item.scoreLabel;
+
+      const setAuthTile = (type, data) => {
+        const statusEl = document.getElementById(`cc-${type}-status`);
+        const expEl = document.getElementById(`cc-${type}-exp`);
+        statusEl.textContent = data.status;
+        statusEl.className = `cc-auth-status ${data.cls}`;
+        expEl.textContent = data.text;
+      };
+
+      setAuthTile('spf', item.spf);
+      setAuthTile('dkim', item.dkim);
+      setAuthTile('dmarc', item.dmarc);
+      setAuthTile('align', item.align);
+
+      const iocContainer = document.getElementById('cc-ioc-list');
+      iocContainer.innerHTML = item.iocs.map(ioc => `
+        <div class="cc-ioc-item">
+          <span class="cc-ioc-chip ${ioc.badgeCls}">${ioc.type}</span>
+          <div class="cc-ioc-text">
+            <strong>${ioc.title}</strong>
+            <div class="cc-ioc-hash">${ioc.sub}</div>
+          </div>
+        </div>
+      `).join('');
+
+      document.getElementById('cc-raw-rfc-pre').textContent = item.rfc.replace(/\n/g, '
+');
+    }
+
+    function toggleRawHeaders() {
+      const pre = document.getElementById('cc-raw-rfc-pre');
+      const hint = document.getElementById('cc-raw-toggle-hint');
+      if (pre.classList.contains('hidden')) {
+        pre.classList.remove('hidden');
+        hint.textContent = 'Click to collapse';
+      } else {
+        pre.classList.add('hidden');
+        hint.textContent = 'Click to expand';
+      }
+    }
+
+    function filterForensicList(val) {
+      val = val.toLowerCase();
+      const rows = document.querySelectorAll('.cc-email-row');
+      rows.forEach(r => {
+        const text = r.textContent.toLowerCase();
+        r.style.display = text.includes(val) ? 'block' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,2422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SecureInbox — SOC Triage & Action Queue</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-base: #0b0f17;
+      --bg-surface: #111827;
+      --bg-surface-elevated: #162032;
+      --bg-surface-hover: #1c283f;
+      --border-subtle: #1e293b;
+      --border-focus: #334155;
+      
+      --text-primary: #f8fafc;
+      --text-secondary: #94a3b8;
+      --text-muted: #64748b;
+      
+      --accent-blue: #38bdf8;
+      --accent-blue-dim: rgba(56, 189, 248, 0.12);
+      
+      --danger-rose: #f43f5e;
+      --danger-rose-dim: rgba(244, 63, 94, 0.12);
+      --danger-rose-border: rgba(244, 63, 94, 0.35);
+      
+      --warn-amber: #f59e0b;
+      --warn-amber-dim: rgba(245, 158, 11, 0.12);
+      --warn-amber-border: rgba(245, 158, 11, 0.35);
+      
+      --safe-emerald: #10b981;
+      --safe-emerald-dim: rgba(16, 185, 129, 0.12);
+      --safe-emerald-border: rgba(16, 185, 129, 0.35);
+
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      
+      --radius-sm: 6px;
+      --radius-md: 8px;
+      --radius-lg: 12px;
+      --shadow-soft: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Top Navigation Bar */
+    header.top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      height: 64px;
+      padding: 0 24px;
+      background: rgba(11, 15, 23, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border-subtle);
+    }
+
+    .brand-cluster {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .brand-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+      color: inherit;
+    }
+
+    .logo-icon {
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
+      border: 1px solid rgba(56, 189, 248, 0.4);
+      border-radius: var(--radius-sm);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+    }
+
+    .brand-title {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--text-primary);
+    }
+
+    .env-tag {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.25);
+      padding: 2px 8px;
+      border-radius: 999px;
+    }
+
+    .top-telemetry {
+      display: flex;
+      align-items: center;
+      gap: 28px;
+    }
+
+    /* Safe Rate Gauge */
+    .gauge-wrapper {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 6px 14px;
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    .gauge-svg-container {
+      position: relative;
+      width: 42px;
+      height: 42px;
+    }
+
+    .gauge-svg-container svg {
+      transform: rotate(-90deg);
+    }
+
+    .gauge-bg {
+      fill: none;
+      stroke: #1e293b;
+      stroke-width: 3.5;
+    }
+
+    .gauge-progress {
+      fill: none;
+      stroke: var(--safe-emerald);
+      stroke-width: 3.5;
+      stroke-linecap: round;
+      stroke-dasharray: 100;
+      stroke-dashoffset: 3.6; /* 96.4% */
+      transition: stroke-dashoffset 1s ease;
+    }
+
+    .gauge-val-inner {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--safe-emerald);
+    }
+
+    .gauge-details {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .gauge-details .label {
+      font-size: 11px;
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+
+    .gauge-details .sub {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+    }
+
+    /* Active Mailbox Status */
+    .active-account-pill {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 14px;
+      background: rgba(17, 24, 39, 0.6);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+    }
+
+    .pulse-indicator {
+      position: relative;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--safe-emerald);
+    }
+
+    .pulse-indicator::after {
+      content: '';
+      position: absolute;
+      inset: -3px;
+      border-radius: 50%;
+      border: 1.5px solid var(--safe-emerald);
+      animation: pulse-ring 2.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+      opacity: 0.7;
+    }
+
+    @keyframes pulse-ring {
+      0% { transform: scale(0.6); opacity: 0.9; }
+      70% { transform: scale(1.8); opacity: 0; }
+      100% { transform: scale(1.8); opacity: 0; }
+    }
+
+    .account-meta {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .account-email {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .account-sync {
+      font-size: 10px;
+      color: var(--text-muted);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sync-latency {
+      color: var(--safe-emerald);
+      font-family: var(--font-mono);
+    }
+
+    /* Header Actions & Shortcuts */
+    .header-controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .badge-queue-pending {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 10px;
+      background: rgba(244, 63, 94, 0.15);
+      border: 1px solid var(--danger-rose-border);
+      border-radius: 999px;
+      color: #fecdd3;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .badge-queue-pending .count {
+      background: var(--danger-rose);
+      color: #fff;
+      padding: 1px 6px;
+      border-radius: 10px;
+      font-size: 10px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+    }
+
+    .shortcut-guide {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      color: var(--text-muted);
+      border: 1px solid var(--border-subtle);
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      background: var(--bg-surface);
+    }
+
+    .kbd-chip {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: var(--text-secondary);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 5px;
+      border-radius: 3px;
+    }
+
+    /* Main Dashboard Grid */
+    main.dashboard-grid {
+      display: grid;
+      grid-template-columns: minmax(680px, 1fr) 390px;
+      gap: 20px;
+      padding: 24px;
+      max-width: 1720px;
+      margin: 0 auto;
+    }
+
+    @media (max-width: 1280px) {
+      main.dashboard-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    /* Left Column: Triage & Action Queue */
+    .queue-section {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Queue Header & Filters */
+    .queue-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 12px 16px;
+    }
+
+    .queue-filter-tabs {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .filter-btn {
+      background: transparent;
+      border: 1px solid transparent;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      transition: all 0.15s ease;
+    }
+
+    .filter-btn:hover {
+      background: rgba(255, 255, 255, 0.04);
+      color: var(--text-primary);
+    }
+
+    .filter-btn.active {
+      background: var(--bg-surface-elevated);
+      color: var(--text-primary);
+      border-color: var(--border-focus);
+      font-weight: 600;
+    }
+
+    .filter-badge {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      padding: 1px 6px;
+      border-radius: 999px;
+      background: #1e293b;
+      color: var(--text-secondary);
+    }
+
+    .filter-btn.active .filter-badge {
+      background: var(--accent-blue-dim);
+      color: var(--accent-blue);
+    }
+
+    .filter-badge.danger {
+      background: var(--danger-rose-dim);
+      color: var(--danger-rose);
+    }
+
+    .filter-badge.warning {
+      background: var(--warn-amber-dim);
+      color: var(--warn-amber);
+    }
+
+    .queue-search-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-grow: 1;
+      max-width: 380px;
+    }
+
+    .search-input-wrap {
+      position: relative;
+      width: 100%;
+    }
+
+    .search-input-wrap svg {
+      position: absolute;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      pointer-events: none;
+    }
+
+    .search-input {
+      width: 100%;
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      color: var(--text-primary);
+      font-family: var(--font-sans);
+      font-size: 12px;
+      padding: 7px 10px 7px 32px;
+      outline: none;
+      transition: border-color 0.15s ease;
+    }
+
+    .search-input:focus {
+      border-color: var(--accent-blue);
+    }
+
+    .sort-select {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      outline: none;
+      cursor: pointer;
+    }
+
+    /* Queue Action Cards Container */
+    .queue-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Individual Threat Card */
+    .threat-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease, opacity 0.25s ease;
+    }
+
+    .threat-card:hover {
+      border-color: var(--border-focus);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .threat-card.selected {
+      border-color: rgba(56, 189, 248, 0.45);
+      background: linear-gradient(180deg, rgba(56, 189, 248, 0.03) 0%, rgba(17, 24, 39, 1) 100%);
+    }
+
+    .threat-card.resolved-exit {
+      opacity: 0;
+      transform: translateX(40px) scale(0.98);
+      pointer-events: none;
+    }
+
+    /* Urgency status border accent */
+    .threat-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 4px;
+    }
+
+    .threat-card[data-urgency="critical"]::before {
+      background: var(--danger-rose);
+      box-shadow: 0 0 10px rgba(244, 63, 94, 0.5);
+    }
+
+    .threat-card[data-urgency="high"]::before {
+      background: var(--warn-amber);
+      box-shadow: 0 0 10px rgba(245, 158, 11, 0.4);
+    }
+
+    .threat-card[data-urgency="medium"]::before {
+      background: #0ea5e9;
+    }
+
+    /* Card Top Bar */
+    .card-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .card-meta-main {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex: 1;
+    }
+
+    .card-subject-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .card-subject {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      color: var(--text-primary);
+      line-height: 1.3;
+    }
+
+    .sender-badge-group {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      font-size: 12px;
+      color: var(--text-secondary);
+      flex-wrap: wrap;
+    }
+
+    .sender-name {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .sender-address {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 1px 6px;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .sender-address.suspicious-domain {
+      border-color: rgba(244, 63, 94, 0.4);
+      color: #fda4af;
+      background: rgba(244, 63, 94, 0.08);
+    }
+
+    .recipient-tag {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+    }
+
+    /* Urgency & Risk Score Badge */
+    .risk-score-badge {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      border-radius: var(--radius-md);
+      flex-shrink: 0;
+    }
+
+    .risk-score-badge.critical {
+      background: var(--danger-rose-dim);
+      border: 1px solid var(--danger-rose-border);
+      color: #fecdd3;
+    }
+
+    .risk-score-badge.high {
+      background: var(--warn-amber-dim);
+      border: 1px solid var(--warn-amber-border);
+      color: #fef3c7;
+    }
+
+    .risk-score-badge.medium {
+      background: rgba(14, 165, 233, 0.12);
+      border: 1px solid rgba(14, 165, 233, 0.35);
+      color: #bae6fd;
+    }
+
+    .risk-num {
+      font-size: 18px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      line-height: 1;
+    }
+
+    .risk-scale {
+      font-size: 10px;
+      opacity: 0.7;
+    }
+
+    .risk-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    /* Forensic Indicators Matrix */
+    .forensic-pills-row {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: var(--radius-md);
+    }
+
+    .forensic-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 11px;
+      font-family: var(--font-mono);
+      padding: 3px 8px;
+      border-radius: 4px;
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      color: var(--text-secondary);
+    }
+
+    .forensic-pill.flag-fail {
+      background: rgba(244, 63, 94, 0.12);
+      border-color: rgba(244, 63, 94, 0.3);
+      color: #fda4af;
+    }
+
+    .forensic-pill.flag-warn {
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.3);
+      color: #fde68a;
+    }
+
+    .forensic-pill.flag-pass {
+      background: rgba(16, 185, 129, 0.1);
+      border-color: rgba(16, 185, 129, 0.25);
+      color: #6ee7b7;
+    }
+
+    .forensic-pill strong {
+      color: var(--text-primary);
+      font-weight: 600;
+    }
+
+    .forensic-pill .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+    }
+
+    .forensic-pill.flag-fail .dot { background: var(--danger-rose); }
+    .forensic-pill.flag-warn .dot { background: var(--warn-amber); }
+    .forensic-pill.flag-pass .dot { background: var(--safe-emerald); }
+
+    /* Threat Context Details */
+    .threat-summary-snippet {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.4;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .snippet-highlight {
+      color: #e2e8f0;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+
+    .timestamp-badge {
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-left: auto;
+      white-space: nowrap;
+      font-family: var(--font-mono);
+    }
+
+    /* 1-Click Action Bar */
+    .card-actions-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .action-group-primary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .action-group-secondary {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 6px 14px;
+      font-family: var(--font-sans);
+      font-size: 12px;
+      font-weight: 600;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s ease;
+      outline: none;
+      border: 1px solid transparent;
+      white-space: nowrap;
+      text-decoration: none;
+    }
+
+    .btn:active {
+      transform: translateY(1px);
+    }
+
+    .btn-quarantine {
+      background: var(--danger-rose);
+      color: #ffffff;
+      border-color: rgba(244, 63, 94, 0.8);
+      box-shadow: 0 1px 3px rgba(244, 63, 94, 0.3);
+    }
+
+    .btn-quarantine:hover {
+      background: #e11d48;
+      box-shadow: 0 2px 6px rgba(244, 63, 94, 0.4);
+    }
+
+    .btn-block {
+      background: var(--bg-surface-elevated);
+      color: #fde68a;
+      border-color: var(--warn-amber-border);
+    }
+
+    .btn-block:hover {
+      background: rgba(245, 158, 11, 0.15);
+      border-color: var(--warn-amber);
+      color: #fff;
+    }
+
+    .btn-dismiss {
+      background: transparent;
+      color: var(--text-secondary);
+      border-color: var(--border-subtle);
+    }
+
+    .btn-dismiss:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+      border-color: var(--border-focus);
+    }
+
+    .btn-inspect {
+      background: var(--accent-blue-dim);
+      color: var(--accent-blue);
+      border-color: rgba(56, 189, 248, 0.3);
+    }
+
+    .btn-inspect:hover {
+      background: rgba(56, 189, 248, 0.2);
+      border-color: var(--accent-blue);
+    }
+
+    .btn-inspect.active {
+      background: var(--accent-blue);
+      color: #0b0f17;
+      border-color: var(--accent-blue);
+      font-weight: 700;
+    }
+
+    .btn-sm {
+      padding: 4px 10px;
+      font-size: 11px;
+    }
+
+    /* Right Column: Telemetry & Inspector Panel */
+    .sidebar-pane {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Micro Telemetry Widget */
+    .telemetry-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .card-heading-simple {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: -0.01em;
+      border-bottom: 1px solid var(--border-subtle);
+      padding-bottom: 10px;
+    }
+
+    .sub-indicator {
+      font-size: 10px;
+      color: var(--text-muted);
+      font-family: var(--font-mono);
+      font-weight: normal;
+    }
+
+    .telemetry-metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .metric-box {
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-md);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .metric-label {
+      font-size: 11px;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .metric-value-row {
+      display: flex;
+      align-items: baseline;
+      gap: 6px;
+    }
+
+    .metric-val {
+      font-size: 20px;
+      font-weight: 700;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+      line-height: 1.1;
+    }
+
+    .metric-unit {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .metric-trend {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      font-weight: 600;
+    }
+
+    .metric-trend.good {
+      color: var(--safe-emerald);
+    }
+
+    .metric-trend.neutral {
+      color: var(--accent-blue);
+    }
+
+    /* Attack Category Stacked Bar */
+    .attack-distribution {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .dist-label-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+
+    .dist-bar {
+      height: 8px;
+      background: #1e293b;
+      border-radius: 4px;
+      overflow: hidden;
+      display: flex;
+    }
+
+    .dist-seg {
+      height: 100%;
+      transition: width 0.3s ease;
+    }
+
+    .dist-seg.phish { background: var(--danger-rose); width: 56%; }
+    .dist-seg.malware { background: var(--warn-amber); width: 28%; }
+    .dist-seg.bec { background: #38bdf8; width: 16%; }
+
+    .dist-legend {
+      display: flex;
+      justify-content: space-between;
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      padding-top: 2px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .legend-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 2px;
+    }
+
+    /* Quick Inspector Panel */
+    .inspector-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: var(--shadow-soft);
+      position: sticky;
+      top: 84px;
+    }
+
+    .inspector-header {
+      padding: 14px 16px;
+      background: var(--bg-surface-elevated);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .inspector-title-cluster {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .inspector-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .inspector-msg-id {
+      font-size: 10px;
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+    }
+
+    .inspector-tabs {
+      display: flex;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--border-subtle);
+      padding: 0 12px;
+    }
+
+    .insp-tab {
+      padding: 8px 12px;
+      background: transparent;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-secondary);
+      font-family: var(--font-sans);
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .insp-tab:hover {
+      color: var(--text-primary);
+    }
+
+    .insp-tab.active {
+      color: var(--accent-blue);
+      border-bottom-color: var(--accent-blue);
+    }
+
+    .inspector-body {
+      padding: 16px;
+      max-height: 480px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    /* Forensic Key Value rows */
+    .kv-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .kv-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      padding: 8px 10px;
+      background: var(--bg-base);
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+    }
+
+    .kv-item .k {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+    }
+
+    .kv-item .v {
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+      word-break: break-all;
+    }
+
+    .kv-item .v.danger {
+      color: #fca5a5;
+    }
+
+    /* Payload / Link Defanged Box */
+    .defanged-box {
+      background: #090d14;
+      border: 1px solid rgba(244, 63, 94, 0.25);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: #fecdd3;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .defanged-title {
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 700;
+      color: var(--danger-rose);
+      letter-spacing: 0.05em;
+    }
+
+    /* Raw Headers Viewer */
+    .raw-code-block {
+      background: #080c13;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 10.5px;
+      color: #94a3b8;
+      line-height: 1.45;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      max-height: 260px;
+    }
+
+    .raw-code-block .hl-key {
+      color: #38bdf8;
+    }
+
+    .raw-code-block .hl-val {
+      color: #cbd5e1;
+    }
+
+    .raw-code-block .hl-fail {
+      color: #f43f5e;
+      font-weight: 600;
+    }
+
+    /* Toast Notification */
+    .toast-container {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      z-index: 999;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+
+    .toast-item {
+      pointer-events: auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 12px 18px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: var(--radius-md);
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7);
+      color: var(--text-primary);
+      font-size: 12px;
+      animation: slide-in-toast 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .toast-item.success {
+      border-left: 4px solid var(--safe-emerald);
+    }
+
+    .toast-item.danger {
+      border-left: 4px solid var(--danger-rose);
+    }
+
+    .toast-item.info {
+      border-left: 4px solid var(--accent-blue);
+    }
+
+    .toast-undo-btn {
+      background: transparent;
+      border: 1px solid #475569;
+      color: #f8fafc;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .toast-undo-btn:hover {
+      background: #334155;
+    }
+
+    @keyframes slide-in-toast {
+      from { transform: translateY(15px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    /* Empty state */
+    .queue-empty-state {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 64px 24px;
+      background: var(--bg-surface);
+      border: 1px dashed var(--border-subtle);
+      border-radius: var(--radius-lg);
+      gap: 12px;
+    }
+
+    .queue-empty-state.visible {
+      display: flex;
+    }
+
+    .empty-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      background: var(--safe-emerald-dim);
+      border: 1px solid var(--safe-emerald-border);
+      color: var(--safe-emerald);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .empty-title {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+
+    .empty-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      max-width: 320px;
+    }
+
+    /* Live activity feed mini */
+    .activity-feed-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .activity-row {
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+      font-size: 11px;
+      color: var(--text-secondary);
+      line-height: 1.4;
+    }
+
+    .activity-time {
+      font-family: var(--font-mono);
+      color: var(--text-muted);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+
+    .activity-action {
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .activity-action.danger { color: var(--danger-rose); }
+    .activity-action.warn { color: var(--warn-amber); }
+    .activity-action.safe { color: var(--safe-emerald); }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation & Global Telemetry Bar -->
+  <header class="top-bar">
+    <div class="brand-cluster">
+      <a href="#" class="brand-logo">
+        <div class="logo-icon">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            <path d="m9 12 2 2 4-4"/>
+          </svg>
+        </div>
+        <span class="brand-title">SecureInbox</span>
+      </a>
+      <span class="env-tag">SOC Triage</span>
+    </div>
+
+    <!-- Telemetry Badges & Safe Rate Gauge -->
+    <div class="top-telemetry">
+      <!-- Safe Delivery Rate Gauge -->
+      <div class="gauge-wrapper" title="Safe delivery ratio: 96.4% of inspected messages passed heuristics in last 24h">
+        <div class="gauge-svg-container">
+          <svg viewBox="0 0 36 36" width="38" height="38">
+            <path class="gauge-bg"
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+            />
+            <path class="gauge-progress"
+              stroke-dasharray="96.4, 100"
+              d="M18 2.0845
+                a 15.9155 15.9155 0 0 1 0 31.831
+                a 15.9155 15.9155 0 0 1 0 -31.831"
+            />
+          </svg>
+          <div class="gauge-val-inner">96.4%</div>
+        </div>
+        <div class="gauge-details">
+          <span class="label">Safe Traffic Rate</span>
+          <span class="sub">+0.3% vs yesterday</span>
+        </div>
+      </div>
+
+      <!-- Active Monitored Inbox Account -->
+      <div class="active-account-pill">
+        <div class="pulse-indicator" title="Streaming telemetry active"></div>
+        <div class="account-meta">
+          <span class="account-email">security@company.com</span>
+          <span class="account-sync">
+            M365 Graph Sync &bull; <span class="sync-latency">12s ago (118ms)</span>
+          </span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Quick Status & Actions -->
+    <div class="header-controls">
+      <div class="badge-queue-pending">
+        <span>Active Queue</span>
+        <span class="count" id="headerPendingCount">4</span>
+      </div>
+
+      <div class="shortcut-guide" title="Keyboard triage keys">
+        <span>Keys:</span>
+        <span class="kbd-chip">Q</span> Quar
+        <span class="kbd-chip">B</span> Block
+        <span class="kbd-chip">I</span> Insp
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Grid -->
+  <main class="dashboard-grid">
+    
+    <!-- LEFT: Triage & Action Queue Column -->
+    <section class="queue-section" aria-label="Triage Queue">
+      
+      <!-- Toolbar: Tabs, Search, Filter -->
+      <div class="queue-toolbar">
+        <div class="queue-filter-tabs">
+          <button class="filter-btn active" data-filter="all">
+            All Reviews <span class="filter-badge" id="filterCountAll">4</span>
+          </button>
+          <button class="filter-btn" data-filter="critical">
+            Critical <span class="filter-badge danger" id="filterCountCritical">2</span>
+          </button>
+          <button class="filter-btn" data-filter="high">
+            High <span class="filter-badge warning" id="filterCountHigh">1</span>
+          </button>
+          <button class="filter-btn" data-filter="medium">
+            Medium <span class="filter-badge" id="filterCountMedium">1</span>
+          </button>
+        </div>
+
+        <div class="queue-search-controls">
+          <div class="search-input-wrap">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input type="text" id="queueSearchInput" class="search-input" placeholder="Filter by subject, sender, hash, or IOC..." autocomplete="off">
+          </div>
+          <select class="sort-select" id="sortSelect">
+            <option value="urgency-desc">Urgency (High → Low)</option>
+            <option value="time-desc">Time Received (Newest)</option>
+            <option value="risk-desc">Risk Score (Desc)</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Threat Cards List -->
+      <div class="queue-list" id="queueList">
+
+        <!-- THREAT ITEM 1: Executable Attachment (Double Extension) -->
+        <article class="threat-card selected" id="card-threat-1" data-urgency="critical" data-score="95" data-id="THREAT-8821">
+          <div class="card-top">
+            <div class="card-meta-main">
+              <div class="card-subject-row">
+                <h2 class="card-subject">Updated Employee Handbook.pdf.exe</h2>
+              </div>
+              <div class="sender-badge-group">
+                <span class="sender-name">HR Support (Spoofed)</span>
+                <span class="sender-address suspicious-domain">hr-support@external-mail.net</span>
+                <span>&rarr;</span>
+                <span class="recipient-tag">all-staff@company.com (1,420 targets)</span>
+              </div>
+            </div>
+
+            <!-- Risk Score Badge -->
+            <div class="risk-score-badge critical">
+              <div>
+                <span class="risk-num">95</span><span class="risk-scale">/100</span>
+              </div>
+              <span class="risk-label">Critical</span>
+            </div>
+          </div>
+
+          <!-- Forensics Indicators Matrix -->
+          <div class="forensic-pills-row">
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>Double Extension</strong> .pdf.exe (PE32 Binary)
+            </span>
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>Attachment Entropy</strong> 7.84 bits/byte (High)
+            </span>
+            <span class="forensic-pill flag-warn">
+              <span class="dot"></span>
+              <strong>SPF</strong> Neutral
+            </span>
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>DMARC</strong> Fail (No alignment)
+            </span>
+            <span class="forensic-pill flag-warn">
+              <span class="dot"></span>
+              <strong>DKIM</strong> Absent
+            </span>
+          </div>
+
+          <!-- Threat Context Snippet -->
+          <div class="threat-summary-snippet">
+            <span>Attachment hash: <span class="snippet-highlight">e9b418a034...719f</span> matches AgentTesla malware signature.</span>
+            <span class="timestamp-badge">14:41:09 UTC (4 mins ago)</span>
+          </div>
+
+          <!-- 1-Click Action Bar -->
+          <div class="card-actions-bar">
+            <div class="action-group-primary">
+              <button class="btn btn-quarantine" onclick="handleAction('quarantine', 'card-threat-1', 'Updated Employee Handbook.pdf.exe')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+                1-Click Quarantine (1,420)
+              </button>
+              <button class="btn btn-block" onclick="handleAction('block', 'card-threat-1', 'external-mail.net')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+                Block Domain
+              </button>
+              <button class="btn btn-dismiss" onclick="handleAction('dismiss', 'card-threat-1', 'Updated Employee Handbook.pdf.exe')">
+                Dismiss
+              </button>
+            </div>
+
+            <div class="action-group-secondary">
+              <button class="btn btn-inspect active" id="inspect-btn-threat-1" onclick="inspectThreat(1)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                Quick Inspect
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <!-- THREAT ITEM 2: Wire Transfer Lookalike Domain -->
+        <article class="threat-card" id="card-threat-2" data-urgency="critical" data-score="92" data-id="THREAT-8820">
+          <div class="card-top">
+            <div class="card-meta-main">
+              <div class="card-subject-row">
+                <h2 class="card-subject">Urgent: Wire Transfer Verification Required</h2>
+              </div>
+              <div class="sender-badge-group">
+                <span class="sender-name">Intuit Billing Services</span>
+                <span class="sender-address suspicious-domain">billing@intuit-quickb00ks.com</span>
+                <span>&rarr;</span>
+                <span class="recipient-tag">finance-ops@company.com</span>
+              </div>
+            </div>
+
+            <div class="risk-score-badge critical">
+              <div>
+                <span class="risk-num">92</span><span class="risk-scale">/100</span>
+              </div>
+              <span class="risk-label">Critical</span>
+            </div>
+          </div>
+
+          <div class="forensic-pills-row">
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>Lookalike Domain</strong> homoglyph `quickb00ks` (zeroes)
+            </span>
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>Domain Age</strong> 18 hours old
+            </span>
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>DMARC</strong> Fail (p=reject violation)
+            </span>
+            <span class="forensic-pill flag-warn">
+              <span class="dot"></span>
+              <strong>SPF</strong> Softfail (~all)
+            </span>
+            <span class="forensic-pill flag-warn">
+              <span class="dot"></span>
+              <strong>DKIM</strong> Tempfail (hash mismatch)
+            </span>
+          </div>
+
+          <div class="threat-summary-snippet">
+            <span>BEC heuristic: Impersonating QuickBooks vendor with fraudulent wire routing instructions.</span>
+            <span class="timestamp-badge">14:38:22 UTC (7 mins ago)</span>
+          </div>
+
+          <div class="card-actions-bar">
+            <div class="action-group-primary">
+              <button class="btn btn-quarantine" onclick="handleAction('quarantine', 'card-threat-2', 'Urgent: Wire Transfer Verification Required')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+                1-Click Quarantine
+              </button>
+              <button class="btn btn-block" onclick="handleAction('block', 'card-threat-2', 'intuit-quickb00ks.com')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+                Block Domain
+              </button>
+              <button class="btn btn-dismiss" onclick="handleAction('dismiss', 'card-threat-2', 'Urgent: Wire Transfer Verification Required')">
+                Dismiss
+              </button>
+            </div>
+
+            <div class="action-group-secondary">
+              <button class="btn btn-inspect" id="inspect-btn-threat-2" onclick="inspectThreat(2)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                Quick Inspect
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <!-- THREAT ITEM 3: Credential Harvester Link -->
+        <article class="threat-card" id="card-threat-3" data-urgency="high" data-score="88" data-id="THREAT-8819">
+          <div class="card-top">
+            <div class="card-meta-main">
+              <div class="card-subject-row">
+                <h2 class="card-subject">Password Expiry in 2 Hours</h2>
+              </div>
+              <div class="sender-badge-group">
+                <span class="sender-name">Global IT Support</span>
+                <span class="sender-address suspicious-domain">it-support@m1crosoft-office.com</span>
+                <span>&rarr;</span>
+                <span class="recipient-tag">c.danvers@company.com</span>
+              </div>
+            </div>
+
+            <div class="risk-score-badge high">
+              <div>
+                <span class="risk-num">88</span><span class="risk-scale">/100</span>
+              </div>
+              <span class="risk-label">High</span>
+            </div>
+          </div>
+
+          <div class="forensic-pills-row">
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>Credential Harvester</strong> O365 Reverse Proxy Link
+            </span>
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>Lookalike Domain</strong> `m1crosoft` (number 1)
+            </span>
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>SPF</strong> Fail (-all strict)
+            </span>
+            <span class="forensic-pill flag-warn">
+              <span class="dot"></span>
+              <strong>Urgency Coercion</strong> 2-hour deadline ultimatum
+            </span>
+            <span class="forensic-pill flag-fail">
+              <span class="dot"></span>
+              <strong>DKIM</strong> Invalid
+            </span>
+          </div>
+
+          <div class="threat-summary-snippet">
+            <span>Target link redirects to malicious auth proxy: <span class="snippet-highlight">hxxps://auth-m1crosoft.token-relay.cc</span></span>
+            <span class="timestamp-badge">14:32:05 UTC (13 mins ago)</span>
+          </div>
+
+          <div class="card-actions-bar">
+            <div class="action-group-primary">
+              <button class="btn btn-quarantine" onclick="handleAction('quarantine', 'card-threat-3', 'Password Expiry in 2 Hours')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+                1-Click Quarantine
+              </button>
+              <button class="btn btn-block" onclick="handleAction('block', 'card-threat-3', 'm1crosoft-office.com')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="12" cy="12" r="10"/>
+                  <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                </svg>
+                Block Domain
+              </button>
+              <button class="btn btn-dismiss" onclick="handleAction('dismiss', 'card-threat-3', 'Password Expiry in 2 Hours')">
+                Dismiss
+              </button>
+            </div>
+
+            <div class="action-group-secondary">
+              <button class="btn btn-inspect" id="inspect-btn-threat-3" onclick="inspectThreat(3)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                Quick Inspect
+              </button>
+            </div>
+          </div>
+        </article>
+
+        <!-- THREAT ITEM 4: Suspicious Tracking Pixel -->
+        <article class="threat-card" id="card-threat-4" data-urgency="medium" data-score="44" data-id="THREAT-8818">
+          <div class="card-top">
+            <div class="card-meta-main">
+              <div class="card-subject-row">
+                <h2 class="card-subject">Invoice #89421</h2>
+              </div>
+              <div class="sender-badge-group">
+                <span class="sender-name">ACME Parts Vendor Portal</span>
+                <span class="sender-address">vendor-portal@acmeparts.de</span>
+                <span>&rarr;</span>
+                <span class="recipient-tag">procurement@company.com</span>
+              </div>
+            </div>
+
+            <div class="risk-score-badge medium">
+              <div>
+                <span class="risk-num">44</span><span class="risk-scale">/100</span>
+              </div>
+              <span class="risk-label">Medium</span>
+            </div>
+          </div>
+
+          <div class="forensic-pills-row">
+            <span class="forensic-pill flag-warn">
+              <span class="dot"></span>
+              <strong>Tracking Pixel</strong> 1x1 GIF to unverified external CDN
+            </span>
+            <span class="forensic-pill flag-pass">
+              <span class="dot"></span>
+              <strong>SPF</strong> Pass (ip4:195.201.44.12)
+            </span>
+            <span class="forensic-pill flag-pass">
+              <span class="dot"></span>
+              <strong>DKIM</strong> Pass (sig: valid)
+            </span>
+            <span class="forensic-pill flag-pass">
+              <span class="dot"></span>
+              <strong>DMARC</strong> Pass (d=acmeparts.de)
+            </span>
+            <span class="forensic-pill flag-warn">
+              <span class="dot"></span>
+              <strong>Attachment</strong> Invoice_89421.pdf (Clean)
+            </span>
+          </div>
+
+          <div class="threat-summary-snippet">
+            <span>Reconnaissance beacon detected: External telemetry pixel embedded in HTML body. No malware found in PDF.</span>
+            <span class="timestamp-badge">14:19:40 UTC (26 mins ago)</span>
+          </div>
+
+          <div class="card-actions-bar">
+            <div class="action-group-primary">
+              <button class="btn btn-quarantine" onclick="handleAction('quarantine', 'card-threat-4', 'Invoice #89421')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                  <line x1="8" y1="12" x2="16" y2="12"/>
+                </svg>
+                Quarantine
+              </button>
+              <button class="btn btn-block" onclick="handleAction('strip-pixel', 'card-threat-4', 'Invoice #89421')">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+                Strip Pixel & Deliver
+              </button>
+              <button class="btn btn-dismiss" onclick="handleAction('allowlist', 'card-threat-4', 'acmeparts.de')">
+                Allowlist Sender
+              </button>
+            </div>
+
+            <div class="action-group-secondary">
+              <button class="btn btn-inspect" id="inspect-btn-threat-4" onclick="inspectThreat(4)">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <circle cx="11" cy="11" r="8"/>
+                  <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                </svg>
+                Quick Inspect
+              </button>
+            </div>
+          </div>
+        </article>
+
+      </div>
+
+      <!-- Empty State Container when all resolved -->
+      <div class="queue-empty-state" id="queueEmptyState">
+        <div class="empty-icon">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+        </div>
+        <h3 class="empty-title">Triage Queue Cleared</h3>
+        <p class="empty-desc">All pending security reviews have been triaged. Inbound traffic is actively monitored by heuristic engine v4.2.1.</p>
+        <button class="btn btn-dismiss btn-sm" onclick="resetQueueDemo()">Reset Demo Queue</button>
+      </div>
+
+    </section>
+
+    <!-- RIGHT: Telemetry & Deep Quick Inspector Panel -->
+    <aside class="sidebar-pane" aria-label="Telemetry and Inspector">
+
+      <!-- Micro Telemetry Widget -->
+      <div class="telemetry-card">
+        <div class="card-heading-simple">
+          <span>Security Operations Telemetry</span>
+          <span class="sub-indicator">Shift: UTC 14:00 - 22:00</span>
+        </div>
+
+        <div class="telemetry-metrics-grid">
+          <div class="metric-box">
+            <span class="metric-label">Triage Velocity</span>
+            <div class="metric-value-row">
+              <span class="metric-val" id="metricVelocity">42</span>
+              <span class="metric-unit">sec/item</span>
+            </div>
+            <span class="metric-trend good">&darr; 18% vs weekly avg</span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Daily Caught Attacks</span>
+            <div class="metric-value-row">
+              <span class="metric-val" id="metricCaught">147</span>
+              <span class="metric-unit">blocked</span>
+            </div>
+            <span class="metric-trend good">&uarr; +12% vs yesterday</span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">False Positive Rate</span>
+            <div class="metric-value-row">
+              <span class="metric-val">0.2</span>
+              <span class="metric-unit">%</span>
+            </div>
+            <span class="metric-trend good">Target SLA &lt; 0.5%</span>
+          </div>
+
+          <div class="metric-box">
+            <span class="metric-label">Engine Latency</span>
+            <div class="metric-value-row">
+              <span class="metric-val">14</span>
+              <span class="metric-unit">ms</span>
+            </div>
+            <span class="metric-trend neutral">Model v4.2.1-live</span>
+          </div>
+        </div>
+
+        <!-- Caught Attacks Categorical Breakdown -->
+        <div class="attack-distribution">
+          <div class="dist-label-row">
+            <span>Today's Threat Composition</span>
+            <span style="font-family: var(--font-mono);">147 items</span>
+          </div>
+          <div class="dist-bar" title="Phishing 56% | Malware 28% | BEC 16%">
+            <div class="dist-seg phish"></div>
+            <div class="dist-seg malware"></div>
+            <div class="dist-seg bec"></div>
+          </div>
+          <div class="dist-legend">
+            <div class="legend-item">
+              <span class="legend-dot" style="background: var(--danger-rose);"></span>
+              <span>Phishing (82)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: var(--warn-amber);"></span>
+              <span>Malware (41)</span>
+            </div>
+            <div class="legend-item">
+              <span class="legend-dot" style="background: #38bdf8;"></span>
+              <span>BEC (24)</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Inspector Panel -->
+      <div class="inspector-card" id="inspectorCard">
+        <div class="inspector-header">
+          <div class="inspector-title-cluster">
+            <span class="inspector-title" id="inspectorSubject">Updated Employee Handbook.pdf.exe</span>
+            <span class="inspector-msg-id" id="inspectorMsgId">RFC 822 &bull; &lt;20260906-8821@external-mail.net&gt;</span>
+          </div>
+        </div>
+
+        <div class="inspector-tabs">
+          <button class="insp-tab active" onclick="switchInspectorTab('forensics')">Threat Forensics</button>
+          <button class="insp-tab" onclick="switchInspectorTab('auth')">Auth & SPF/DKIM</button>
+          <button class="insp-tab" onclick="switchInspectorTab('payload')">Payload & IOCs</button>
+          <button class="insp-tab" onclick="switchInspectorTab('headers')">Raw Headers</button>
+        </div>
+
+        <div class="inspector-body" id="inspectorTabContent">
+          <!-- Content dynamically rendered via JS based on selected tab and active threat item -->
+        </div>
+      </div>
+
+      <!-- Micro Audit Log -->
+      <div class="telemetry-card">
+        <div class="card-heading-simple">
+          <span>Recent Analyst Actions</span>
+          <span class="sub-indicator">Live Stream</span>
+        </div>
+        <div class="activity-feed-list" id="activityFeedList">
+          <div class="activity-row">
+            <span class="activity-time">14:40:12</span>
+            <span><strong class="activity-action danger">Quarantined</strong> dhl-shipment-notice.iso &bull; AgentTesla detected</span>
+          </div>
+          <div class="activity-row">
+            <span class="activity-time">14:35:48</span>
+            <span><strong class="activity-action warn">Domain Block</strong> @login-appleid-verify.cc added to boundary perimeter</span>
+          </div>
+          <div class="activity-row">
+            <span class="activity-time">14:28:01</span>
+            <span><strong class="activity-action safe">Dismissed</strong> AWS Billing statement (Clean cryptographic DKIM match)</span>
+          </div>
+        </div>
+      </div>
+
+    </aside>
+
+  </main>
+
+  <!-- Floating Micro-Toast Feedback Container -->
+  <div class="toast-container" id="toastContainer"></div>
+
+  <!-- Interactive Logic & State Controller -->
+  <script>
+    // State Store
+    const THREAT_DATA = {
+      1: {
+        id: "THREAT-8821",
+        msgId: "<20260906-8821@external-mail.net>",
+        subject: "Updated Employee Handbook.pdf.exe",
+        senderName: "HR Support (Spoofed)",
+        senderEmail: "hr-support@external-mail.net",
+        recipient: "all-staff@company.com",
+        recipientsCount: 1420,
+        riskScore: 95,
+        urgency: "critical",
+        forensics: {
+          verdict: "High-confidence malicious payload masquerading as PDF handbook.",
+          heuristicScore: "95/100",
+          doubleExtension: "True (.pdf.exe binary container)",
+          fileType: "PE32 executable (GUI) Intel 80386, for MS Windows",
+          sha256: "e9b418a034fec8391b402808c1a938c3746a827e81057790b8f413a69312719f",
+          entropy: "7.842 bits/byte (Encrypted payload/packer: Themida v3.x)",
+          sandboxHits: "48 of 64 AV engines flag as Trojan.AgentTesla.Generic"
+        },
+        auth: {
+          spf: "Neutral (SPF record ~all, ip4:89.144.20.18 not explicitly authorized)",
+          dkim: "None (No dkim-signature header in MIME structure)",
+          dmarc: "Fail (Policy p=reject not published on external-mail.net)",
+          senderIp: "89.144.20.18 (AS49453 - Global Transit AS)",
+          ptrRecord: "mail-gw-89-144-20-18.dynamic.cloudhost.biz"
+        },
+        payload: {
+          primaryIoc: "Updated Employee Handbook.pdf.exe",
+          iocType: "Malicious Attachment (Double Extension)",
+          md5: "b45a278912e9b891823cdd19280efaa4",
+          c2Domain: "hxxp://telemetry-gateway.dynv6.net:8080/log",
+          exfilPath: "SMTP / Telegram Bot token extraction heuristic"
+        },
+        rawHeaders: `Received: from mail-gw-89-144-20-18.dynamic.cloudhost.biz (89.144.20.18)\n  by m365-inbound-edge.secureinbox.corp with ESMTP id SI-8821;\n  Sun, 06 Sep 2026 14:41:09 +0000\nFrom: "HR Support" <hr-support@external-mail.net>\nTo: <all-staff@company.com>\nSubject: Updated Employee Handbook.pdf.exe\nDate: Sun, 06 Sep 2026 14:40:48 +0000\nMessage-ID: <20260906-8821@external-mail.net>\nAuthentication-Results: secureinbox.corp;\n  spf=neutral (sender IP 89.144.20.18) smtp.mailfrom=external-mail.net;\n  dkim=none;\n  dmarc=fail action=quarantine header.from=external-mail.net\nX-SecureInbox-Risk: 95 (CRITICAL)\nX-Attachment-Signature: PE32:Themida:AgentTesla`
+      },
+      2: {
+        id: "THREAT-8820",
+        msgId: "<tx-verify-99120@intuit-quickb00ks.com>",
+        subject: "Urgent: Wire Transfer Verification Required",
+        senderName: "Intuit Billing Services",
+        senderEmail: "billing@intuit-quickb00ks.com",
+        recipient: "finance-ops@company.com",
+        recipientsCount: 1,
+        riskScore: 92,
+        urgency: "critical",
+        forensics: {
+          verdict: "Punycode/Homoglyph lookalike domain impersonating Intuit QuickBooks with wire routing intercept.",
+          heuristicScore: "92/100",
+          domainAnalysis: "Homoglyph detected: 'quickb00ks.com' (digits 00 replace 'oo')",
+          whoisAge: "18 hours ago (Registrar: NameCheap, PrivacyGuard)",
+          lexicalUrgency: "High ('Wire Transfer', 'Immediate Action', 'Account Suspension')",
+          recipientTarget: "Identified high-privilege finance operator",
+          sandboxVerdict: "Phishing / Wire Fraud BEC Kit"
+        },
+        auth: {
+          spf: "Softfail (ip4:198.51.100.42 not in SPF TXT: v=spf1 include:_spf.google.com ~all)",
+          dkim: "Tempfail (Invalid public key selector 202609)",
+          dmarc: "Fail (Header from 'intuit-quickb00ks.com' violates parent brand policy)",
+          senderIp: "198.51.100.42 (US Dedicated Cloud)",
+          ptrRecord: "host-42.dedicated-server-us.net"
+        },
+        payload: {
+          primaryIoc: "intuit-quickb00ks.com",
+          iocType: "Lookalike Domain & Wire Instruction Form",
+          targetUrl: "hxxps://intuit-quickb00ks.com/portal/verify-wire-auth?session=f819",
+          bankAccountRouting: "First Federal Reserve Routing #021000021 / Acct: 8991204812",
+          exfilPath: "Credential & wire verification form post"
+        },
+        rawHeaders: `Received: from host-42.dedicated-server-us.net (198.51.100.42)\n  by m365-inbound-edge.secureinbox.corp with ESMTP id SI-8820;\n  Sun, 06 Sep 2026 14:38:22 +0000\nFrom: "Intuit Billing Services" <billing@intuit-quickb00ks.com>\nTo: <finance-ops@company.com>\nSubject: Urgent: Wire Transfer Verification Required\nDate: Sun, 06 Sep 2026 14:38:01 +0000\nMessage-ID: <tx-verify-99120@intuit-quickb00ks.com>\nAuthentication-Results: secureinbox.corp;\n  spf=softfail (sender IP 198.51.100.42) smtp.mailfrom=intuit-quickb00ks.com;\n  dkim=tempfail (bad sig) header.d=intuit-quickb00ks.com;\n  dmarc=fail (p=reject policy) header.from=intuit-quickb00ks.com\nX-SecureInbox-Risk: 92 (CRITICAL)\nX-Homoglyph-Target: quickbooks.intuit.com`
+      },
+      3: {
+        id: "THREAT-8819",
+        msgId: "<pw-alert-4401@m1crosoft-office.com>",
+        subject: "Password Expiry in 2 Hours",
+        senderName: "Global IT Support",
+        senderEmail: "it-support@m1crosoft-office.com",
+        recipient: "c.danvers@company.com",
+        recipientsCount: 1,
+        riskScore: 88,
+        urgency: "high",
+        forensics: {
+          verdict: "Sophisticated Microsoft 365 credential harvester reverse proxy kit (Evilginx-style).",
+          heuristicScore: "88/100",
+          domainAnalysis: "Lookalike domain: 'm1crosoft' (digit '1' substituted for 'i')",
+          whoisAge: "2 days old",
+          proxyTechnique: "Session token relay bypassing standard 2FA prompts",
+          targetedLink: "hxxps://auth-m1crosoft.token-relay.cc/auth/login",
+          sandboxHits: "42 of 60 AV engines flag URL as Phishing.M365.Proxy"
+        },
+        auth: {
+          spf: "Fail (ip4:185.220.101.5 violates -all)",
+          dkim: "Fail (Signature failed RSA verification)",
+          dmarc: "Fail (Alignment mismatch)",
+          senderIp: "185.220.101.5 (Tor Exit / Anonymous VPS)",
+          ptrRecord: "node-185-220-101-5.tor-exit.net"
+        },
+        payload: {
+          primaryIoc: "auth-m1crosoft.token-relay.cc",
+          iocType: "AiTM Credential Harvester & Token Thief",
+          targetUrl: "hxxps://auth-m1crosoft.token-relay.cc/sso?id=c.danvers",
+          ipReputation: "Known Tor exit node and threat actor bulletproof hosting",
+          exfilPath: "OAuth token interception"
+        },
+        rawHeaders: `Received: from node-185-220-101-5.tor-exit.net (185.220.101.5)\n  by m365-inbound-edge.secureinbox.corp with ESMTP id SI-8819;\n  Sun, 06 Sep 2026 14:32:05 +0000\nFrom: "Global IT Support" <it-support@m1crosoft-office.com>\nTo: <c.danvers@company.com>\nSubject: Password Expiry in 2 Hours\nDate: Sun, 06 Sep 2026 14:31:40 +0000\nMessage-ID: <pw-alert-4401@m1crosoft-office.com>\nAuthentication-Results: secureinbox.corp;\n  spf=fail (sender IP 185.220.101.5) smtp.mailfrom=m1crosoft-office.com;\n  dkim=fail;\n  dmarc=fail (p=none) header.from=m1crosoft-office.com\nX-SecureInbox-Risk: 88 (HIGH)\nX-Threat-Classification: AiTM-Proxy`
+      },
+      4: {
+        id: "THREAT-8818",
+        msgId: "<inv-89421@acmeparts.de>",
+        subject: "Invoice #89421",
+        senderName: "ACME Parts Vendor Portal",
+        senderEmail: "vendor-portal@acmeparts.de",
+        recipient: "procurement@company.com",
+        recipientsCount: 1,
+        riskScore: 44,
+        urgency: "medium",
+        forensics: {
+          verdict: "Legitimate German vendor domain with suspicious third-party tracking pixel beacon embedded in HTML body.",
+          heuristicScore: "44/100",
+          domainAnalysis: "acmeparts.de (Registered 2011, good reputation)",
+          trackingPixel: "Hidden 1x1 GIF contacting unverified analytics beacon",
+          attachmentScan: "Invoice_89421.pdf (Clean static PDF, zero JavaScript/exploits)",
+          reputation: "Low external risk, telemetry leak risk only"
+        },
+        auth: {
+          spf: "Pass (ip4:195.201.44.12 authorized in v=spf1)",
+          dkim: "Pass (Domain key 2024 validated)",
+          dmarc: "Pass (p=reject policy satisfied, aligned)",
+          senderIp: "195.201.44.12 (Hetzner Online GmbH)",
+          ptrRecord: "mail01.acmeparts.de"
+        },
+        payload: {
+          primaryIoc: "hxxp://track.analytics-beacons.org/px?id=procurement89421",
+          iocType: "HTML Tracking Pixel (Reconnaissance)",
+          attachmentName: "Invoice_89421.pdf",
+          sha256: "33df88bca120387...9921b (Clean)",
+          actionAdvised: "Strip tracking element and release attachment to recipient"
+        },
+        rawHeaders: `Received: from mail01.acmeparts.de (195.201.44.12)\n  by m365-inbound-edge.secureinbox.corp with ESMTP id SI-8818;\n  Sun, 06 Sep 2026 14:19:40 +0000\nFrom: "ACME Parts Vendor Portal" <vendor-portal@acmeparts.de>\nTo: <procurement@company.com>\nSubject: Invoice #89421\nDate: Sun, 06 Sep 2026 14:19:15 +0000\nMessage-ID: <inv-89421@acmeparts.de>\nAuthentication-Results: secureinbox.corp;\n  spf=pass (sender IP 195.201.44.12) smtp.mailfrom=acmeparts.de;\n  dkim=pass header.d=acmeparts.de;\n  dmarc=pass (p=reject) header.from=acmeparts.de\nX-SecureInbox-Risk: 44 (MEDIUM)\nX-Tracker-Detected: 1x1-gif-beacon`
+      }
+    };
+
+    let activeThreatId = 1;
+    let currentInspectorTab = 'forensics';
+    let pendingCount = 4;
+    let caughtCount = 147;
+    let lastActionUndoItem = null;
+
+    // Switch Inspector Tab
+    function switchInspectorTab(tabName) {
+      currentInspectorTab = tabName;
+      document.querySelectorAll('.insp-tab').forEach(b => b.classList.remove('active'));
+      const activeBtn = Array.from(document.querySelectorAll('.insp-tab')).find(b => 
+        b.getAttribute('onclick').includes(tabName)
+      );
+      if (activeBtn) activeBtn.classList.add('active');
+      renderInspectorContent();
+    }
+
+    // Inspect Specific Threat
+    function inspectThreat(threatNum) {
+      activeThreatId = threatNum;
+      
+      // Update card active classes
+      document.querySelectorAll('.threat-card').forEach(c => c.classList.remove('selected'));
+      const card = document.getElementById(`card-threat-${threatNum}`);
+      if (card) card.classList.add('selected');
+
+      // Update inspect button states
+      document.querySelectorAll('.btn-inspect').forEach(b => b.classList.remove('active'));
+      const activeBtn = document.getElementById(`inspect-btn-threat-${threatNum}`);
+      if (activeBtn) activeBtn.classList.add('active');
+
+      const data = THREAT_DATA[threatNum];
+      if (!data) return;
+
+      document.getElementById('inspectorSubject').textContent = data.subject;
+      document.getElementById('inspectorMsgId').textContent = `RFC 822 • ${data.msgId}`;
+
+      renderInspectorContent();
+    }
+
+    // Render Inspector Content Tab
+    function renderInspectorContent() {
+      const container = document.getElementById('inspectorTabContent');
+      const data = THREAT_DATA[activeThreatId];
+      if (!data) {
+        container.innerHTML = `<div style="color: var(--text-muted); padding: 20px; text-align: center;">No inspection target selected.</div>`;
+        return;
+      }
+
+      if (currentInspectorTab === 'forensics') {
+        container.innerHTML = `
+          <div class="kv-list">
+            <div class="kv-item">
+              <span class="k">Heuristic Verdict</span>
+              <span class="v danger">${data.forensics.verdict}</span>
+            </div>
+            <div class="kv-item">
+              <span class="k">Calculated Threat Score</span>
+              <span class="v" style="font-size: 14px; font-weight: 700; color: ${data.riskScore >= 90 ? 'var(--danger-rose)' : (data.riskScore >= 70 ? 'var(--warn-amber)' : 'var(--accent-blue)')};">
+                ${data.forensics.heuristicScore}
+              </span>
+            </div>
+            ${data.forensics.doubleExtension ? `
+              <div class="kv-item">
+                <span class="k">Executable Container</span>
+                <span class="v danger">${data.forensics.doubleExtension}</span>
+              </div>
+            ` : ''}
+            ${data.forensics.domainAnalysis ? `
+              <div class="kv-item">
+                <span class="k">Domain Heuristic</span>
+                <span class="v danger">${data.forensics.domainAnalysis}</span>
+              </div>
+            ` : ''}
+            ${data.forensics.entropy ? `
+              <div class="kv-item">
+                <span class="k">Attachment Entropy</span>
+                <span class="v">${data.forensics.entropy}</span>
+              </div>
+            ` : ''}
+            ${data.forensics.whoisAge ? `
+              <div class="kv-item">
+                <span class="k">Domain Registration Age</span>
+                <span class="v danger">${data.forensics.whoisAge}</span>
+              </div>
+            ` : ''}
+            ${data.forensics.sandboxHits ? `
+              <div class="kv-item">
+                <span class="k">Antivirus Engine Consensus</span>
+                <span class="v danger">${data.forensics.sandboxHits}</span>
+              </div>
+            ` : ''}
+            ${data.forensics.trackingPixel ? `
+              <div class="kv-item">
+                <span class="k">Privacy / Recon Beacon</span>
+                <span class="v" style="color: var(--warn-amber);">${data.forensics.trackingPixel}</span>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      } else if (currentInspectorTab === 'auth') {
+        container.innerHTML = `
+          <div class="kv-list">
+            <div class="kv-item">
+              <span class="k">SPF Check</span>
+              <span class="v" style="color: ${data.auth.spf.includes('Pass') ? 'var(--safe-emerald)' : 'var(--danger-rose)'};">${data.auth.spf}</span>
+            </div>
+            <div class="kv-item">
+              <span class="k">DKIM Cryptographic Signature</span>
+              <span class="v" style="color: ${data.auth.dkim.includes('Pass') ? 'var(--safe-emerald)' : 'var(--warn-amber)'};">${data.auth.dkim}</span>
+            </div>
+            <div class="kv-item">
+              <span class="k">DMARC Policy Enforcement</span>
+              <span class="v" style="color: ${data.auth.dmarc.includes('Pass') ? 'var(--safe-emerald)' : 'var(--danger-rose)'};">${data.auth.dmarc}</span>
+            </div>
+            <div class="kv-item">
+              <span class="k">Originating Sender IP</span>
+              <span class="v">${data.auth.senderIp}</span>
+            </div>
+            <div class="kv-item">
+              <span class="k">Reverse DNS (PTR)</span>
+              <span class="v">${data.auth.ptrRecord}</span>
+            </div>
+          </div>
+        `;
+      } else if (currentInspectorTab === 'payload') {
+        container.innerHTML = `
+          <div class="defanged-box">
+            <span class="defanged-title">Defanged IOC Target</span>
+            <div>${data.payload.targetUrl || data.payload.primaryIoc}</div>
+          </div>
+          <div class="kv-list">
+            <div class="kv-item">
+              <span class="k">Indicator Type</span>
+              <span class="v">${data.payload.iocType}</span>
+            </div>
+            ${data.payload.sha256 ? `
+              <div class="kv-item">
+                <span class="k">SHA-256 Hash</span>
+                <span class="v">${data.payload.sha256}</span>
+              </div>
+            ` : ''}
+            ${data.payload.c2Domain ? `
+              <div class="kv-item">
+                <span class="k">C2 Endpoint</span>
+                <span class="v danger">${data.payload.c2Domain}</span>
+              </div>
+            ` : ''}
+            ${data.payload.bankAccountRouting ? `
+              <div class="kv-item">
+                <span class="k">Intercepted Wire Route</span>
+                <span class="v danger">${data.payload.bankAccountRouting}</span>
+              </div>
+            ` : ''}
+            ${data.payload.exfilPath ? `
+              <div class="kv-item">
+                <span class="k">Exfiltration Vector</span>
+                <span class="v">${data.payload.exfilPath}</span>
+              </div>
+            ` : ''}
+          </div>
+        `;
+      } else if (currentInspectorTab === 'headers') {
+        container.innerHTML = `
+          <pre class="raw-code-block">${escapeHtml(data.rawHeaders)}</pre>
+        `;
+      }
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    }
+
+    // 1-Click Action Handlers
+    function handleAction(actionType, cardId, subject) {
+      const card = document.getElementById(cardId);
+      if (!card) return;
+
+      const idNum = parseInt(cardId.replace('card-threat-', ''));
+
+      if (actionType === 'quarantine') {
+        card.classList.add('resolved-exit');
+        pendingCount = Math.max(0, pendingCount - 1);
+        caughtCount++;
+        updateCounters();
+        
+        lastActionUndoItem = { cardId, idNum, actionType };
+        showToast(`Quarantined: ${subject}. Inboxes purged.`, 'danger', true);
+        logAnalystActivity('Quarantined', subject, 'danger');
+
+        setTimeout(() => {
+          card.style.display = 'none';
+          checkIfAllResolved();
+          selectNextAvailableCard();
+        }, 250);
+
+      } else if (actionType === 'block') {
+        showToast(`Perimeter rule created: Blocked domain for ${subject}`, 'warn', false);
+        logAnalystActivity('Domain Block', subject, 'warn');
+
+      } else if (actionType === 'dismiss') {
+        card.classList.add('resolved-exit');
+        pendingCount = Math.max(0, pendingCount - 1);
+        updateCounters();
+
+        lastActionUndoItem = { cardId, idNum, actionType };
+        showToast(`Dismissed false positive: ${subject}`, 'info', true);
+        logAnalystActivity('Dismissed', subject, 'safe');
+
+        setTimeout(() => {
+          card.style.display = 'none';
+          checkIfAllResolved();
+          selectNextAvailableCard();
+        }, 250);
+
+      } else if (actionType === 'strip-pixel') {
+        card.classList.add('resolved-exit');
+        pendingCount = Math.max(0, pendingCount - 1);
+        updateCounters();
+
+        showToast(`Stripped tracking pixel. Invoice delivered clean to procurement.`, 'info', false);
+        logAnalystActivity('Cleaned & Delivered', subject, 'safe');
+
+        setTimeout(() => {
+          card.style.display = 'none';
+          checkIfAllResolved();
+          selectNextAvailableCard();
+        }, 250);
+
+      } else if (actionType === 'allowlist') {
+        showToast(`Allowlist updated for domain: ${subject}`, 'info', false);
+        logAnalystActivity('Allowlisted', subject, 'safe');
+      }
+    }
+
+    function selectNextAvailableCard() {
+      const visibleCards = Array.from(document.querySelectorAll('.threat-card')).filter(c => c.style.display !== 'none');
+      if (visibleCards.length > 0) {
+        const nextId = parseInt(visibleCards[0].id.replace('card-threat-', ''));
+        inspectThreat(nextId);
+      }
+    }
+
+    function checkIfAllResolved() {
+      const visibleCards = Array.from(document.querySelectorAll('.threat-card')).filter(c => c.style.display !== 'none');
+      const emptyState = document.getElementById('queueEmptyState');
+      if (visibleCards.length === 0) {
+        emptyState.classList.add('visible');
+      } else {
+        emptyState.classList.remove('visible');
+      }
+    }
+
+    function resetQueueDemo() {
+      document.querySelectorAll('.threat-card').forEach(c => {
+        c.style.display = 'flex';
+        c.classList.remove('resolved-exit');
+      });
+      pendingCount = 4;
+      updateCounters();
+      document.getElementById('queueEmptyState').classList.remove('visible');
+      inspectThreat(1);
+      showToast('Triage demo queue restored.', 'info', false);
+    }
+
+    function undoLastAction() {
+      if (!lastActionUndoItem) return;
+      const { cardId, idNum } = lastActionUndoItem;
+      const card = document.getElementById(cardId);
+      if (card) {
+        card.style.display = 'flex';
+        setTimeout(() => card.classList.remove('resolved-exit'), 20);
+        pendingCount++;
+        updateCounters();
+        checkIfAllResolved();
+        inspectThreat(idNum);
+        showToast('Action reversed. Item returned to queue.', 'info', false);
+      }
+      lastActionUndoItem = null;
+    }
+
+    function updateCounters() {
+      document.getElementById('headerPendingCount').textContent = pendingCount;
+      document.getElementById('filterCountAll').textContent = pendingCount;
+      document.getElementById('metricCaught').textContent = caughtCount;
+
+      // Recalculate tab counts
+      let criticals = 0;
+      let highs = 0;
+      let mediums = 0;
+      document.querySelectorAll('.threat-card').forEach(c => {
+        if (c.style.display !== 'none') {
+          const urg = c.getAttribute('data-urgency');
+          if (urg === 'critical') criticals++;
+          else if (urg === 'high') highs++;
+          else if (urg === 'medium') mediums++;
+        }
+      });
+      document.getElementById('filterCountCritical').textContent = criticals;
+      document.getElementById('filterCountHigh').textContent = highs;
+      document.getElementById('filterCountMedium').textContent = mediums;
+    }
+
+    function showToast(message, type = 'info', allowUndo = false) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast-item ${type}`;
+      
+      let undoHtml = allowUndo ? `<button class="toast-undo-btn" onclick="undoLastAction()">Undo</button>` : '';
+      toast.innerHTML = `<span>${message}</span>${undoHtml}`;
+      container.appendChild(toast);
+
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateY(10px)';
+        toast.style.transition = 'all 0.2s ease';
+        setTimeout(() => toast.remove(), 200);
+      }, 4000);
+    }
+
+    function logAnalystActivity(action, target, badgeClass) {
+      const feed = document.getElementById('activityFeedList');
+      const now = new Date();
+      const timeStr = now.toISOString().substring(11, 19);
+      const row = document.createElement('div');
+      row.className = 'activity-row';
+      row.innerHTML = `
+        <span class="activity-time">${timeStr}</span>
+        <span><strong class="activity-action ${badgeClass}">${action}</strong> ${target}</span>
+      `;
+      feed.insertBefore(row, feed.firstChild);
+      if (feed.children.length > 5) {
+        feed.removeChild(feed.lastChild);
+      }
+    }
+
+    // Filter Buttons logic
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const filter = btn.getAttribute('data-filter');
+
+        document.querySelectorAll('.threat-card').forEach(card => {
+          if (card.classList.contains('resolved-exit')) return;
+          const cardUrg = card.getAttribute('data-urgency');
+          if (filter === 'all' || cardUrg === filter) {
+            card.style.display = 'flex';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+        checkIfAllResolved();
+      });
+    });
+
+    // Search input filtering
+    document.getElementById('queueSearchInput').addEventListener('input', (e) => {
+      const query = e.target.value.toLowerCase().trim();
+      document.querySelectorAll('.threat-card').forEach(card => {
+        if (card.classList.contains('resolved-exit')) return;
+        const text = card.textContent.toLowerCase();
+        if (!query || text.includes(query)) {
+          card.style.display = 'flex';
+        } else {
+          card.style.display = 'none';
+        }
+      });
+      checkIfAllResolved();
+    });
+
+    // Sort select handler
+    document.getElementById('sortSelect').addEventListener('change', (e) => {
+      const val = e.target.value;
+      const list = document.getElementById('queueList');
+      const cards = Array.from(list.querySelectorAll('.threat-card'));
+
+      cards.sort((a, b) => {
+        const scoreA = parseInt(a.getAttribute('data-score') || '0');
+        const scoreB = parseInt(b.getAttribute('data-score') || '0');
+        if (val === 'urgency-desc' || val === 'risk-desc') {
+          return scoreB - scoreA;
+        } else {
+          return scoreA - scoreB;
+        }
+      });
+
+      cards.forEach(c => list.appendChild(c));
+    });
+
+    // Keyboard navigation shortcuts
+    window.addEventListener('keydown', (e) => {
+      if (['input', 'textarea'].includes(document.activeElement.tagName.toLowerCase())) return;
+      
+      const key = e.key.toUpperCase();
+      if (key === 'Q') {
+        const activeCard = document.querySelector('.threat-card.selected');
+        if (activeCard && activeCard.style.display !== 'none') {
+          const btn = activeCard.querySelector('.btn-quarantine');
+          if (btn) btn.click();
+        }
+      } else if (key === 'B') {
+        const activeCard = document.querySelector('.threat-card.selected');
+        if (activeCard && activeCard.style.display !== 'none') {
+          const btn = activeCard.querySelector('.btn-block');
+          if (btn) btn.click();
+        }
+      } else if (key === 'I') {
+        const activeCard = document.querySelector('.threat-card.selected');
+        if (activeCard) {
+          const num = parseInt(activeCard.id.replace('card-threat-', ''));
+          inspectThreat(num);
+        }
+      } else if (['1', '2', '3', '4'].includes(e.key)) {
+        inspectThreat(parseInt(e.key));
+      }
+    });
+
+    // Initial render
+    inspectThreat(1);
+    updateCounters();
+  </script>
+</body>
+</html>
