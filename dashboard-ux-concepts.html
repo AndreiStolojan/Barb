@@ -2377,6 +2377,21 @@ Content-Type: multipart/mixed; boundary="===============91823712893=="
       c: "Forensic deep-dive: master-detail inspector with live authentication matrix and sandbox IOCs."
     };
 
+    
+    // Global keyboard listener for model switching & shortcuts
+    document.addEventListener('keydown', (e) => {
+      // Don't trigger if user is in an input
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(e.target.tagName)) return;
+
+      if (e.key === '1') {
+        switchModel('a');
+      } else if (e.key === '2') {
+        switchModel('b');
+      } else if (e.key === '3') {
+        switchModel('c');
+      }
+    });
+
     function switchModel(modelKey) {
       document.querySelectorAll('.model-tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.concept-container').forEach(el => el.classList.remove('active'));
