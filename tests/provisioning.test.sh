@@ -81,3 +81,13 @@ if PROVISION_ENV_FILE="$temp_dir/atlas.env" bash -c 'source ./provision; load_ru
   echo 'Expected rejection of production database in development' >&2
   exit 1
 fi
+
+# A pre-consolidation production .env (no NODE_ENV) must be refused untouched:
+# filling it would replace the secrets that decrypt stored Gmail tokens.
+printf '%s\n' 'TUNNEL_TOKEN=existing' 'GRAFANA_ADMIN_PASSWORD=existing' > "$temp_dir/legacy.env"
+legacy_hash="$(shasum -a 256 "$temp_dir/legacy.env" | awk '{print $1}')"
+if PROVISION_ENV_FILE="$temp_dir/legacy.env" bash -c 'source ./provision; create_env' >/dev/null 2>&1; then
+  echo 'Expected refusal of a legacy .env without NODE_ENV' >&2
+  exit 1
+fi
+test "${legacy_hash}" = "$(shasum -a 256 "$temp_dir/legacy.env" | awk '{print $1}')"

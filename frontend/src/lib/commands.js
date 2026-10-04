@@ -49,6 +49,11 @@ const isEditable = (el) =>
   Boolean(el) &&
   (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT' || el.isContentEditable);
 
+// A dialog or an open menu owns the keyboard: "p" pressed on the shortcut
+// sheet must not mark the message behind it as phishing.
+const isInsideOverlay = (el) =>
+  Boolean(el?.closest?.('[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]'));
+
 /** Normalise a KeyboardEvent to the 'mod+k' / 'j' / '?' vocabulary. */
 export function describeKey(event) {
   const key = event.key.length === 1 ? event.key.toLowerCase() : event.key;
@@ -60,8 +65,9 @@ export function describeKey(event) {
 const SEQUENCE_WINDOW_MS = 900;
 
 /**
- * Global key dispatcher. Typing in a field only lets `mod+` shortcuts and
- * Escape through, so a "j" in the search box stays a "j".
+ * Global key dispatcher. Typing in a field, or any key inside a dialog or a
+ * menu, only lets `mod+` shortcuts and Escape through, so a "j" in the search
+ * box stays a "j" and a key on an overlay never acts on the page behind it.
  */
 export function useCommandHotkeys() {
   useEffect(() => {
@@ -76,8 +82,13 @@ export function useCommandHotkeys() {
     const onKeyDown = (event) => {
       const desc = describeKey(event);
       if (!desc) return;
-      const typing = isEditable(document.activeElement);
-      if (typing && !desc.startsWith('mod+') && desc !== 'Escape') return;
+      const target = event.target instanceof Element ? event.target : document.activeElement;
+      // Escape inside an overlay belongs to the overlay (it closes it).
+      if (isInsideOverlay(target) || isInsideOverlay(document.activeElement)) {
+        if (!desc.startsWith('mod+')) return;
+      } else if (isEditable(document.activeElement) && !desc.startsWith('mod+') && desc !== 'Escape') {
+        return;
+      }
 
       const commands = snapshot.filter((c) => c.keys && !c.disabled);
       const combo = prefix ? `${prefix} ${desc}` : desc;

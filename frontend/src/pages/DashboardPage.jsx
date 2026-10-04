@@ -232,7 +232,10 @@ function FlaggedPerDay({ data, loading, label }) {
   const H = 120;
   const slot = days.length > 0 ? W / days.length : W;
   const bw = Math.min(slot * 0.5, 22);
-  const ticks = days.length > 1 ? [0, Math.round((days.length - 1) / 4), Math.round((days.length - 1) / 2), Math.round(((days.length - 1) * 3) / 4), days.length - 1] : [0];
+  const last = days.length - 1;
+  // Up to five labels, never two on the same day (short ranges would collide).
+  const ticks = [...new Set([0, Math.round(last / 4), Math.round(last / 2), Math.round((last * 3) / 4), last])].filter((t) => t >= 0);
+  const todayKey = new Date().toLocaleDateString('en-CA');
 
   return (
     <Card
@@ -285,13 +288,13 @@ function FlaggedPerDay({ data, loading, label }) {
             })}
           </svg>
           <div className="relative mt-2.5 h-4 text-xs text-muted-foreground-subtle">
-            {ticks.map((t, k) => (
+            {ticks.map((t) => (
               <span
                 key={t}
                 className="absolute top-0 whitespace-nowrap"
-                style={k === 0 ? { left: 0 } : k === ticks.length - 1 ? { right: 0 } : { left: `${((t + 0.5) / days.length) * 100}%`, transform: 'translateX(-50%)' }}
+                style={t === 0 ? { left: 0 } : t === last ? { right: 0 } : { left: `${((t + 0.5) / days.length) * 100}%`, transform: 'translateX(-50%)' }}
               >
-                {k === ticks.length - 1 ? 'Today' : formatAxisDate(days[t].date)}
+                {t === last && days[t].date === todayKey ? 'Today' : formatAxisDate(days[t].date)}
               </span>
             ))}
           </div>

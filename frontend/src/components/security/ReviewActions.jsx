@@ -1,6 +1,7 @@
 // The two review verbs for the open message. Mark safe is local; mark phishing
 // also asks the backend to move the message to Gmail Spam. The buttons flip
-// optimistically and roll back if the request fails.
+// optimistically and roll back if the request fails. `onReviewed` receives the
+// action result ({ action, email, providerAction }), not the email itself.
 //
 // A parent can drive the same actions from the keyboard through `ref`:
 //   ref.current.review('safe' | 'phishing')
@@ -36,7 +37,15 @@ export const ReviewActions = forwardRef(function ReviewActions({ email, onReview
     setVerdict(kind);
     try {
       const result = await (kind === 'safe' ? safe : phishing).run(emailId(email));
-      toast.success(kind === 'safe' ? 'Marked as safe' : 'Marked as phishing');
+      // Marking phishing also asks Gmail to move the message to Spam. The
+      // verdict is saved either way; a failed move is said, never swallowed.
+      if (result?.providerAction?.status === 'failed') {
+        toast.warning('Marked as phishing, but Gmail did not move it to Spam', {
+          description: result.providerAction.message || 'The message is still in your Gmail inbox.',
+        });
+      } else {
+        toast.success(kind === 'safe' ? 'Marked as safe' : 'Marked as phishing · moved to Spam');
+      }
       onReviewed?.(result);
     } catch (err) {
       setVerdict(previous);

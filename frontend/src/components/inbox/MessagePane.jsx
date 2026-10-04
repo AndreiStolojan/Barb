@@ -336,9 +336,16 @@ export function MessagePane({ id, onReviewed, onBack, onMove }) {
             email={email}
             disabled={scanning}
             className="sm:col-span-2 lg:col-span-1"
-            onReviewed={(result) => {
-              setEmail((prev) => ({ ...prev, ...result }));
-              afterChange(result);
+            onReviewed={async () => {
+              // The action returns a summary, not the message; read the message
+              // again so the verdict, the bucket and the Gmail row are current.
+              try {
+                const fresh = await getEmail(id);
+                setEmail((prev) => ({ ...prev, ...fresh }));
+                afterChange(fresh);
+              } catch {
+                afterChange(null);
+              }
             }}
           />
         </div>
@@ -406,17 +413,20 @@ export function MessagePane({ id, onReviewed, onBack, onMove }) {
             <EmailBody htmlBody={raw?.htmlBody} textBody={raw?.textBody} riskBucket={email.riskBucket} />
           </div>
           {attachments.length > 0 && (
-            <ul className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
+            <ul className="mt-5 grid gap-2 border-t border-border pt-4">
               {attachments.map((attachment, i) => {
                 const analysis = analysisItems.find((item) => item?.attachmentIndex === i);
                 const findings = Array.isArray(analysis?.findings) ? analysis.findings : [];
+                const type = analysis?.detectedMimeType || attachment.declaredMimeType;
                 const size = formatSize(attachment.size);
                 return (
-                  <li key={`${attachment.filename || 'attachment'}-${i}`} className="flex max-w-full items-center gap-2 rounded-[0.625rem] bg-white/[0.04] px-3 py-2 text-sm" title={findings.map(getRuleLabel).join(', ') || undefined}>
-                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground-subtle" aria-hidden="true" />
-                    <span className="truncate">{attachment.filename || 'Attachment'}</span>
-                    {size && <span className="data shrink-0 text-muted-foreground-subtle">{size}</span>}
-                    {findings.length > 0 && <span className="shrink-0 text-risk-review">{getRuleLabel(findings[0])}</span>}
+                  <li key={`${attachment.filename || 'attachment'}-${i}`} className="flex min-w-0 items-start gap-2.5 text-sm">
+                    <Paperclip className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground-subtle" aria-hidden="true" />
+                    <div className="min-w-0">
+                      <span className="break-all">{attachment.filename || 'Attachment'}</span>
+                      {(type || size) && <span className="text-muted-foreground-subtle"> · {[size, type].filter(Boolean).join(' · ')}</span>}
+                      {findings.length > 0 && <p className="mt-0.5 text-[0.8125rem] text-risk-review">{findings.map(getRuleLabel).join(' · ')}</p>}
+                    </div>
                   </li>
                 );
               })}
@@ -477,6 +487,10 @@ export function MessagePane({ id, onReviewed, onBack, onMove }) {
 
               <DetailBlock title={`Links${links.length ? ` (${links.length})` : ''}`}>
                 <LinkList links={links} />
+              </DetailBlock>
+
+              <DetailBlock title="Sender verification">
+                <SenderAuthentication authResults={auth} detailed />
               </DetailBlock>
 
               <DetailBlock title="Facts">

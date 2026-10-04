@@ -150,8 +150,11 @@ result privately. Do not put account numbers or payment data in this repository.
 ## Current release startup, readiness and optional shutdown
 
 These commands apply after the shared-environment release in PR #95 is promoted.
-Before deployment, preserve the previous revision, images and matching encrypted
-environment files. Verify recovery access and a recent backup under #77.
+Before deployment, take the backup in
+[raspberry-pi-deployment.md](raspberry-pi-deployment.md#back-up-before-every-deployment):
+it dumps the database, copies the configuration and tags the running images.
+The isolated restore drill in #77 is recovery evidence, not a gate for
+deploying reviewed code: holding back a release also holds back its fixes.
 
 Use the root production `.env` with mode `600`, `NODE_ENV=production`,
 `COMPOSE_PROJECT_NAME=secureinbox`,
