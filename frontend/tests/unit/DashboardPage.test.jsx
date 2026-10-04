@@ -64,12 +64,13 @@ describe('DashboardPage', () => {
   // the page at runtime.
   it('renders the loaded dashboard without crashing', async () => {
     renderDashboard();
-    expect(await screen.findByRole('heading', { name: 'Welcome back, there!' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: 'Briefing' })).toBeTruthy();
   });
 
   it('renders the four briefing blocks in priority order', async () => {
     renderDashboard();
-    await screen.findByRole('heading', { name: 'Welcome back, there!' });
+    await screen.findByRole('heading', { name: 'Briefing' });
+    await screen.findByText('Nothing to report yet');
 
     const blocks = screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent);
     expect(blocks).toEqual([

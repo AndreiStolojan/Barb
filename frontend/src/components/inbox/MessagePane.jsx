@@ -1,89 +1,74 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// MessagePane.jsx — the right-hand pane of the Inbox workspace.
+// MessagePane.jsx — the evidence pane: everything about one message.
 //
-// Reading order, top to bottom, and why:
-//   1. Subject + sender + time — identity first: who is this from, and is that
-//      address really who it claims to be. The quiet Trust/Block control lives
-//      here too, because it acts on the SENDER, not on this one message.
-//   2. Score + verdict + the three message actions on one aligned row — the
-//      decision. Everything above it is context, everything below is evidence.
-//   3. Why we flagged it — the plain-English reasons and the AI's summary. This
-//      sits ABOVE the message body on purpose: the user should know what to
-//      look out for before reading a message that may be manipulating them.
-//   4. The message itself.
-//   5. How the score was reached + the rules that fired — the audit trail, for
-//      the user who wants to check our working.
-//   6. Links + attachments — the technical residue, last.
+// Fixed order, top to bottom:
+//   1. Header   — subject, who sent it, when; the sender-scoped Trust/Block.
+//   2. Verdict strip — the decision: score, verdict word, and the three
+//      actions with their keys. The only large colour on the screen.
+//   3. Three tabs:
+//        Verdict  — why we flagged it, what the AI read, how the score was
+//                   reached, the rules that fired.
+//        Message  — the sanitised body (links dead), links, attachments.
+//        Evidence — identity (From vs Reply-To), sender verification, links
+//                   at a glance, your decision, what Gmail did, scan metadata.
 //
-// No cards anywhere. Divisions are whitespace, or at most a single hairline
-// under a section label.
-//
-// Data comes from three existing calls: getEmail (details + state), getEmailRaw
-// (body, links, attachment extensions) and getLatestScan (score, reasons[],
-// triggeredRules[]). Plus getSenderLists for the Trust/Block state.
+// Data: getEmail (detail + state), getEmailRaw (body, links), getLatestScan
+// (score, reasons, rules, AI metadata), getSenderLists (trust/block state).
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useCallback, useEffect, useState } from 'react';
-import { AlertTriangle, Loader2, Mail, Paperclip, ScanLine, ShieldCheck, ShieldX } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { AlertTriangle, ArrowLeft, Loader2, Paperclip, ScanLine } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { ErrorState, LoadingState } from '@/components/common/states';
-import { SenderListActions } from '@/components/security/SenderListActions';
 import { EmailBody } from '@/components/inbox/EmailBody';
 import { LinkList } from '@/components/inbox/LinkList';
 import { ScoreMeter } from '@/components/inbox/ScoreMeter';
+import { ReviewActions } from '@/components/security/ReviewActions';
+import { SenderAuthentication } from '@/components/security/SenderAuthentication';
+import { SenderListActions } from '@/components/security/SenderListActions';
 import { Button } from '@/components/ui/button';
+import { Kbd } from '@/components/ui/kbd';
 import { useApi, bustCache, bustCacheByPrefix } from '@/hooks/useApi';
 import { getEmail, getEmailRaw } from '@/api/emailsApi';
 import { getLatestScan, scanEmail } from '@/api/scansApi';
 import { getSenderLists } from '@/api/senderListsApi';
-import { markEmailSafe, markEmailPhishing } from '@/api/actionsApi';
-import { emailId, getSenderName, getSenderAddress } from '@/lib/email';
-import { getRiskMeta, getRuleLabel } from '@/lib/risk';
-import { getSenderAuthentication } from '@/lib/senderAuth';
-import { SenderAuthentication } from '@/components/security/SenderAuthentication';
+import { useRegisterCommands } from '@/lib/commands';
+import { emailId, getSenderAddress, getSenderName } from '@/lib/email';
+import { getRiskMeta, getRuleDescription, getRuleLabel } from '@/lib/risk';
 import { findListEntries } from '@/lib/senderLists';
 import { getRiskTextColor, isScored, UNSCORED_COLOR } from '@/lib/scoreScale';
-import { getAiStatus, AI_SCORE_MAX, RULE_SCORE_MAX, SCORE_MAX } from '@/lib/scoring';
+import { AI_SCORE_MAX, RULE_SCORE_MAX, SCORE_MAX, getAiStatus } from '@/lib/scoring';
 import { formatDateTime } from '@/utils/formatDate';
 import { cn } from '@/lib/utils';
 
-/* ─── Section label: one hairline, one word. The only chrome in the pane. ─── */
+/* ─── small pieces ────────────────────────────────────────────────────────── */
 
-function SectionHead({ children, note, className }) {
+function Section({ title, note, children, className }) {
   return (
-    <div
-      className={cn(
-        'mt-9 flex items-baseline gap-2.5 border-t border-border/70 pt-5 text-xs font-semibold text-muted-foreground',
-        className
-      )}
-    >
-      <span>{children}</span>
-      {note && (
-        <span className="ml-auto font-normal tabular-nums text-muted-foreground-subtle">{note}</span>
-      )}
+    <section className={cn('pt-7 first:pt-0', className)}>
+      <div className="mb-3 flex items-baseline gap-3 border-b border-border pb-2">
+        <h3 className="label-section text-foreground">{title}</h3>
+        {note && <span className="data ml-auto text-[0.6875rem] text-muted-foreground-subtle">{note}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+const Quiet = ({ children }) => <p className="text-[0.8125rem] text-muted-foreground">{children}</p>;
+
+/* A fact: label on the left, value on the right, in mono. */
+function Fact({ label, children, tone }) {
+  return (
+    <div className="grid grid-cols-[9rem_minmax(0,1fr)] gap-x-4 border-b border-border py-2 text-xs last:border-b-0 max-sm:grid-cols-1 max-sm:gap-y-0.5">
+      <dt className="text-muted-foreground">{label}</dt>
+      <dd className={cn('data min-w-0 break-words', tone)}>{children}</dd>
     </div>
   );
 }
 
-/* ─── One figure in "How the score was reached" — no box, just alignment. ── */
-
-function Figure({ label, value, note, color }) {
-  return (
-    <div className="min-w-0">
-      <p className="text-xs font-medium text-muted-foreground">{label}</p>
-      <p
-        className="mt-1.5 text-2xl font-semibold leading-none tracking-tight tabular-nums"
-        style={color ? { color } : undefined}
-      >
-        {value}
-      </p>
-      <p className="mt-1.5 text-xs text-muted-foreground-subtle">{note}</p>
-    </div>
-  );
-}
-
-const formatAttachmentSize = (bytes) => {
+const formatSize = (bytes) => {
   if (!Number.isFinite(bytes) || bytes < 0) return null;
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -99,58 +84,59 @@ const scanTimestamp = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
-const wait = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
+const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-const waitForTimedOutRescan = async ({ emailId: targetEmailId, previousScan, requestedAt }) => {
+// A rescan that timed out at the proxy may still finish on the server. Poll
+// the idempotent latest-scan read until a newer result lands, then give up.
+const waitForTimedOutRescan = async ({ emailId: targetId, previousScan, requestedAt }) => {
   const previousTimestamp = scanTimestamp(previousScan);
-
   for (let attempt = 0; attempt < RESCAN_POLL_ATTEMPTS; attempt += 1) {
     await wait(RESCAN_POLL_INTERVAL_MS);
-
     try {
-      const candidate = await getLatestScan(targetEmailId);
-      const candidateTimestamp = scanTimestamp(candidate);
-      const completedAfterRequest = candidateTimestamp !== null && candidateTimestamp >= requestedAt;
-      const changedFromPrevious =
-        previousTimestamp !== null && candidateTimestamp !== null && candidateTimestamp > previousTimestamp;
-
-      if (completedAfterRequest || changedFromPrevious) return candidate;
+      const candidate = await getLatestScan(targetId);
+      const ts = scanTimestamp(candidate);
+      if ((ts !== null && ts >= requestedAt) || (previousTimestamp !== null && ts !== null && ts > previousTimestamp)) return candidate;
     } catch {
-      // A transient read failure should not launch another scan. Keep polling
-      // the idempotently upserted current result until the bounded deadline.
+      // transient read failure: keep polling
     }
   }
-
   return null;
 };
 
-/* ─── Empty right pane — a deliberate state, not an accident ─────────────── */
-
-export function MessagePaneEmpty({ hint = 'Select a message to see why it was flagged.' }) {
+export function MessagePaneEmpty({ hint = 'Select a message to see its verdict and the evidence behind it.' }) {
   return (
-    <div className="flex min-h-[320px] flex-col items-center justify-center gap-2 px-8 py-16 text-center">
-      <span className="mb-1 flex h-10 w-10 items-center justify-center rounded-full bg-foreground/[0.06] text-muted-foreground">
-        <Mail className="h-4 w-4" />
-      </span>
-      <p className="text-sm font-semibold text-foreground/80">Nothing open</p>
-      <p className="max-w-[34ch] text-xs text-muted-foreground">{hint}</p>
+    <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-8 py-16 text-center">
+      <p className="text-sm font-medium text-foreground/80">Nothing open</p>
+      <p className="max-w-[36ch] text-xs text-muted-foreground">{hint}</p>
+      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground-subtle max-md:hidden">
+        <Kbd>J</Kbd>
+        <Kbd>K</Kbd>
+        to move, <Kbd>?</Kbd> for every shortcut
+      </p>
     </div>
   );
 }
 
-/* ─── Main pane ──────────────────────────────────────────────────────────── */
+const TABS = [
+  { key: 'verdict', label: 'Verdict', keys: 'v' },
+  { key: 'message', label: 'Message', keys: 'm' },
+  { key: 'evidence', label: 'Evidence', keys: 'e' },
+];
 
-export function MessagePane({ id, onReviewed }) {
+/* ─── the pane ────────────────────────────────────────────────────────────── */
+
+export function MessagePane({ id, onReviewed, onBack }) {
   const [email, setEmail] = useState(null);
   const [raw, setRaw] = useState(null);
   const [scan, setScan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(null); // 'safe' | 'phishing' | null
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState(null);
+  const [tab, setTab] = useState('verdict');
+  const reviewRef = useRef(null);
+  const scrollRef = useRef(null);
 
-  // The user's trust/block lists are global, not per-message — one cached read.
   const senderLists = useApi(getSenderLists, [], 'sender-lists');
 
   const load = useCallback(async () => {
@@ -159,49 +145,33 @@ export function MessagePane({ id, onReviewed }) {
     setError(null);
     try {
       const detail = await getEmail(id);
-      const [rawResult, scanResult] = await Promise.allSettled([
-        getEmailRaw(id),
-        getLatestScan(id),
-      ]);
+      const [rawResult, scanResult] = await Promise.allSettled([getEmailRaw(id), getLatestScan(id)]);
       setEmail(detail);
       setRaw(rawResult.status === 'fulfilled' ? rawResult.value : null);
-      setScan(
-        scanResult.status === 'fulfilled' ? scanResult.value : detail.latestScan || null
-      );
+      setScan(scanResult.status === 'fulfilled' ? scanResult.value : detail.latestScan || null);
     } catch (err) {
-      setError(err.message || 'Failed to load this message.');
+      setError(err.message || 'Could not load this message.');
     } finally {
       setLoading(false);
     }
   }, [id]);
 
-  // Reload on every selection change, clearing the old state first so the pane
-  // never shows the previous message for a frame.
   useEffect(() => {
     setEmail(null);
     setRaw(null);
     setScan(null);
     setScanError(null);
+    scrollRef.current?.scrollTo?.({ top: 0 });
     load();
   }, [load]);
 
-  const handleReview = async (kind) => {
-    setBusy(kind);
-    try {
-      const result = await (kind === 'safe' ? markEmailSafe(id) : markEmailPhishing(id));
-      setEmail((prev) => ({ ...prev, ...result }));
-      toast.success(
-        kind === 'safe' ? 'Marked as safe' : 'Marked as phishing · Moved to Gmail Spam'
-      );
-      onReviewed?.(result);
-    } catch (err) {
-      toast.error(err.message || 'Action failed. Please try again.');
-    } finally {
-      setBusy(null);
-    }
+  const afterChange = (fresh) => {
+    bustCacheByPrefix('inbox-', 'dash-', 'risky-');
+    onReviewed?.(fresh);
   };
 
   const handleRescan = async () => {
+    if (!email) return;
     setScanning(true);
     setScanError(null);
     const requestedAt = Date.now();
@@ -210,351 +180,342 @@ export function MessagePane({ id, onReviewed }) {
       const freshEmail = await getEmail(id);
       setScan(freshScan);
       setEmail((prev) => ({ ...prev, ...freshEmail }));
-      bustCacheByPrefix('inbox-', 'dash-', 'risky-');
-      onReviewed?.(freshEmail);
+      afterChange(freshEmail);
       toast.success('Scan complete');
     } catch (err) {
       if (RESCAN_TIMEOUT_STATUSES.has(err.statusCode)) {
-        const completedScan = await waitForTimedOutRescan({
-          emailId: emailId(email),
-          previousScan: scan,
-          requestedAt,
-        });
-
-        if (completedScan) {
+        const completed = await waitForTimedOutRescan({ emailId: emailId(email), previousScan: scan, requestedAt });
+        if (completed) {
           const freshEmail = await getEmail(id);
-          setScan(completedScan);
+          setScan(completed);
           setEmail((prev) => ({ ...prev, ...freshEmail }));
-          bustCacheByPrefix('inbox-', 'dash-', 'risky-');
-          onReviewed?.(freshEmail);
+          afterChange(freshEmail);
           toast.success('Scan complete');
+          setScanning(false);
           return;
         }
       }
-
-      // Leave the previous verdict exactly as it was and put the failure inline
-      // next to the button — never a page-level alert that hides the message.
-      setScanError(err.message || 'Scan failed. Your previous result is unchanged.');
+      setScanError(err.message || 'The scan failed. The previous result is unchanged.');
     } finally {
       setScanning(false);
     }
   };
-
-  if (!id) return <MessagePaneEmpty />;
-  if (loading && !email) return <LoadingState label="Loading message…" className="py-24" />;
-  if (error) return <ErrorState message={error} onRetry={load} className="py-24" />;
-  if (!email) return null;
-
-  const { label: verdictLabel, description, tone } = getRiskMeta(email.riskBucket);
-  const score = scan?.score ?? email.latestScan?.score ?? null;
-  const ruleScore = scan?.ruleScore ?? email.latestScan?.ruleScore ?? null;
-  const aiScore = scan?.aiScore ?? email.latestScan?.aiScore ?? null;
-  const ai = getAiStatus(scan || email.latestScan);
-  const aiOff = ai.state !== 'ok';
-
-  // The numeral uses the continuous risk ramp (0 green → 100 red); the verdict
-  // WORD keeps its categorical colour. Never colour an unscanned message green.
-  const scored = isScored(score);
-  const scoreColor = scored ? getRiskTextColor(score) : UNSCORED_COLOR;
-
-  const senderName = getSenderName(email);
-  const senderAddress = getSenderAddress(email);
-  const showAddress = senderAddress && senderAddress !== senderName;
-
-  const reasons = Array.isArray(scan?.reasons) ? scan.reasons.filter(Boolean) : [];
-  const summary = scan?.aiExplanation?.summary;
-
-  const rules = Array.isArray(scan?.triggeredRules) ? scan.triggeredRules : [];
-  const links = raw?.links || [];
-  const attachmentMetadata = Array.isArray(email.attachments) ? email.attachments : [];
-  const attachments = attachmentMetadata.length > 0
-    ? attachmentMetadata
-    : (raw?.attachmentExtensions || []).map((extension) => ({
-        filename: `.${String(extension).replace(/^\./, '')}`,
-        declaredMimeType: null,
-        size: null,
-      }));
-  const attachmentAnalysisItems = Array.isArray(email.attachmentAnalysis?.items)
-    ? email.attachmentAnalysis.items
-    : [];
-
-  const userVerdict = email.userVerdict ?? null;
-  const senderAuth = getSenderAuthentication(email.authResults);
-
-  const { senderEntry, domainEntry } = findListEntries(
-    senderLists.data?.entries,
-    senderAddress,
-    email.senderDomain
-  );
 
   const handleListChanged = (message) => {
     bustCache('sender-lists');
     senderLists.reload();
     toast.success(message, {
       description: 'Applies the next time this message is scanned.',
-      action: { label: 'Scan again', onClick: handleRescan },
+      action: { label: 'Rescan', onClick: handleRescan },
     });
   };
 
+  const ready = Boolean(email) && !loading;
+  const userVerdict = email?.userVerdict ?? null;
+
+  useRegisterCommands(
+    'message',
+    [
+      { id: 'mark-phishing', label: 'Mark phishing', group: 'Message', keys: 'p', disabled: !ready || scanning || userVerdict === 'phishing', run: () => reviewRef.current?.review('phishing') },
+      { id: 'mark-safe', label: 'Mark safe', group: 'Message', keys: 's', disabled: !ready || scanning || userVerdict === 'safe', run: () => reviewRef.current?.review('safe') },
+      { id: 'rescan', label: 'Rescan this message', group: 'Message', keys: 'r', disabled: !ready || scanning, run: handleRescan },
+      ...TABS.map((t) => ({ id: `tab-${t.key}`, label: `Show ${t.label.toLowerCase()}`, group: 'Message', keys: t.keys, disabled: !ready, run: () => setTab(t.key) })),
+    ],
+    [ready, scanning, userVerdict, id]
+  );
+
+  if (!id) return <MessagePaneEmpty />;
+  if (loading && !email) return <LoadingState label="Loading message…" className="py-24" />;
+  if (error) return <ErrorState message={error} onRetry={load} className="py-24" />;
+  if (!email) return null;
+
+  const { label: verdictLabel, description: verdictDescription, tone } = getRiskMeta(email.riskBucket);
+  const score = scan?.score ?? email.latestScan?.score ?? null;
+  const ruleScore = scan?.ruleScore ?? email.latestScan?.ruleScore ?? null;
+  const aiScore = scan?.aiScore ?? email.latestScan?.aiScore ?? null;
+  const ai = getAiStatus(scan || email.latestScan);
+  const aiOff = ai.state !== 'ok';
+  const scored = isScored(score);
+  const scoreColor = scored ? getRiskTextColor(score) : UNSCORED_COLOR;
+
+  const senderName = getSenderName(email);
+  const senderAddress = getSenderAddress(email);
+  const reasons = Array.isArray(scan?.reasons) ? scan.reasons.filter(Boolean) : [];
+  const summary = scan?.aiExplanation?.summary;
+  const rules = Array.isArray(scan?.triggeredRules) ? scan.triggeredRules : [];
+  const links = raw?.links || [];
+  const attachments = Array.isArray(email.attachments) && email.attachments.length > 0
+    ? email.attachments
+    : (raw?.attachmentExtensions || email.attachmentExtensions || []).map((ext) => ({ filename: `.${String(ext).replace(/^\./, '')}`, declaredMimeType: null, size: null }));
+  const analysisItems = Array.isArray(email.attachmentAnalysis?.items) ? email.attachmentAnalysis.items : [];
+  const { senderEntry, domainEntry } = findListEntries(senderLists.data?.entries, senderAddress, email.senderDomain);
+  const replyToDiffers = Boolean(email.replyToDomain) && email.replyToDomain !== email.senderDomain;
+
   return (
-    <div className="min-w-0 px-5 pb-16 pt-6 min-[780px]:px-8">
-      {/* 1 ─ Subject, sender, and the sender-scoped control ------------------ */}
-      <h1 className="text-[1.25rem] font-semibold leading-tight tracking-tight break-words">
-        {email.subject || '(no subject)'}
-      </h1>
-      <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-border/70 pb-5">
-        <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-1 text-[0.8125rem]">
-          <span className="font-medium text-foreground/90">{senderName}</span>
-          {showAddress && (
-            <span className="min-w-0 truncate text-muted-foreground">{senderAddress}</span>
-          )}
-          <span className="whitespace-nowrap tabular-nums text-muted-foreground">
-            {formatDateTime(email.receivedAt)}
-          </span>
+    <div ref={scrollRef} className="flex h-full min-w-0 flex-col">
+      {/* 1 ─ header */}
+      <div className="shrink-0 border-b border-border px-4 pb-4 pt-4 md:px-6">
+        {onBack && (
+          <button type="button" onClick={onBack} className="focus-ring mb-3 -ml-1 flex items-center gap-1 rounded px-1 text-xs text-muted-foreground hover:text-foreground md:hidden">
+            <ArrowLeft className="h-3.5 w-3.5" />
+            Back to list
+          </button>
+        )}
+        <h2 className="text-h2 font-semibold break-words">{email.subject || '(no subject)'}</h2>
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
+            <span className="font-medium text-foreground">{senderName}</span>
+            {senderAddress && senderAddress !== senderName && <span className="data min-w-0 truncate text-muted-foreground">{senderAddress}</span>}
+            <span className="data whitespace-nowrap text-muted-foreground-subtle">{formatDateTime(email.receivedAt)}</span>
+          </div>
+          <SenderListActions senderAddress={senderAddress} senderDomain={email.senderDomain} senderEntry={senderEntry} domainEntry={domainEntry} onChanged={handleListChanged} />
         </div>
-        {/* Acts on the sender, so it sits with the sender — not with the
-            message actions below. */}
-        <SenderListActions
-          senderAddress={senderAddress}
-          senderDomain={email.senderDomain}
-          senderEntry={senderEntry}
-          domainEntry={domainEntry}
-          onChanged={handleListChanged}
-        />
       </div>
 
-      {/* 2 ─ Score, verdict and the message actions, on one aligned row ------ */}
-      <div className="grid items-center gap-x-7 gap-y-5 py-6 min-[900px]:grid-cols-[auto_minmax(0,1fr)_auto]">
-        <div className="grid gap-[7px]">
-          <div
-            className="flex items-baseline gap-1 text-[2.5rem] font-bold leading-none tracking-tighter tabular-nums"
-            style={{ color: scoreColor }}
-          >
-            {scored ? score : '—'}
-            <span className="text-[0.8125rem] font-medium tracking-normal text-muted-foreground">
-              /{SCORE_MAX}
-            </span>
+      {/* 2 ─ verdict strip */}
+      <div
+        className="shrink-0 border-b border-border border-l-[3px] px-4 py-4 md:px-6"
+        style={{ borderLeftColor: tone.hex, background: `linear-gradient(90deg, color-mix(in srgb, ${tone.hex} 9%, transparent), transparent 55%)` }}
+      >
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
+          <div className="flex items-center gap-4">
+            <div className="data flex items-baseline gap-1 text-[2.75rem] font-medium leading-none" style={{ color: scoreColor }}>
+              {scored ? score : '–'}
+              <span className="text-xs font-normal text-muted-foreground">/{SCORE_MAX}</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-[0.9375rem] font-semibold" style={{ color: tone.hex }}>{verdictLabel}</p>
+              <p className="max-w-[40ch] text-xs text-muted-foreground">{verdictDescription}</p>
+              <ScoreMeter score={score} className="mt-2 w-32" />
+            </div>
           </div>
-          <ScoreMeter score={score} className="w-full min-w-[112px]" />
-        </div>
 
-        <div className="min-w-0">
-          <p className="text-[1.0625rem] font-semibold tracking-tight" style={{ color: tone.hex }}>
-            {verdictLabel}
-          </p>
-          {description && (
-            <p className="mt-1 max-w-[54ch] text-[0.8125rem] text-muted-foreground">{description}</p>
-          )}
-        </div>
-
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy !== null || scanning || userVerdict === 'phishing'}
-              onClick={() => handleReview('phishing')}
-              className="border-risk-phishing/40 text-risk-phishing hover:bg-risk-phishing-soft hover:text-risk-phishing"
-            >
-              {busy === 'phishing' ? <Loader2 className="animate-spin" /> : <ShieldX />}
-              {userVerdict === 'phishing' ? 'Marked as phishing' : 'Mark as phishing'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={busy !== null || scanning || userVerdict === 'safe'}
-              onClick={() => handleReview('safe')}
-            >
-              {busy === 'safe' ? <Loader2 className="animate-spin" /> : <ShieldCheck className="text-risk-safe" />}
-              {userVerdict === 'safe' ? 'Marked as safe' : 'Mark as safe'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={scanning || busy !== null}
-              onClick={handleRescan}
-            >
+          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+            <ReviewActions ref={reviewRef} email={email} hints disabled={scanning} onReviewed={(result) => { setEmail((prev) => ({ ...prev, ...result })); afterChange(result); }} />
+            <Button variant="ghost" disabled={scanning} onClick={handleRescan}>
               {scanning ? <Loader2 className="animate-spin" /> : <ScanLine />}
               {scanning ? 'Scanning…' : 'Rescan'}
+              {!scanning && <Kbd className="max-md:hidden">R</Kbd>}
             </Button>
           </div>
-
-          {scanError && (
-            <p className="mt-2 flex items-start gap-1.5 text-xs text-destructive" role="alert">
-              <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
-              <span className="min-w-0 break-words">{scanError}</span>
-            </p>
-          )}
         </div>
+        {scanError && (
+          <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs text-destructive">
+            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 break-words">{scanError}</span>
+          </p>
+        )}
       </div>
 
-      {/* 3 ─ Why we flagged it ----------------------------------------------- */}
-      <SectionHead className="mt-0">Why we flagged it</SectionHead>
-      <div className="mt-3.5 grid gap-2.5">
-        {reasons.length > 0 ? (
-          reasons.map((reason, i) => (
-            <p
-              key={i}
-              className="flex items-baseline gap-2.5 text-sm leading-relaxed text-foreground/85"
+      {/* 3 ─ tabs */}
+      <div role="tablist" aria-label="Message sections" className="flex shrink-0 gap-0.5 border-b border-border px-2 md:px-4">
+        {TABS.map((t) => {
+          const count = t.key === 'verdict' ? rules.length : t.key === 'message' ? links.length + attachments.length : null;
+          const isActive = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setTab(t.key)}
+              className={cn(
+                'focus-ring relative flex items-center gap-1.5 px-2.5 py-2.5 text-xs transition-colors',
+                isActive ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'
+              )}
             >
-              <span
-                aria-hidden="true"
-                className="h-[5px] w-[5px] shrink-0 translate-y-[-2px] rounded-full"
-                style={{ backgroundColor: tone.hex }}
-              />
-              <span className="min-w-0 break-words">{reason}</span>
-            </p>
-          ))
-        ) : (
-          !summary && (
-            <p className="text-sm text-muted-foreground">
-              Nothing stood out in this message — no detection rule matched it.
-            </p>
-          )
-        )}
-
-        {summary && (
-          <div className={cn(reasons.length > 0 && 'mt-2')}>
-            <p className="text-xs font-medium text-muted-foreground-subtle">What the AI read</p>
-            <p className="mt-1.5 max-w-[68ch] text-sm leading-relaxed text-foreground/85 break-words">
-              {summary}
-            </p>
-          </div>
-        )}
-
-        {!summary && aiOff && ai.message && (
-          <p className="text-xs text-muted-foreground">{ai.message}</p>
-        )}
+              {t.label}
+              {count > 0 && <span className="data text-[0.6875rem] text-muted-foreground-subtle">{count}</span>}
+              <Kbd className="max-md:hidden">{t.keys.toUpperCase()}</Kbd>
+              {isActive && <span aria-hidden="true" className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-foreground" />}
+            </button>
+          );
+        })}
       </div>
 
-      {/* 4 ─ The message ------------------------------------------------------ */}
-      <SectionHead note="Links are disabled">Message</SectionHead>
-      <div className="mt-3.5 min-w-0">
-        <EmailBody htmlBody={raw?.htmlBody} textBody={raw?.textBody} riskBucket={email.riskBucket} />
-      </div>
-
-      {/* 5 ─ How the score was reached ---------------------------------------- */}
-      <SectionHead>How the score was reached</SectionHead>
-      <div className="mt-4 grid gap-x-10 gap-y-6 min-[780px]:grid-cols-3">
-        <Figure
-          label="Rule engine"
-          value={ruleScore ?? '—'}
-          note={`out of ${RULE_SCORE_MAX} · ${rules.length} rule${rules.length === 1 ? '' : 's'} triggered`}
-        />
-
-        {/* When AI scoring is off we say so, rather than showing a misleading 0. */}
-        {aiOff ? (
-          <Figure
-            label="AI model"
-            value={ai.state === 'disabled' ? 'Off' : 'Unavailable'}
-            note={ai.state === 'disabled' ? 'AI scoring is turned off' : ai.message}
-          />
-        ) : (
-          <Figure label="AI model" value={aiScore ?? '—'} note={`out of ${AI_SCORE_MAX}`} />
-        )}
-
-        <Figure
-          label="Combined"
-          value={scored ? score : '—'}
-          note={`out of ${SCORE_MAX} · ${verdictLabel}`}
-          color={scoreColor}
-        />
-      </div>
-
-      {/* Sender authentication — SPF, DKIM and DMARC. The backend has computed
-          these since the email-authentication work; until now nothing rendered
-          them, so "did this really come from them?" had no answer in the UI. */}
-      <SectionHead note={senderAuth.available ? undefined : 'Unavailable'}>
-        Sender verification
-      </SectionHead>
-      <SenderAuthentication authResults={email.authResults} />
-
-      {/* Triggered rules — the audit trail behind the rule score. */}
-      <SectionHead note={rules.length > 0 ? `${rules.length}` : 'None'}>
-        Rules that fired
-      </SectionHead>
-      {rules.length > 0 ? (
-        <div className="grid gap-x-10 min-[1100px]:grid-cols-2">
-          {rules.map((rule, i) => (
-            <div
-              key={`${rule.rule}-${i}`}
-              className="grid grid-cols-[9px_minmax(0,1fr)_auto] items-baseline gap-3 border-b border-border/70 py-3 last:border-b-0"
-            >
-              <span
-                aria-hidden="true"
-                className="h-[5px] w-[5px] rounded-full"
-                style={{ backgroundColor: tone.hex }}
-              />
-              <div className="min-w-0">
-                <p className="text-[0.8125rem] font-medium text-foreground/90 break-words">
-                  {getRuleLabel(rule.rule)}
+      <div className="min-w-0 flex-1 px-4 pb-16 pt-5 md:px-6">
+        {tab === 'verdict' && (
+          <>
+            <Section title="Why we flagged it">
+              {reasons.length > 0 ? (
+                <ul className="grid gap-2">
+                  {reasons.map((reason, i) => (
+                    <li key={i} className="grid grid-cols-[0.5rem_minmax(0,1fr)] items-baseline gap-2.5 text-[0.8125rem] leading-relaxed text-foreground/90">
+                      <span aria-hidden="true" className="h-1.5 w-1.5 translate-y-[-1px] rounded-full" style={{ backgroundColor: tone.hex }} />
+                      <span className="min-w-0 break-words">{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                !summary && <Quiet>Nothing stood out. No detection rule matched this message.</Quiet>
+              )}
+              {scan?.senderVerifiedBrand && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Verified brand: <span className="font-medium text-foreground">{scan.verifiedBrandName || email.senderDomain}</span>. The sender proved it owns this domain, so brand impersonation signals were not applied.
                 </p>
-                {rule.details && (
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground break-words">
-                    {rule.details}
-                  </p>
+              )}
+              {scan?.senderListMatch?.value && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Matched your rule: <span className="data text-foreground">{scan.senderListMatch.value}</span> is {scan.senderListMatch.listType === 'allow' ? 'trusted' : 'blocked'}.
+                </p>
+              )}
+            </Section>
+
+            <Section title="What the AI read" note={aiOff ? (ai.state === 'disabled' ? 'AI off · template' : ai.state) : 'local model'}>
+              {summary ? (
+                <p className="max-w-[70ch] text-[0.8125rem] leading-relaxed text-foreground/90 break-words">{summary}</p>
+              ) : (
+                <Quiet>{ai.message || 'The model did not produce a summary for this scan.'}</Quiet>
+              )}
+            </Section>
+
+            <Section title="How the score was reached">
+              <div className="grid gap-5 sm:grid-cols-3">
+                <ScoreFigure label="Rule engine" value={ruleScore} max={RULE_SCORE_MAX} note={`${rules.length} ${rules.length === 1 ? 'rule' : 'rules'} fired`} />
+                {aiOff ? (
+                  <ScoreFigure label="AI model" value={null} max={AI_SCORE_MAX} valueLabel={ai.state === 'disabled' ? 'Off' : 'Unavailable'} note={ai.state === 'disabled' ? 'AI scoring is turned off' : 'Rule score shown alone'} />
+                ) : (
+                  <ScoreFigure label="AI model" value={aiScore} max={AI_SCORE_MAX} note={`capped at ${AI_SCORE_MAX}; AI alone can never reach phishing`} />
                 )}
+                <ScoreFigure label="Combined" value={scored ? score : null} max={SCORE_MAX} note={verdictLabel} color={scoreColor} />
               </div>
-              <span className="text-[0.8125rem] font-semibold tabular-nums text-muted-foreground">
-                +{rule.points}
-              </span>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <p className="mt-3 text-sm text-muted-foreground">No detection rule matched this message.</p>
-      )}
+            </Section>
 
-      {/* 6 ─ Links + attachments ---------------------------------------------- */}
-      <div className="grid gap-x-10 min-[1100px]:grid-cols-2">
-        <div className="min-w-0">
-          <SectionHead note={links.length > 0 ? `${links.length} found` : 'None'}>Links</SectionHead>
-          <div className="mt-2.5">
-            <LinkList links={links} />
-          </div>
-        </div>
+            <Section title="Rules that fired" note={rules.length > 0 ? `${rules.length}` : 'none'}>
+              {rules.length > 0 ? (
+                <ul className="divide-y divide-border">
+                  {rules.map((rule, i) => (
+                    <li key={`${rule.rule}-${i}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 py-2.5">
+                      <div className="min-w-0">
+                        <p className="text-[0.8125rem] font-medium break-words">{getRuleLabel(rule.rule)}</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground break-words">{rule.details || getRuleDescription(rule.rule)}</p>
+                      </div>
+                      <span className="data text-[0.8125rem] font-medium text-foreground">+{rule.points}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Quiet>No detection rule matched this message.</Quiet>
+              )}
+            </Section>
+          </>
+        )}
 
-        <div className="min-w-0">
-          <SectionHead note={attachments.length > 0 ? `${attachments.length}` : 'None'}>
-            Attachments
-          </SectionHead>
-          <div className="mt-3.5">
-            {attachments.length > 0 ? (
-              <div className="space-y-3">
-                {attachments.map((attachment, i) => {
-                  const analysis = attachmentAnalysisItems.find(
-                    (item) => item?.attachmentIndex === i
-                  );
-                  const findings = Array.isArray(analysis?.findings) ? analysis.findings : [];
-                  const type = analysis?.detectedMimeType || attachment.declaredMimeType;
-                  const size = formatAttachmentSize(attachment.size);
+        {tab === 'message' && (
+          <>
+            <Section title="Message" note="links are disabled">
+              <EmailBody htmlBody={raw?.htmlBody} textBody={raw?.textBody} riskBucket={email.riskBucket} />
+            </Section>
+            <Section title="Links" note={links.length > 0 ? `${links.length}` : 'none'}>
+              <LinkList links={links} />
+            </Section>
+            <Section title="Attachments" note={attachments.length > 0 ? `${attachments.length}` : 'none'}>
+              {attachments.length > 0 ? (
+                <ul className="divide-y divide-border">
+                  {attachments.map((attachment, i) => {
+                    const analysis = analysisItems.find((item) => item?.attachmentIndex === i);
+                    const findings = Array.isArray(analysis?.findings) ? analysis.findings : [];
+                    const type = analysis?.detectedMimeType || attachment.declaredMimeType;
+                    const size = formatSize(attachment.size);
+                    return (
+                      <li key={`${attachment.filename || 'attachment'}-${i}`} className="flex items-start gap-3 py-2.5">
+                        <Paperclip className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground-subtle" aria-hidden="true" />
+                        <div className="min-w-0">
+                          <p className="data truncate text-xs">{attachment.filename || 'Attachment'}</p>
+                          {(type || size) && <p className="data mt-0.5 text-[0.6875rem] text-muted-foreground">{[type, size].filter(Boolean).join(' · ')}</p>}
+                          {findings.length > 0 && <p className="mt-1 text-xs text-risk-review">{findings.map(getRuleLabel).join(' · ')}</p>}
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <Quiet>This message has no attachments.</Quiet>
+              )}
+            </Section>
+          </>
+        )}
 
-                  return (
-                    <div key={`${attachment.filename || 'attachment'}-${i}`} className="min-w-0">
-                      <p className="flex items-center gap-1.5 text-xs text-foreground/80">
-                        <Paperclip className="h-3 w-3 shrink-0 text-muted-foreground-subtle" aria-hidden="true" />
-                        <span className="truncate font-mono">{attachment.filename || 'Attachment'}</span>
-                      </p>
-                      {(type || size) && (
-                        <p className="mt-1 text-xs text-muted-foreground-subtle">
-                          {[type, size].filter(Boolean).join(' · ')}
-                        </p>
-                      )}
-                      {findings.length > 0 && (
-                        <p className="mt-1 text-xs text-risk-review">
-                          {findings.map(getRuleLabel).join(' · ')}
-                        </p>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">This message has no attachments.</p>
-            )}
-          </div>
-        </div>
+        {tab === 'evidence' && (
+          <>
+            <Section title="Identity">
+              <dl>
+                <Fact label="From">{senderName}{senderAddress && senderAddress !== senderName ? ` <${senderAddress}>` : ''}</Fact>
+                <Fact label="Reply-To" tone={replyToDiffers ? 'text-risk-review' : undefined}>
+                  {email.replyTo ? `${email.replyTo}${replyToDiffers ? '  (differs from the sender)' : ''}` : 'same as sender'}
+                </Fact>
+                <Fact label="Sender domain">{email.senderDomain || 'unknown'}</Fact>
+                <Fact label="History" tone={email.isFirstTimeSender ? 'text-risk-review' : undefined}>
+                  {email.isFirstTimeSender ? 'first message from this sender' : 'you have received mail from this sender before'}
+                </Fact>
+                <Fact label="Received">{formatDateTime(email.receivedAt)}</Fact>
+              </dl>
+            </Section>
+
+            <Section title="Sender verification">
+              <SenderAuthentication authResults={email.authResults} />
+            </Section>
+
+            <Section title="Links at a glance">
+              <dl>
+                <Fact label="Links">{email.linkCount ?? links.length}</Fact>
+                <Fact label="Domains">{(email.linkDomains || []).length > 0 ? email.linkDomains.join('  ') : 'none'}</Fact>
+                <Fact label="Shortened links" tone={email.hasShortenedUrl ? 'text-risk-review' : undefined}>{email.hasShortenedUrl ? 'yes' : 'no'}</Fact>
+                <Fact label="Patterns" tone={(email.suspiciousLinkPatterns || []).length > 0 ? 'text-risk-review' : undefined}>
+                  {(email.suspiciousLinkPatterns || []).length > 0 ? email.suspiciousLinkPatterns.map((p) => getRuleLabel(`suspicious_link_pattern:${p}`)).join(' · ') : 'none'}
+                </Fact>
+                <Fact label="Attachments">{(email.attachmentExtensions || []).length > 0 ? email.attachmentExtensions.map((e) => `.${e}`).join(' ') : 'none'}</Fact>
+              </dl>
+            </Section>
+
+            <Section title="Your decision">
+              <dl>
+                <Fact label="Verdict" tone={userVerdict === 'phishing' ? 'text-risk-phishing' : userVerdict === 'safe' ? 'text-risk-safe' : undefined}>
+                  {userVerdict ? `marked ${userVerdict}` : 'none yet'}
+                </Fact>
+                {email.reviewedAt && <Fact label="Reviewed">{formatDateTime(email.reviewedAt)}</Fact>}
+                <Fact label="Gmail action" tone={email.lastProviderActionStatus === 'failed' ? 'text-risk-review' : undefined}>
+                  {email.lastProviderAction
+                    ? `${String(email.lastProviderAction).replace(/_/g, ' ')}: ${email.lastProviderActionStatus || 'unknown'}${email.lastProviderActionAt ? ` at ${formatDateTime(email.lastProviderActionAt)}` : ''}`
+                    : 'none'}
+                  {email.lastProviderActionError?.message && <span className="block text-muted-foreground">{email.lastProviderActionError.message}</span>}
+                </Fact>
+              </dl>
+            </Section>
+
+            <Section title="Scan">
+              <dl>
+                <Fact label="Scanned">{scan?.scannedAt ? formatDateTime(scan.scannedAt) : 'never'}</Fact>
+                {scan?.scanSource && <Fact label="Trigger">{String(scan.scanSource).replace(/_/g, ' ')}</Fact>}
+                {scan?.engineVersion && <Fact label="Engine">{scan.engineVersion}</Fact>}
+                <Fact label="AI">
+                  {aiOff
+                    ? ai.message
+                    : [scan?.aiExplanationMeta?.source, scan?.aiExplanationMeta?.mode, Number.isFinite(scan?.aiExplanationMeta?.latencyMs) ? `${scan.aiExplanationMeta.latencyMs} ms` : null].filter(Boolean).join(' · ') || 'generated'}
+                </Fact>
+                <Fact label="Verdict source">{email.verdictSource ? (email.verdictSource === 'user' ? 'your decision' : 'scan') : 'scan'}</Fact>
+              </dl>
+            </Section>
+          </>
+        )}
       </div>
+    </div>
+  );
+}
+
+/* One figure in "How the score was reached": value, a bar against its own
+   maximum, a note. */
+function ScoreFigure({ label, value, max, valueLabel, note, color }) {
+  const scored = isScored(value);
+  return (
+    <div className="min-w-0">
+      <p className="text-xs text-muted-foreground">{label}</p>
+      <p className={cn('mt-1 text-2xl font-medium leading-none', valueLabel ? 'text-muted-foreground' : 'data')} style={color ? { color } : undefined}>
+        {valueLabel ?? (scored ? value : '–')}
+        {scored && <span className="text-xs font-normal text-muted-foreground"> /{max}</span>}
+      </p>
+      <ScoreMeter score={scored ? value : null} max={max} hex={color} className="mt-2 w-full" />
+      <p className="mt-1.5 text-[0.6875rem] text-muted-foreground-subtle">{note}</p>
     </div>
   );
 }

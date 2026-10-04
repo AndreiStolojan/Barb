@@ -2,198 +2,217 @@
 @import 'tw-animate-css';
 
 /*
-  SecureInbox — dark-only, security-first design system.
-  Foundation: self-hosted Inter Variable, a semantic type ramp, a dark-tuned
-  elevation ramp, one motion vocabulary, and the 6 risk buckets as the core
-  semantic palette. Components reference semantic names (never raw hex), and the
-  risk-* token NAMES are stable so src/lib/risk.js and every badge/banner/chart
-  keep working unchanged.
+  SecureInbox design system — "triage desk".
+
+  One canvas (pure black), one typeface family (IBM Plex Sans for prose,
+  IBM Plex Mono for anything that is literal data: addresses, URLs, scores,
+  timestamps, key hints), and one rule for colour: colour means severity.
+  The only chromatic things on a screen are risk marks. Interactive chrome is
+  bone/white, never blue, so an action can never be mistaken for a warning.
+
+  Severity ramp (warm, one direction):
+    safe        quiet bone-grey  — the absence of alarm, not a colour
+    review      amber            — worth a look
+    quarantine  orange-red       — likely phishing
+    phishing    red              — confirmed by the user
+    unscanned   neutral grey     — no verdict yet
 */
 
 @font-face {
-  font-family: 'InterVariable';
+  font-family: 'IBM Plex Sans';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 100 700;
   font-display: swap;
-  src: url('/fonts/InterVariable.woff2') format('woff2');
+  src: url('/fonts/plex/IBMPlexSans-Roman-100to700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexSans-Roman-100to700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: italic;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexSans-Italic-100to700-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: italic;
+  font-weight: 100 700;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexSans-Italic-100to700-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexMono-Roman-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexMono-Roman-400-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexMono-Roman-500-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexMono-Roman-500-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexMono-Roman-600-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexMono-Roman-600-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Mono';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/plex/IBMPlexMono-Italic-400-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
 @theme {
-  /* The self-hosted face declared above. It was previously declared and never
-     referenced — --font-sans named Roboto, which is not loaded anywhere, so the
-     app fell through to ui-sans-serif. */
-  --font-sans: 'InterVariable', -apple-system, ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  /* Type ramp — size / line-height / tracking paired per step */
-  --text-display: 2.5rem;
-  --text-display--line-height: 1.05;
+  /* Weights. Plex is a variable face; these are the four steps the UI uses. */
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 650;
+
+  /* Type ramp */
+  --text-display: 2rem;
+  --text-display--line-height: 1.1;
   --text-display--letter-spacing: -0.02em;
-  --text-h1: 1.875rem;
-  --text-h1--line-height: 1.1;
-  --text-h1--letter-spacing: -0.018em;
-  --text-h2: 1.375rem;
-  --text-h2--line-height: 1.2;
-  --text-h2--letter-spacing: -0.012em;
-  --text-h3: 1.0625rem;
-  --text-h3--line-height: 1.3;
-  --text-h3--letter-spacing: -0.006em;
+  --text-h1: 1.5rem;
+  --text-h1--line-height: 1.2;
+  --text-h1--letter-spacing: -0.016em;
+  --text-h2: 1.125rem;
+  --text-h2--line-height: 1.3;
+  --text-h2--letter-spacing: -0.01em;
+  --text-h3: 0.9375rem;
+  --text-h3--line-height: 1.35;
+  --text-h3--letter-spacing: -0.004em;
+  --text-body: 0.8125rem;
+  --text-body--line-height: 1.5;
   --text-caption: 0.75rem;
   --text-caption--line-height: 1.4;
-  --text-caption--letter-spacing: 0.01em;
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.3;
 
-  /* Weight ramp — retuned 2026-07-31.
-     InterVariable is a variable face, so the classic 400/500/600/700 steps are
-     not the only ones available, and on a dark background the heavier ones
-     bloom: 700 reads as shouting and 500 barely separates from body text.
-     Overriding Tailwind's own weight tokens moves EVERY `font-medium` /
-     `font-semibold` / `font-bold` in the app at once, which is the point — the
-     boldness of the product is one decision, not a per-component one.
-       medium   520 — the first step that is visibly not body text
-       semibold 600 — headings and emphasised values
-       bold     680 — reserved for numbers; 700 was too dense here */
-  --font-weight-normal: 400;
-  --font-weight-medium: 520;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 680;
+  --radius-sm: 0.25rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
 
-  /* Radius ramp */
-  --radius-sm: 0.375rem;
-  --radius-md: 0.5rem;
-  --radius-lg: 0.75rem;
-  --radius-xl: 1rem;
-  --radius-2xl: 1.25rem;
+  /* Canvas + the two steps above it. Black is the page; everything else is a
+     translucent lift so it reads as the same material, not a different one. */
+  --color-background: #000000;
+  --color-foreground: #f4f3ee;
+  --color-card: #0b0b0c;
+  --color-card-foreground: #f4f3ee;
+  --color-popover: #121214;
+  --color-popover-foreground: #f4f3ee;
+  --color-elevated: #17171a;
 
-  /* Base surfaces — charcoal, not black.
-     Only three steps: the page, a surface on it, and one raised step. Anything
-     more and the hierarchy stops being readable at these luminances.
+  /* Text steps */
+  --color-muted-foreground: #a4a29b;
+  --color-muted-foreground-subtle: #74736e;
+  --color-muted: #0f0f10;
+  --color-accent: #151517;
+  --color-accent-foreground: #f4f3ee;
+  --color-secondary: #161618;
+  --color-secondary-foreground: #d6d4cd;
 
-     2026-07-31 — the canvas moved off near-black (#09090c) to a neutral-cool
-     charcoal. Pure black is a screenshot colour: it makes every hairline look
-     like a scratch, gives shadows nothing to fall on, and pushes the contrast
-     of body text to a level that reads harsh over a long session. #121319 sits
-     high enough that borders and surfaces separate on their own, and low enough
-     that the risk palette still carries all the colour on the page. Every text
-     and risk token below was re-measured against it — see the notes there. */
-  --color-background: #121319;
-  --color-foreground: #f0f1f5;
-  --color-card: #191a22;
-  --color-card-foreground: #f0f1f5;
-  --color-popover: #1e1f28;
-  --color-popover-foreground: #f0f1f5;
-  --color-elevated: #1e1f28;
+  /* Interactive: bone. The single primary action on a screen is a bone fill
+     with black text. Focus is a white ring. Links are bone, underlined. */
+  --color-primary: #e9e6dc;
+  --color-primary-foreground: #0a0a0a;
+  --color-primary-hover: #ffffff;
+  --color-primary-active: #d6d3c8;
+  --color-primary-soft: rgb(233 230 220 / 0.09);
+  --color-link: #e9e6dc;
+  --color-ring: #ffffff;
 
-  /* Brand — periwinkle. Interactive ONLY: primary action, focus, selection,
-     links. It is deliberately outside the severity ramp below so the two never
-     compete: periwinkle means "you can act on this", warm means "this is a
-     problem". */
-  --color-primary: #6f8bf5;
-  --color-primary-foreground: #06070d;
-  --color-primary-hover: #8ba1f8;
-  --color-primary-active: #5a78ef;
-  --color-primary-soft: color-mix(in oklab, var(--color-primary) 16%, var(--color-background));
-  --color-link: #8ba1f8;
-  --color-secondary: #1e1f28;
-  --color-secondary-foreground: #c9cbd6;
-  --color-muted: #1a1b23;
-  --color-muted-foreground: #9b9ead;
-  /* 2026-07-30 — raised from #6e7180, which measured 4.11:1 on the background
-     and so failed WCAG AA (4.5:1) for the small tertiary text it is used on.
-     2026-07-31 — raised again, from #7c7f8e, because the lighter charcoal
-     canvas took it down to 4.66:1 on the page and 4.12:1 on an elevated
-     surface. #8a8d9b measures 5.62:1 on the page and 4.96:1 on the raised
-     step, so it now passes AA everywhere it is actually used, while keeping a
-     clear step below muted-foreground (6.96:1). */
-  --color-muted-foreground-subtle: #8a8d9b;
-  --color-accent: #1c1d25;
-  --color-accent-foreground: #e6e7ee;
-  /* `destructive` stays light so it passes as text/icon on dark surfaces
-     (text-destructive). `destructive-strong` is the darker fill used UNDER
-     near-white text on solid danger buttons — #ef5350 was too light there
-     (white text only 3.26:1). Verified 2026-06-12, see scripts/contrast-audit.mjs. */
-  --color-destructive: #ef5350;
-  --color-destructive-strong: #c62828;
+  /* Hairlines */
+  --color-border: rgb(255 255 255 / 0.1);
+  --color-border-strong: rgb(255 255 255 / 0.18);
+  --color-input: rgb(255 255 255 / 0.16);
+
+  /* Destructive = the phishing red; it is the only red on the page. */
+  --color-destructive: #e5484d;
+  --color-destructive-strong: #b4262b;
   --color-destructive-foreground: #fff5f5;
 
-  /* Both lifted with the canvas (2026-07-31) so a hairline still reads as a
-     line at the new background luminance instead of dissolving into it. */
-  --color-border: #272935;
-  --color-input: #33353f;
-  --color-ring: #8b9cf7;
+  /* Severity ramp. Names are stable: lib/risk.js and every chart reference
+     them. All five pass 4.5:1 as text on black. */
+  --color-risk-safe: #a3a199;
+  --color-risk-safe-soft: rgb(163 161 153 / 0.12);
+  --color-risk-review: #e2a63a;
+  --color-risk-review-soft: rgb(226 166 58 / 0.14);
+  --color-risk-quarantine: #f0703f;
+  --color-risk-quarantine-soft: rgb(240 112 63 / 0.14);
+  --color-risk-phishing: #ea4d52;
+  --color-risk-phishing-soft: rgb(234 77 82 / 0.14);
+  --color-risk-unscanned: #5e5e63;
+  --color-risk-unscanned-soft: rgb(94 94 99 / 0.16);
 
-  /* Risk buckets — core semantic palette. Names are STABLE.
-     Severity ramp: review (amber) -> quarantine (rose) -> phishing (violet).
-     Hues tuned for luminosity on the near-black background so charts and
-     badges pop without losing their semantic meaning (2026-06-10).
-     Every value passes WCAG 2.1 AA (4.5:1 as text) against the background,
-     the card AND its own -soft badge surface — verified 2026-06-11; phishing
-     was lightened from #a855f7, which failed on its soft badge (4.21:1).
+  /* Charts draw from the same ramp */
+  --color-chart-1: #e9e6dc;
+  --color-chart-2: #a3a199;
+  --color-chart-3: #e2a63a;
+  --color-chart-4: #f0703f;
+  --color-chart-5: #ea4d52;
 
-     2026-07-30 — retuned to an ORDERED ramp. The old set was five saturated
-     hues of equal loudness (green/orange/pink/violet/grey), so nothing led the
-     eye and the palette read as decoration. The ramp now escalates in one
-     direction — teal → amber → rose → crimson — and the two phishing steps are
-     separated by hue temperature (rose is warm, crimson cool) rather than by
-     brightness, which keeps confirmed_phishing distinguishable from quarantine
-     without making it shout louder than it should.
-     Safe is deliberately the quietest thing on the screen: 289 safe messages
-     must never out-shout the 11 that need review.
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.6);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.7);
+  --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 0.8);
+  --shadow-lg: 0 16px 48px -12px rgb(0 0 0 / 0.85);
 
-     2026-07-30 (second pass) — retuned again for a security console rather
-     than a wellness app. Three specific problems with the first ramp:
-     - safe was a soft sage that read organic//spa/ rather than "verified";
-       it is now a cooler, cleaner teal.
-     - review was a muddy ochre; it is now a truer gold, which is what a
-       caution state is expected to look like.
-     - quarantine and phishing sat only ~15° apart and both read "pink-red",
-       so the two worst states were hard to tell apart at a glance. Quarantine
-       moved warm toward red-orange and phishing moved cool toward crimson,
-       which opens real separation between them while keeping the escalation
-       reading in one direction.
-
-     2026-07-31 (canvas change) — the lighter background costs every one of
-     these ~0.6:1 of contrast. Only phishing actually broke: #cc4a63 fell to
-     4.17:1 on the page (it was already a marginal 4.48:1 on near-black), so it
-     was lightened to #d9607a — 5.21:1 on the page, 4.87:1 on a card. Its soft
-     badge mix dropped from 17% to 12%, and the quarantine mix from 16% to 14%, to keep
-     each colour ≥4.5:1 against its own badge surface. The other three cleared
-     AA on the new canvas unchanged and were left alone, so the ramp still
-     escalates teal → gold → red-orange → crimson exactly as before. */
-  --color-risk-safe: #4aa08f;
-  --color-risk-safe-soft: color-mix(in oklab, var(--color-risk-safe) 14%, var(--color-background));
-  --color-risk-review: #d3a13f;
-  --color-risk-review-soft: color-mix(in oklab, var(--color-risk-review) 15%, var(--color-background));
-  --color-risk-quarantine: #e0664e;
-  --color-risk-quarantine-soft: color-mix(in oklab, var(--color-risk-quarantine) 14%, var(--color-background));
-  --color-risk-phishing: #d9607a;
-  --color-risk-phishing-soft: color-mix(in oklab, var(--color-risk-phishing) 12%, var(--color-background));
-  --color-risk-unscanned: #6e7180;
-  --color-risk-unscanned-soft: color-mix(in oklab, var(--color-risk-unscanned) 14%, var(--color-background));
-
-  /* Chart palette — same ramp, so charts and badges agree */
-  --color-chart-1: #6f8bf5;
-  --color-chart-2: #4aa08f;
-  --color-chart-3: #d3a13f;
-  --color-chart-4: #e0664e;
-  --color-chart-5: #d9607a;
-
-  /* Elevation — barely there. On a near-black canvas a drop shadow has nothing
-     to fall on; separation comes from the border and the surface step instead. */
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.5);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.55);
-  --shadow-md: 0 6px 20px -8px rgb(0 0 0 / 0.65);
-  --shadow-lg: 0 14px 40px -14px rgb(0 0 0 / 0.7);
-  --shadow-xl: 0 20px 52px -16px rgb(0 0 0 / 0.75);
-  --shadow-2xl: 0 28px 64px -20px rgb(0 0 0 / 0.8);
-
-  /* Motion — one vocabulary (mirrored in src/lib/motion.js) */
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
-  --duration-fast: 180ms;
-  --duration-base: 260ms;
-  --duration-slow: 400ms;
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 360ms;
 
-  /* Layout rhythm */
-  --gutter: clamp(1rem, 4vw, 2rem);
+  --gutter: clamp(1rem, 3vw, 1.75rem);
 }
 
 @layer base {
@@ -213,35 +232,24 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-size: 0.875rem;
-    /* A hair of negative tracking at body size. Inter is drawn slightly wide
-       for UI at 14px, and closing it up is most of what makes the app read as
-       typeset rather than as a default browser page. Headings tighten further
-       via the per-step --text-*--letter-spacing values above. */
-    letter-spacing: -0.006em;
+    font-size: 0.8125rem;
     line-height: 1.5;
-    /* cv11 = single-storey a-alternates off / disambiguated l; ss01 keeps the
-       numerals from clashing with the risk scores shown next to them. */
-    font-feature-settings: 'cv11', 'ss01';
+    letter-spacing: -0.004em;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
-  /* Only apply safe-area bottom padding on devices that support it (e.g. iPhone with home indicator) */
-  @supports (padding-bottom: env(safe-area-inset-bottom)) {
-    body {
-      padding-bottom: env(safe-area-inset-bottom);
-    }
-  }
-
   ::selection {
-    background-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+    background-color: rgb(233 230 220 / 0.28);
   }
 
-  /* Graficele recharts sunt pur decorative -> la click nu vrem chenar de focus
-     (ringul albastru --color-ring) în jurul suprafeței/wrapper-ului. Hover-ul
-     (tooltip) nu e afectat. */
+  /* Numbers line up in columns everywhere. */
+  .tabular,
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+
   .recharts-wrapper:focus,
   .recharts-wrapper:focus-visible,
   .recharts-surface:focus,
@@ -249,23 +257,21 @@
     outline: none;
   }
 
-  /* Slim, themed scrollbars */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-border) transparent;
+    scrollbar-color: rgb(255 255 255 / 0.14) transparent;
   }
   *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
   *::-webkit-scrollbar-thumb {
-    background-color: var(--color-border);
+    background-color: rgb(255 255 255 / 0.14);
     border-radius: 9999px;
-    border: 2px solid transparent;
+    border: 3px solid transparent;
     background-clip: padding-box;
   }
 
-  /* Respect reduced-motion everywhere (paired with <MotionConfig reducedMotion="user">) */
   @media (prefers-reduced-motion: reduce) {
     *,
     *::before,
@@ -278,53 +284,47 @@
   }
 }
 
-@utility container-page {
-  width: 100%;
-  margin-inline: auto;
-  max-width: 80rem;
-  padding-inline: var(--gutter);
-}
-
-/* Small uppercase section label */
-@utility label-overline {
-  font-size: 0.6875rem;
-  /* 560, not 600: uppercase letterforms already carry weight, and at this size
-     600 + wide tracking reads as a shouted label rather than a quiet one. */
-  font-weight: 560;
-  letter-spacing: 0.075em;
-  text-transform: uppercase;
+/* The quiet section title: small, medium weight, muted. Not uppercase. */
+@utility label-section {
+  font-size: 0.75rem;
+  font-weight: 500;
+  line-height: 1.4;
   color: var(--color-muted-foreground);
 }
 
-/* Section heading used by the rebuilt pages — the one place the "block title"
-   look is written down, so Settings, Rules and the dashboard agree. */
-@utility heading-section {
-  font-size: 1.0625rem;
-  font-weight: 620;
-  letter-spacing: -0.019em;
-  line-height: 1.3;
-  color: var(--color-foreground);
+/* Literal data: addresses, domains, URLs, ids, timestamps. */
+@utility data {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
 }
 
-/* Running explanatory copy under a heading or beside a control. Slightly
-   smaller than body, generously leaded, and capped so it never runs to an
-   unreadable measure. */
-@utility copy-support {
-  font-size: 0.8125rem;
-  line-height: 1.6;
-  letter-spacing: -0.003em;
+/* A keyboard key hint. */
+@utility kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  height: 1.125rem;
+  padding-inline: 0.3rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--color-border-strong);
+  background: rgb(255 255 255 / 0.04);
+  font-family: var(--font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  line-height: 1;
   color: var(--color-muted-foreground);
 }
 
-/* Elevation helpers that pair a dark shadow with a subtle top inner highlight */
-@utility surface-raised {
-  box-shadow: var(--shadow-sm), inset 0 1px 0 0 rgb(255 255 255 / 0.05);
-}
-@utility surface-overlay {
-  box-shadow: var(--shadow-md), inset 0 1px 0 0 rgb(255 255 255 / 0.06);
+/* Focus ring, shared by every interactive element. */
+@utility focus-ring {
+  outline: none;
+  &:focus-visible {
+    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
+  }
 }
 
-/* Hide scrollbar visually while preserving scroll functionality */
 @utility scrollbar-none {
   scrollbar-width: none;
   &::-webkit-scrollbar {
@@ -332,7 +332,12 @@
   }
 }
 
-/* Skeleton shimmer sweep */
+/* A hairline that fades at both ends, used under sticky headers. */
+@utility hairline-fade {
+  background: linear-gradient(to right, transparent, var(--color-border-strong) 12%, var(--color-border-strong) 88%, transparent);
+  height: 1px;
+}
+
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -340,13 +345,12 @@
 }
 
 /*
-  Scoped typography for rendered email HTML. Real email markup arrives unstyled,
-  so :where() gives it readable defaults at zero specificity — the email's own
-  inline styles still win where present.
+  Rendered email HTML. Real mail arrives unstyled; :where() gives it readable
+  defaults at zero specificity so inline styles still win.
 */
 @layer components {
   .email-body {
-    color: color-mix(in oklab, var(--color-foreground) 92%, transparent);
+    color: rgb(244 243 238 / 0.9);
     font-size: 0.875rem;
     line-height: 1.65;
     word-break: break-word;
@@ -362,22 +366,13 @@
   .email-body :where(h2) { font-size: 1.125rem; }
   .email-body :where(h3, h4) { font-size: 1rem; }
   .email-body :where(p) { margin: 0.75em 0; }
-  /*
-    Links inside a rendered email are deliberately DEAD — the href is stripped
-    when the body is sanitised, because a single accidental click in a phishing
-    tool is the exact failure this app exists to prevent.
-
-    So they must not LOOK clickable either. Periwinkle + solid underline is the
-    app's "you can act on this" signal and would be a lie here. A dotted
-    underline in the running text colour keeps the phrase visible as a link the
-    sender wrote, without inviting a click. The real destination is listed,
-    inspectable and copyable, in the Links section instead.
-  */
+  /* Links are dead by construction (href stripped). They must not look live:
+     dotted underline in the running colour, default cursor. */
   .email-body :where(a) {
     color: inherit;
     text-decoration: underline dotted;
     text-decoration-color: var(--color-muted-foreground-subtle);
-    text-underline-offset: 2px;
+    text-underline-offset: 3px;
     cursor: default;
   }
   .email-body :where(ul, ol) { margin: 0.75em 0; padding-left: 1.5em; }
@@ -387,24 +382,20 @@
   .email-body :where(blockquote) {
     margin: 0.75em 0;
     padding-left: 1em;
-    border-left: 3px solid var(--color-border);
+    border-left: 2px solid var(--color-border-strong);
     color: var(--color-muted-foreground);
   }
-  .email-body :where(hr) {
-    margin: 1.25em 0;
-    border: 0;
-    border-top: 1px solid var(--color-border);
-  }
-  .email-body :where(img) { max-width: 100%; height: auto; border-radius: 0.5rem; }
+  .email-body :where(hr) { margin: 1.25em 0; border: 0; border-top: 1px solid var(--color-border); }
+  .email-body :where(img) { max-width: 100%; height: auto; border-radius: 0.375rem; }
   .email-body :where(table) { max-width: 100%; border-collapse: collapse; }
   .email-body :where(td, th) { word-break: break-word; }
-  .email-body :where(code) { font-family: ui-monospace, monospace; font-size: 0.85em; }
+  .email-body :where(code) { font-family: var(--font-mono); font-size: 0.85em; }
   .email-body :where(pre) {
     overflow-x: auto;
     padding: 0.75em;
     background: var(--color-muted);
-    border-radius: 0.5rem;
-    font-family: ui-monospace, monospace;
+    border-radius: 0.375rem;
+    font-family: var(--font-mono);
     font-size: 0.85em;
   }
 }

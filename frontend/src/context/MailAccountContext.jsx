@@ -68,9 +68,11 @@ export function MailAccountProvider({ children }) {
   // contul curent, salvează rezultatul ca `lastSync`, incrementează
   // `syncVersion` (declanșează reîncărcarea automată în toate paginile) și
   // reîncarcă lista de conturi (ex. ca să se actualizeze data ultimei sincronizări).
-  const sync = useCallback(async () => {
+  // `silent` is for the background poll below: it must not flip the Refresh
+  // button into its busy state every 45 seconds.
+  const sync = useCallback(async ({ silent = false } = {}) => {
     if (!account) return null;
-    setSyncing(true);
+    if (!silent) setSyncing(true);
     try {
       const result = await syncMailAccount(accountId(account));
       setLastSync(result);
@@ -78,7 +80,7 @@ export function MailAccountProvider({ children }) {
       await reload();
       return result;
     } finally {
-      setSyncing(false);
+      if (!silent) setSyncing(false);
     }
   }, [account, reload]);
 
@@ -92,7 +94,7 @@ export function MailAccountProvider({ children }) {
 
     const tick = () => {
       if (document.visibilityState !== 'visible') return;
-      sync().catch(() => {});
+      sync({ silent: true }).catch(() => {});
     };
 
     const intervalId = setInterval(tick, 45_000);

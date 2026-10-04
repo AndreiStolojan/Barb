@@ -86,3 +86,22 @@ export const getDateGroupLabel = (value) => {
   if (d >= weekStart) return 'This week';
   return 'Older';
 };
+
+/*
+  The time shown on a list row. Rows are grouped under Today / Yesterday /
+  This week / Older headers, so the row itself never repeats the group word:
+  today and yesterday show the clock time, this week the weekday, older the date.
+*/
+export const formatRowTime = (value) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfYesterday = new Date(startOfToday);
+  startOfYesterday.setDate(startOfToday.getDate() - 1);
+  if (date >= startOfYesterday) {
+    return new Intl.DateTimeFormat('en', { hour: '2-digit', minute: '2-digit', hour12: false }).format(date);
+  }
+  return formatEmailDate(value);
+};

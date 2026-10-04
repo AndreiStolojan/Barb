@@ -3,42 +3,37 @@ import { cva } from 'class-variance-authority';
 
 import { cn } from '@/lib/utils';
 
+/*
+  One button. `primary` is the single bone-filled action a screen is allowed;
+  everything else is an outline or a ghost so the hierarchy stays readable.
+  `danger` is for the two verbs that destroy something.
+*/
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-[transform,background-color,border-color,color,box-shadow] duration-150 ease-out active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0",
+  'focus-ring inline-flex shrink-0 select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-[background-color,border-color,color,opacity] duration-[var(--duration-fast)] disabled:pointer-events-none disabled:opacity-40 [&_svg]:pointer-events-none [&_svg]:shrink-0',
   {
     variants: {
       variant: {
-        default:
-          'bg-primary text-primary-foreground shadow-xs hover:bg-primary-hover active:bg-primary-active',
-        destructive:
-          'bg-destructive-strong text-destructive-foreground shadow-xs hover:bg-destructive-strong/90',
-        outline:
-          'border border-input bg-transparent hover:bg-accent hover:text-accent-foreground hover:border-input/80',
-        secondary:
-          'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-accent hover:text-accent-foreground',
+        primary: 'bg-primary text-primary-foreground hover:bg-primary-hover active:bg-primary-active',
+        outline: 'border border-input bg-transparent text-foreground hover:border-border-strong hover:bg-white/[0.05]',
+        ghost: 'text-muted-foreground hover:bg-white/[0.06] hover:text-foreground',
+        danger: 'border border-destructive/40 text-destructive hover:border-destructive/70 hover:bg-destructive/10',
         link: 'text-link underline-offset-4 hover:underline',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-8 rounded-md px-3 text-xs',
-        lg: 'h-11 rounded-md px-6',
-        icon: 'h-10 w-10',
-        'icon-sm': 'h-9 w-9',
+        sm: 'h-7 px-2.5 text-xs [&_svg]:size-3.5',
+        md: 'h-8 px-3 text-[0.8125rem] [&_svg]:size-4',
+        lg: 'h-10 px-4 text-sm [&_svg]:size-4',
+        icon: 'h-8 w-8 [&_svg]:size-4',
+        'icon-sm': 'h-7 w-7 [&_svg]:size-3.5',
       },
     },
-    defaultVariants: {
-      variant: 'default',
-      size: 'default',
-    },
+    defaultVariants: { variant: 'outline', size: 'md' },
   }
 );
 
 function Button({ className, variant, size, asChild = false, ...props }) {
   const Comp = asChild ? Slot : 'button';
-  return (
-    <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />
-  );
+  return <Comp className={cn(buttonVariants({ variant, size, className }))} {...props} />;
 }
 
 export { Button, buttonVariants };

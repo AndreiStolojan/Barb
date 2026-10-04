@@ -1,87 +1,70 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// DashboardPage.jsx — briefingul de securitate al inboxului.
+// DashboardPage.jsx — the briefing.
 //
-// Pagina răspunde, în ordinea asta, la două întrebări: "sunt în siguranță?" și
-// "ce am de făcut?". De aici cele patru blocuri, separate doar prin linii de 1px
-// (fără carduri):
-//   1. Posture        — arcul cu safe rate, o concluzie în limbaj natural și
-//                       cifrele-cheie ca figuri discrete, integrate în frază
-//   2. Needs your review — emailurile care chiar cer atenție, cele mai urgente
-//                       primele; fiecare rând duce în /inbox
-//   3. Risk over time — cum s-a mișcat riscul în intervalul selectat
-//   4. Attacking domains — de unde vin mesajele riscante
+// The inbox is where the work happens; this screen answers two questions
+// before you go there: "am I safe right now?" and "what needs me first?".
+// Four blocks, separated by hairlines, in that order:
+//   1. Posture        — safe rate, a sentence, the key counts
+//   2. Needs your review — the likely-phishing queue, most urgent first
+//   3. Risk over time — flagged messages per day in the selected range
+//   4. Where the risky mail came from — attacking domains
 //
-// Culorile de CATEGORIE (grafice, segmente) vin din lib/risk.js. Un SCOR
-// numeric (safe rate, scorul unui email) se colorează din rampa continuă din
-// lib/scoreScale.js — niciodată hex hardcodat.
+// Category colour comes from lib/risk.js; a numeric score is coloured from
+// the continuous ramp in lib/scoreScale.js. Never a raw hex here.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { Check, Loader2, RefreshCw, Send } from 'lucide-react';
 import { toast } from 'sonner';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
-import { DashboardSkeleton, ErrorState, ConnectGmailState } from '@/components/common/states';
-import { PageHeader } from '@/components/common/PageHeader';
+import { BriefingSkeleton, ConnectGmailState, ErrorState } from '@/components/common/states';
 import { PostureGauge } from '@/components/dashboard/PostureGauge';
+import { TimeRangeFilter } from '@/components/common/TimeRangeFilter';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { TimeRangeFilter } from '@/components/common/TimeRangeFilter';
 import { useApi } from '@/hooks/useApi';
-import { useAuth } from '@/hooks/useAuth';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useMailAccount } from '@/context/MailAccountContext';
 import { useTimeRange } from '@/context/TimeRangeContext';
 import { getEmails, getEmailStats, getEmailTrend, getTopRiskySenders } from '@/api/emailsApi';
 import { sendReportSummary } from '@/api/reportsApi';
 import { normalizeEmailList } from '@/lib/email-list';
-import { emailId, getSenderName, getSenderAddress } from '@/lib/email';
+import { emailId, getSenderAddress, getSenderName } from '@/lib/email';
 import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/lib/risk';
 import { getPostureLabel, getRiskColor, getRiskTextColor, isScored, UNSCORED_COLOR } from '@/lib/scoreScale';
 import { formatDateTime } from '@/utils/formatDate';
 import { cn } from '@/lib/utils';
 
-/* ─── Helpers ─────────────────────────────────────────────────────────────── */
+/* ─── helpers ─────────────────────────────────────────────────────────────── */
 
 const formatAxisDate = (dateStr) => {
   if (!dateStr) return '';
-  const d = new Date(dateStr + 'T00:00:00');
+  const d = new Date(`${dateStr}T00:00:00`);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-// Timp relativ scurt pentru coloana "When" din review queue.
 const relativeTime = (value) => {
-  if (!value) return '—';
+  if (!value) return '';
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '—';
+  if (Number.isNaN(date.getTime())) return '';
   const diffMin = Math.round((Date.now() - date.getTime()) / 60000);
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
+  if (diffMin < 1) return 'now';
+  if (diffMin < 60) return `${diffMin}m`;
   const diffHours = Math.round(diffMin / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
+  if (diffHours < 24) return `${diffHours}h`;
   const diffDays = Math.round(diffHours / 24);
-  if (diffDays === 1) return 'Yesterday';
-  if (diffDays < 30) return `${diffDays}d ago`;
+  if (diffDays < 30) return `${diffDays}d`;
   return formatAxisDate(date.toISOString().slice(0, 10));
 };
 
-// Scorul unui email (0-100), oriunde ar veni în răspuns. Fără scor -> null.
 const scoreOf = (email) => {
   const raw = email?.latestScan?.score ?? email?.score;
   if (raw === null || raw === undefined) return null;
   const n = Number(raw);
-  if (!Number.isFinite(n)) return null;
-  return Math.min(100, Math.max(0, Math.round(n)));
+  return Number.isFinite(n) ? Math.min(100, Math.max(0, Math.round(n))) : null;
 };
 
 const receivedAtMs = (email) => {
@@ -91,13 +74,13 @@ const receivedAtMs = (email) => {
 
 const plural = (n, one, many) => (n === 1 ? one : many);
 
-/* ─── Block scaffolding ───────────────────────────────────────────────────── */
+/* ─── block scaffolding ───────────────────────────────────────────────────── */
 
-function Block({ title, note, last = false, children }) {
+function Block({ title, note, children }) {
   return (
-    <section className={cn('py-10', !last && 'border-b border-border')}>
-      <div className="mb-6 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <h2 className="text-[1.0625rem] font-[620] tracking-[-0.019em] text-foreground">{title}</h2>
+    <section className="border-t border-border py-8">
+      <div className="mb-5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <h2 className="text-h3 font-semibold">{title}</h2>
         {note && <span className="ml-auto text-xs text-muted-foreground">{note}</span>}
       </div>
       {children}
@@ -105,28 +88,23 @@ function Block({ title, note, last = false, children }) {
   );
 }
 
-/* ─── 1. Posture ──────────────────────────────────────────────────────────── */
+const Note = ({ children }) => (
+  <p className="max-w-[56ch] text-[0.8125rem] leading-relaxed text-muted-foreground">{children}</p>
+);
 
-// Cifrele-cheie: nu patru carduri, ci o bandă de figuri discrete sub frază, pe
-// o singură linie subțire. Valoarea e mare, eticheta e o propoziție scurtă.
-function Figure({ value, label, tone }) {
+/* ─── 1. posture ──────────────────────────────────────────────────────────── */
+
+function Figure({ value, label, color }) {
   return (
     <div className="min-w-0">
-      <span
-        className={cn(
-          'block text-[1.25rem] font-[650] leading-[1.15] tracking-[-0.028em] tabular-nums',
-          tone || 'text-foreground'
-        )}
-      >
+      <span className="data block text-[1.5rem] font-medium leading-none" style={color ? { color } : undefined}>
         {value}
       </span>
-      <span className="mt-1 block text-xs leading-snug text-muted-foreground">{label}</span>
+      <span className="mt-1.5 block text-xs text-muted-foreground">{label}</span>
     </div>
   );
 }
 
-// Concluzia în limbaj natural: spune ce s-a găsit, fără să alarmeze când nu e
-// nimic de făcut și fără să banalizeze când e.
 function postureDetail({ scanned, total, needsReview, quarantine, confirmed }) {
   if (scanned === 0) {
     return total > 0
@@ -135,10 +113,7 @@ function postureDetail({ scanned, total, needsReview, quarantine, confirmed }) {
   }
   if (quarantine > 0) {
     const head = `${quarantine} ${plural(quarantine, 'message looks', 'messages look')} like phishing`;
-    const tail =
-      needsReview > 0
-        ? `, and ${needsReview} more ${plural(needsReview, 'is', 'are')} worth a second look.`
-        : '.';
+    const tail = needsReview > 0 ? `, and ${needsReview} more ${plural(needsReview, 'is', 'are')} worth a second look.` : '.';
     return `${head}${tail} Start with the queue below.`;
   }
   if (needsReview > 0) {
@@ -154,34 +129,25 @@ function PostureBlock({ counts, total, scanned, safeRate, periodLabel }) {
   const needsReview = counts.needs_review ?? 0;
   const quarantine = counts.quarantine ?? 0;
   const confirmed = counts.confirmed_phishing ?? 0;
+  const reviewedSafe = counts.reviewed_safe ?? 0;
 
   return (
     <Block title="Posture" note={periodLabel}>
-      <div className="grid grid-cols-[216px_minmax(0,1fr)] items-center gap-12 max-[780px]:grid-cols-1 max-[780px]:gap-7">
+      <div className="grid items-center gap-8 md:grid-cols-[168px_minmax(0,1fr)] md:gap-12">
         <PostureGauge value={safeRate} />
 
         <div className="min-w-0">
-          {/* Cu zero mesaje scanate rata e 0 din lipsă de date, nu din cauza
-              unei probleme — nu alarmăm userul degeaba. */}
-          <p className="text-[1.375rem] font-[620] leading-[1.27] tracking-[-0.024em] text-foreground">
-            {scanned === 0 ? 'Nothing to report yet' : getPostureLabel(safeRate)}
-          </p>
-          <p className="mt-2 max-w-[54ch] text-[0.8125rem] leading-relaxed text-muted-foreground">
+          <p className="text-h1 font-semibold">{scanned === 0 ? 'Nothing to report yet' : getPostureLabel(safeRate)}</p>
+          <p className="mt-2 max-w-[56ch] text-[0.8125rem] leading-relaxed text-muted-foreground">
             {postureDetail({ scanned, total, needsReview, quarantine, confirmed })}
           </p>
 
-          <div className="mt-7 grid grid-cols-4 gap-x-6 gap-y-5 border-t border-border pt-5 max-[900px]:grid-cols-2">
-            <Figure
-              value={scanned}
-              label={
-                total > scanned
-                  ? `Scanned, of ${total} synced`
-                  : `Scanned ${plural(scanned, 'message', 'messages')}`
-              }
-            />
-            <Figure value={needsReview} label="Suspicious" tone="text-risk-review" />
-            <Figure value={quarantine} label="Likely phishing" tone="text-risk-quarantine" />
-            <Figure value={confirmed} label="Confirmed by you" tone="text-risk-phishing" />
+          <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-border pt-5 sm:grid-cols-3 lg:grid-cols-5">
+            <Figure value={scanned} label={total > scanned ? `Scanned, of ${total} synced` : `Scanned ${plural(scanned, 'message', 'messages')}`} />
+            <Figure value={needsReview} label="Suspicious" color={needsReview > 0 ? CATEGORY_COLORS.suspicious : undefined} />
+            <Figure value={quarantine} label="Likely phishing" color={quarantine > 0 ? CATEGORY_COLORS.likely_phishing : undefined} />
+            <Figure value={confirmed} label="Confirmed by you" color={confirmed > 0 ? CATEGORY_COLORS.confirmed_phishing : undefined} />
+            <Figure value={reviewedSafe} label="Cleared by you" />
           </div>
         </div>
       </div>
@@ -189,80 +155,52 @@ function PostureBlock({ counts, total, scanned, safeRate, periodLabel }) {
   );
 }
 
-/* ─── 2. Review queue ─────────────────────────────────────────────────────── */
+/* ─── 2. review queue ─────────────────────────────────────────────────────── */
 
-// Toate coloanele pot să se strângă (minmax(0, …)), deci rândul nu împinge
-// niciodată pagina lateral, oricât de lung ar fi un subiect sau un domeniu.
 const QUEUE_GRID =
-  'grid grid-cols-[minmax(0,1.05fr)_minmax(0,1.7fr)_92px_74px] items-center gap-x-5 ' +
-  'max-[900px]:grid-cols-[minmax(0,1fr)_92px] max-[900px]:gap-x-4 max-[900px]:gap-y-2';
+  'grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_7rem_3rem] items-center gap-x-5 ' +
+  'max-md:grid-cols-[minmax(0,1fr)_7rem] max-md:gap-x-4 max-md:gap-y-1.5';
 
 function QueueRow({ email }) {
   const score = scoreOf(email);
   const scored = isScored(score);
   const barColor = scored ? getRiskColor(score) : UNSCORED_COLOR;
   const scoreColor = scored ? getRiskTextColor(score) : UNSCORED_COLOR;
+  const address = getSenderAddress(email);
 
   return (
     <Link
-      // Open THIS message, in the filter it came from. The queue is built from
-      // the quarantine bucket, so carrying `riskBucket` over means the list
-      // beside the message is the rest of the review queue rather than the
-      // whole inbox — the user keeps working through the same set they clicked
-      // from. `selected` is what the inbox reads; a bare /inbox/:id path drops
-      // it (see the redirect in App.jsx).
+      // Opens THIS message with the queue's filter still applied, so the list
+      // beside it is the rest of the queue.
       to={`/inbox?riskBucket=quarantine&selected=${encodeURIComponent(emailId(email))}`}
-      className={cn(
-        QUEUE_GRID,
-        'rounded-md border-b border-border px-2.5 py-3 outline-none transition-colors',
-        'hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-primary/50'
-      )}
+      className={cn(QUEUE_GRID, 'focus-ring -mx-2 rounded-md border-b border-border px-2 py-2.5 transition-colors hover:bg-white/[0.04]')}
     >
       <div className="min-w-0">
-        <span className="block truncate text-[0.8125rem] font-[590] text-foreground">
-          {getSenderName(email)}
+        <span className="block truncate text-[0.8125rem] font-medium">{getSenderName(email)}</span>
+        <span className="data block truncate text-xs text-muted-foreground">{address || 'no sender address'}</span>
+      </div>
+
+      <span className="truncate text-[0.8125rem] text-foreground/85 max-md:order-3 max-md:col-span-full">
+        {email.subject || 'No subject'}
+      </span>
+
+      <div className="flex items-center gap-2.5">
+        <span className="relative h-[3px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/[0.1]">
+          <i className="absolute inset-y-0 left-0 block rounded-full" style={{ width: `${score ?? 0}%`, backgroundColor: barColor }} />
         </span>
-        <span className="mt-px block truncate text-xs text-muted-foreground">
-          {getSenderAddress(email) || 'No sender address'}
+        <span className="data w-6 shrink-0 text-right text-[0.8125rem] font-medium" style={{ color: scoreColor }}>
+          {scored ? score : '–'}
         </span>
       </div>
 
-      <div className="min-w-0 max-[900px]:order-3 max-[900px]:col-span-full">
-        <span className="block truncate text-[0.8125rem] font-[480] text-foreground">
-          {email.subject || 'No subject'}
-        </span>
-      </div>
-
-      <div className="flex min-w-0 items-center gap-2.5">
-        <span className="relative h-[3px] min-w-0 flex-1 overflow-hidden rounded-sm bg-border">
-          <i
-            className="absolute inset-y-0 left-0 block rounded-sm"
-            style={{ width: `${score ?? 0}%`, backgroundColor: barColor }}
-          />
-        </span>
-        <span
-          className="shrink-0 text-right text-[0.8125rem] font-[590] tabular-nums"
-          style={{ color: scoreColor }}
-        >
-          {scored ? score : '—'}
-        </span>
-      </div>
-
-      <div className="truncate text-right text-xs tabular-nums text-muted-foreground">
-        {relativeTime(email.receivedAt)}
-      </div>
+      <span className="data truncate text-right text-xs text-muted-foreground max-md:hidden">{relativeTime(email.receivedAt)}</span>
     </Link>
   );
 }
 
 function ReviewQueueBlock({ emails, loading }) {
-  // Cele mai urgente primele: scor mai mare = mai periculos; la scor egal,
-  // mesajul mai recent contează mai mult.
   const ordered = useMemo(
-    () =>
-      [...emails].sort(
-        (a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1) || receivedAtMs(b) - receivedAtMs(a)
-      ),
+    () => [...emails].sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1) || receivedAtMs(b) - receivedAtMs(a)),
     [emails]
   );
   const total = ordered.length;
@@ -271,45 +209,28 @@ function ReviewQueueBlock({ emails, loading }) {
   return (
     <Block
       title="Needs your review"
-      note={
-        loading
-          ? undefined
-          : total > shown.length
-            ? `Showing the ${shown.length} most urgent of ${total}`
-            : total > 0
-              ? 'Most urgent first'
-              : undefined
-      }
+      note={loading ? undefined : total > shown.length ? `${shown.length} most urgent of ${total}` : total > 0 ? 'Most urgent first' : undefined}
     >
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
+            <Skeleton key={i} className="h-9 w-full" />
           ))}
         </div>
       ) : total === 0 ? (
-        <p className="max-w-[54ch] text-[0.8125rem] leading-relaxed text-muted-foreground">
-          Nothing needs your attention right now. Anything that looks like phishing will show up
-          here first.
-        </p>
+        <Note>Nothing needs your attention right now. Anything that looks like phishing will show up here first.</Note>
       ) : (
         <>
-          <div className={cn(QUEUE_GRID, 'border-b border-border px-2.5 pb-2 max-[900px]:hidden')}>
-            <span className="text-xs font-medium text-muted-foreground">Sender</span>
-            <span className="text-xs font-medium text-muted-foreground">Subject</span>
-            <span className="text-xs font-medium text-muted-foreground">Risk</span>
-            <span className="text-right text-xs font-medium text-muted-foreground">Received</span>
+          <div className={cn(QUEUE_GRID, '-mx-2 border-b border-border px-2 pb-2 max-md:hidden')}>
+            {['Sender', 'Subject', 'Risk', ''].map((h, i) => (
+              <span key={i} className={cn('text-xs text-muted-foreground', i === 3 && 'text-right')}>{h}</span>
+            ))}
           </div>
-
           {shown.map((email) => (
             <QueueRow key={emailId(email)} email={email} />
           ))}
-
           {total > shown.length && (
-            <Link
-              to="/inbox?riskBucket=quarantine"
-              className="mt-4 inline-block px-2.5 text-xs text-primary hover:underline"
-            >
+            <Link to="/inbox?riskBucket=quarantine" className="focus-ring mt-4 inline-block rounded text-xs text-link underline-offset-4 hover:underline">
               Open all {total} in the inbox
             </Link>
           )}
@@ -319,7 +240,7 @@ function ReviewQueueBlock({ emails, loading }) {
   );
 }
 
-/* ─── 3. Trend ────────────────────────────────────────────────────────────── */
+/* ─── 3. trend ────────────────────────────────────────────────────────────── */
 
 const TREND_SERIES = [
   { key: 'needs_review', name: CATEGORY_LABELS.suspicious, color: CATEGORY_COLORS.suspicious },
@@ -330,97 +251,53 @@ const TREND_SERIES = [
 function TrendTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-md border border-border bg-card px-3 py-2 text-xs shadow-md">
-      <p className="mb-2 font-semibold text-foreground">{formatAxisDate(label)}</p>
-      <div className="space-y-1">
-        {TREND_SERIES.map(({ key, name, color }) => {
-          const entry = payload.find((e) => e.dataKey === key);
-          const val = entry?.value ?? 0;
-          return (
-            <div key={key} className="flex items-center justify-between gap-4">
-              <span className="flex items-center gap-2 text-muted-foreground">
-                <span className="inline-block h-0.5 w-3 rounded-sm" style={{ background: color }} />
-                {name}
-              </span>
-              <span
-                className={cn(
-                  'font-semibold tabular-nums',
-                  val === 0 ? 'text-muted-foreground' : 'text-foreground'
-                )}
-              >
-                {val === 0 ? '—' : val}
-              </span>
-            </div>
-          );
-        })}
-      </div>
+    <div className="rounded-md border border-border-strong bg-popover px-3 py-2 text-xs shadow-md">
+      <p className="data mb-1.5 text-muted-foreground">{formatAxisDate(label)}</p>
+      {TREND_SERIES.map(({ key, name, color }) => {
+        const val = payload.find((e) => e.dataKey === key)?.value ?? 0;
+        return (
+          <div key={key} className="flex items-center justify-between gap-5 py-0.5">
+            <span className="flex items-center gap-2 text-muted-foreground">
+              <span className="inline-block h-0.5 w-3 rounded-full" style={{ background: color }} />
+              {name}
+            </span>
+            <span className={cn('data font-medium', val === 0 ? 'text-muted-foreground-subtle' : 'text-foreground')}>{val}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }
 
 function TrendBlock({ data, loading }) {
+  const hasDetections = data.some((d) => TREND_SERIES.some(({ key }) => Number(d?.[key]) > 0));
   const tickFormatter = (value, index) => (index % 5 === 0 ? formatAxisDate(value) : '');
-  const hasDetections = data.some((d) =>
-    TREND_SERIES.some(({ key }) => Number(d?.[key]) > 0)
-  );
 
   return (
     <Block title="Risk over time" note="Flagged messages per day">
       {loading ? (
-        <Skeleton className="h-[216px] w-full" />
+        <Skeleton className="h-48 w-full" />
       ) : data.length === 0 || !hasDetections ? (
-        <p className="max-w-[54ch] text-[0.8125rem] leading-relaxed text-muted-foreground">
-          No message was flagged on any day in this range, so there is no trend to plot yet.
-        </p>
+        <Note>No message was flagged on any day in this range, so there is no trend to plot yet.</Note>
       ) : (
         <>
-          <div className="mb-5 flex flex-wrap gap-x-5 gap-y-1.5">
+          <div className="mb-4 flex flex-wrap gap-x-5 gap-y-1.5">
             {TREND_SERIES.map(({ key, name, color }) => (
               <span key={key} className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="inline-block h-0.5 w-3 rounded-sm" style={{ background: color }} />
+                <span className="inline-block h-0.5 w-3 rounded-full" style={{ background: color }} />
                 {name}
               </span>
             ))}
           </div>
-
           <div className="w-full select-none">
-            {/* accessibilityLayer={false}: în recharts v3 e activat implicit și
-                desenează un chenar de focus în jurul graficului la click. */}
-            <ResponsiveContainer width="100%" height={216}>
-              <LineChart
-                accessibilityLayer={false}
-                data={data}
-                margin={{ top: 8, right: 4, left: -26, bottom: 0 }}
-              >
-                <CartesianGrid vertical={false} stroke="var(--color-border)" strokeWidth={1} />
-                <XAxis
-                  dataKey="date"
-                  tickFormatter={tickFormatter}
-                  tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-                  axisLine={false}
-                  tickLine={false}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: 'var(--color-muted-foreground)' }}
-                  axisLine={false}
-                  tickLine={false}
-                  allowDecimals={false}
-                />
-                <Tooltip content={<TrendTooltip />} cursor={{ stroke: 'var(--color-border)' }} />
+            <ResponsiveContainer width="100%" height={200}>
+              <LineChart accessibilityLayer={false} data={data} margin={{ top: 6, right: 4, left: -28, bottom: 0 }}>
+                <CartesianGrid vertical={false} stroke="rgb(255 255 255 / 0.08)" />
+                <XAxis dataKey="date" tickFormatter={tickFormatter} tick={{ fontSize: 11, fill: 'var(--color-muted-foreground-subtle)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 11, fill: 'var(--color-muted-foreground-subtle)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} allowDecimals={false} />
+                <Tooltip content={<TrendTooltip />} cursor={{ stroke: 'rgb(255 255 255 / 0.2)' }} />
                 {TREND_SERIES.map(({ key, name, color }) => (
-                  <Line
-                    key={key}
-                    type="monotone"
-                    dataKey={key}
-                    name={name}
-                    stroke={color}
-                    strokeWidth={1.75}
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    dot={false}
-                    activeDot={{ r: 3, strokeWidth: 0 }}
-                    isAnimationActive={false}
-                  />
+                  <Line key={key} type="monotone" dataKey={key} name={name} stroke={color} strokeWidth={1.5} dot={false} activeDot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
                 ))}
               </LineChart>
             </ResponsiveContainer>
@@ -431,7 +308,7 @@ function TrendBlock({ data, loading }) {
   );
 }
 
-/* ─── 4. Attacking domains ────────────────────────────────────────────────── */
+/* ─── 4. attacking domains ────────────────────────────────────────────────── */
 
 const DOMAIN_SEGMENTS = [
   { key: 'needsReview', label: 'suspicious', color: CATEGORY_COLORS.suspicious },
@@ -441,54 +318,39 @@ const DOMAIN_SEGMENTS = [
 
 function DomainRow({ sender, max }) {
   const total = sender.total || 0;
-  // Lățimea barei e raportată la domeniul cel mai activ; segmentele împart
-  // apoi bara proporțional cu propriul total (fără împărțiri la zero).
   const barWidth = max > 0 ? (total / max) * 100 : 0;
 
   return (
     <Link
       to={`/inbox?q=${encodeURIComponent(sender.domain)}`}
       className={cn(
-        'grid grid-cols-[minmax(0,1fr)_minmax(0,1.7fr)_86px] items-center gap-x-6',
-        'max-[780px]:grid-cols-[minmax(0,1fr)_86px] max-[780px]:gap-y-2',
-        'rounded-md border-b border-border px-2.5 py-3 outline-none transition-colors',
-        'hover:bg-foreground/[0.03] focus-visible:ring-2 focus-visible:ring-primary/50'
+        'focus-ring -mx-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_4rem] items-center gap-x-6 rounded-md border-b border-border px-2 py-2.5 transition-colors hover:bg-white/[0.04]',
+        'max-md:grid-cols-[minmax(0,1fr)_4rem] max-md:gap-y-1.5'
       )}
     >
-      <div className="truncate text-[0.8125rem] font-medium text-foreground">{sender.domain}</div>
+      <span className="data truncate text-[0.8125rem]">{sender.domain}</span>
 
-      <div className="min-w-0 max-[780px]:order-3 max-[780px]:col-span-full">
-        <div
-          className="flex h-[5px] overflow-hidden rounded-sm bg-border"
-          style={{ width: `${barWidth}%` }}
-        >
+      <div className="min-w-0 max-md:order-3 max-md:col-span-full">
+        <div className="flex h-[5px] overflow-hidden rounded-full bg-white/[0.08]" style={{ width: `${barWidth}%` }}>
           {DOMAIN_SEGMENTS.map(({ key, color }) => {
             const count = sender[key] ?? 0;
             if (!count || !total) return null;
-            return (
-              <span
-                key={key}
-                className="h-full"
-                style={{ width: `${(count / total) * 100}%`, backgroundColor: color }}
-              />
-            );
+            return <span key={key} className="h-full" style={{ width: `${(count / total) * 100}%`, backgroundColor: color }} />;
           })}
         </div>
-        <div className="mt-1.5 flex flex-wrap gap-x-3.5 text-xs text-muted-foreground">
+        <div className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
           {DOMAIN_SEGMENTS.filter(({ key }) => (sender[key] ?? 0) > 0).map(({ key, label }) => (
             <span key={key}>
-              <b className="font-[560] tabular-nums text-foreground">{sender[key]}</b> {label}
+              <b className="data font-medium text-foreground">{sender[key]}</b> {label}
             </span>
           ))}
         </div>
       </div>
 
-      <div className="flex items-baseline justify-end gap-1.5">
-        <b className="text-[0.9375rem] font-[620] tracking-[-0.024em] tabular-nums text-foreground">
-          {total}
-        </b>
-        <span className="text-xs text-muted-foreground">{plural(total, 'msg', 'msgs')}</span>
-      </div>
+      <span className="data text-right text-[0.8125rem]">
+        <b className="font-medium">{total}</b>
+        <span className="text-muted-foreground"> {plural(total, 'msg', 'msgs')}</span>
+      </span>
     </Link>
   );
 }
@@ -498,21 +360,15 @@ function DomainsBlock({ senders, loading }) {
   const max = list.reduce((acc, s) => Math.max(acc, s.total || 0), 0);
 
   return (
-    <Block
-      title="Where the risky mail came from"
-      note={list.length > 0 ? 'Bars are relative to the busiest domain' : undefined}
-      last
-    >
+    <Block title="Where the risky mail came from" note={list.length > 0 ? 'Bars are relative to the busiest domain' : undefined}>
       {loading ? (
         <div className="space-y-2">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-10 w-full" />
+            <Skeleton key={i} className="h-9 w-full" />
           ))}
         </div>
       ) : list.length === 0 ? (
-        <p className="max-w-[54ch] text-[0.8125rem] leading-relaxed text-muted-foreground">
-          No domain sent you anything suspicious in this range.
-        </p>
+        <Note>No domain sent you anything suspicious in this range.</Note>
       ) : (
         list.map((sender) => <DomainRow key={sender.domain} sender={sender} max={max} />)
       )}
@@ -520,42 +376,22 @@ function DomainsBlock({ senders, loading }) {
   );
 }
 
-/* ─── Dashboard page ──────────────────────────────────────────────────────── */
+/* ─── page ────────────────────────────────────────────────────────────────── */
 
 export function DashboardPage() {
-  const { user } = useAuth();
   const { account, isConnected, syncVersion, sync, syncing } = useMailAccount();
   const { label, from, to } = useTimeRange();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const statsQuery = useApi(
-    () => getEmailStats({ from, to }),
-    [syncVersion, from, to],
-    `dash-stats-${from}-${to}-${syncVersion}`
-  );
-  const riskyQuery = useApi(
-    () => getEmails({ riskBucket: 'quarantine', from, to }),
-    [syncVersion, from, to],
-    `risky-${from}-${to}-${syncVersion}`
-  );
-  const trendQuery = useApi(
-    () => getEmailTrend({ from, to }),
-    [syncVersion, from, to],
-    `dash-trend-${from}-${to}-${syncVersion}`
-  );
-  const sendersQuery = useApi(
-    () => getTopRiskySenders({ from, to }),
-    [syncVersion, from, to],
-    `dash-senders-${from}-${to}-${syncVersion}`
-  );
+  const statsQuery = useApi(() => getEmailStats({ from, to }), [syncVersion, from, to], `dash-stats-${from}-${to}-${syncVersion}`);
+  const riskyQuery = useApi(() => getEmails({ riskBucket: 'quarantine', from, to }), [syncVersion, from, to], `risky-${from}-${to}-${syncVersion}`);
+  const trendQuery = useApi(() => getEmailTrend({ from, to }), [syncVersion, from, to], `dash-trend-${from}-${to}-${syncVersion}`);
+  const sendersQuery = useApi(() => getTopRiskySenders({ from, to }), [syncVersion, from, to], `dash-senders-${from}-${to}-${syncVersion}`);
 
   const sendReport = useAsyncAction(sendReportSummary);
   const [reportSentTo, setReportSentTo] = useState(null);
 
-  // A new range means a new report — reset the "Sent" confirmation.
-  useEffect(() => {
-    setReportSentTo(null);
-  }, [from, to]);
+  useEffect(() => setReportSentTo(null), [from, to]);
 
   const handleSendReport = async () => {
     try {
@@ -565,98 +401,78 @@ export function DashboardPage() {
         toast.success(`Report sent to ${result.recipient}`);
       }
     } catch (err) {
-      toast.error(err?.message || 'Failed to send report. Check your email settings.');
+      toast.error(err?.message || 'Could not send the report. Check your email settings.');
     }
   };
 
+  // Strip the OAuth return parameters once the Google round-trip lands here.
   useEffect(() => {
     if (searchParams.get('gmail')) {
       const next = new URLSearchParams(searchParams);
-      next.delete('gmail');
-      next.delete('account');
-      next.delete('code');
+      ['gmail', 'account', 'code'].forEach((k) => next.delete(k));
       setSearchParams(next, { replace: true });
     }
   }, [searchParams, setSearchParams]);
 
-  if (!isConnected) return <ConnectGmailState />;
+  const toolbar = (
+    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 md:px-6">
+      <h1 className="text-sm font-semibold max-md:hidden">Briefing</h1>
+      {isConnected && (
+        <div className="ml-auto flex items-center gap-1.5">
+          <Button size="sm" onClick={handleSendReport} disabled={sendReport.loading || !statsQuery.data}>
+            {sendReport.loading ? <Loader2 className="animate-spin" /> : reportSentTo ? <Check /> : <Send />}
+            <span className="max-sm:hidden">{reportSentTo ? 'Sent' : 'Email me this'}</span>
+          </Button>
+          <TimeRangeFilter size="sm" />
+          <Button size="sm" onClick={() => sync?.()} disabled={syncing}>
+            <RefreshCw className={cn(syncing && 'animate-spin')} />
+            <span className="max-sm:hidden">{syncing ? 'Refreshing…' : 'Refresh'}</span>
+          </Button>
+        </div>
+      )}
+    </header>
+  );
 
-  if (statsQuery.loading) return <DashboardSkeleton />;
-  if (statsQuery.error)
-    return <ErrorState message={statsQuery.error} onRetry={statsQuery.reload} />;
+  if (!isConnected) {
+    return (
+      <>
+        {toolbar}
+        <ConnectGmailState />
+      </>
+    );
+  }
 
   const counts = statsQuery.data?.counts || {};
   const total = statsQuery.data?.total ?? 0;
-  const risky = normalizeEmailList(riskyQuery.data);
-  const trendData = Array.isArray(trendQuery.data) ? trendQuery.data : [];
-
   const safeCount = (counts.safe || 0) + (counts.reviewed_safe || 0);
   const scanned = Math.max(0, total - (counts.unscanned || 0));
-  // Fără emailuri scanate nu există rată: arătăm 0, niciodată NaN.
   const safeRate = scanned > 0 ? Math.round((safeCount / scanned) * 100) : 0;
   const lastSynced = account?.lastSyncedAt;
-  const displayName = user?.name || user?.email?.split('@')[0] || 'there';
-
-  // Subtitlul spune ce acoperă pagina: intervalul selectat + cât de proaspete
-  // sunt datele. Totul de dedesubt e filtrat pe acel interval.
-  const headerDescription = [
-    total === 0
-      ? `No messages in ${label}`
-      : `${scanned} of ${total} ${plural(total, 'message', 'messages')} scanned · ${label}`,
-    lastSynced ? `Last synced ${formatDateTime(lastSynced)}` : null,
-  ]
-    .filter(Boolean)
-    .join(' · ');
 
   return (
-    <div>
-      {/* Global time-range picker — every count and graph below covers the
-          selected window. Absolute-state items (Gmail connection, last-synced
-          time) are not time-scoped and shown as-is. */}
-      <PageHeader
-        title={`Welcome back, ${displayName}!`}
-        description={headerDescription}
-        className="border-b border-border pb-6"
-        titleClassName="text-[1.75rem] font-[650] tracking-[-0.028em]"
-        actions={
+    <>
+      {toolbar}
+      <div className="mx-auto w-full max-w-[64rem] px-4 pb-16 md:px-6">
+        {statsQuery.loading ? (
+          <div className="pt-8">
+            <BriefingSkeleton />
+          </div>
+        ) : statsQuery.error ? (
+          <ErrorState message={statsQuery.error} onRetry={statsQuery.reload} />
+        ) : (
           <>
-            <Button
-              variant="outline"
-              className="h-[34px]"
-              onClick={handleSendReport}
-              disabled={sendReport.loading}
-            >
-              {sendReport.loading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : reportSentTo ? (
-                <Check className="h-4 w-4 text-risk-safe" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-              {reportSentTo ? 'Sent' : 'Email me this'}
-            </Button>
-            <TimeRangeFilter variant="plain" />
-            <Button variant="outline" className="h-[34px]" onClick={sync} disabled={syncing}>
-              {syncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
-              {syncing ? 'Refreshing…' : 'Refresh'}
-            </Button>
+            <p className="data py-4 text-xs text-muted-foreground">
+              {total === 0 ? `No messages in ${label.toLowerCase()}` : `${scanned} of ${total} ${plural(total, 'message', 'messages')} scanned · ${label.toLowerCase()}`}
+              {lastSynced ? ` · synced ${formatDateTime(lastSynced)}` : ''}
+            </p>
+
+            <PostureBlock counts={counts} total={total} scanned={scanned} safeRate={safeRate} periodLabel={label} />
+            <ReviewQueueBlock emails={normalizeEmailList(riskyQuery.data)} loading={riskyQuery.loading} />
+            <TrendBlock data={Array.isArray(trendQuery.data) ? trendQuery.data : []} loading={trendQuery.loading} />
+            <DomainsBlock senders={sendersQuery.data} loading={sendersQuery.loading} />
           </>
-        }
-      />
-
-      <PostureBlock
-        counts={counts}
-        total={total}
-        scanned={scanned}
-        safeRate={safeRate}
-        periodLabel={label}
-      />
-
-      <ReviewQueueBlock emails={risky} loading={riskyQuery.loading} />
-
-      <TrendBlock data={trendData} loading={trendQuery.loading} />
-
-      <DomainsBlock senders={sendersQuery.data} loading={sendersQuery.loading} />
-    </div>
+        )}
+      </div>
+    </>
   );
 }

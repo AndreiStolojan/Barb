@@ -1,95 +1,74 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SenderAuthentication.jsx — arată dacă emailul chiar vine de la cine pretinde.
+// SenderAuthentication.jsx — did this message really come from who it claims?
 //
-// Ce face, pe scurt: desenează cele trei verificări de expeditor (server de
-// trimitere, semnătură, politica domeniului) pe care backendul le calculează la
-// sincronizare și pe care interfața nu le-a arătat niciodată — deși erau deja
-// în răspunsul API. Până acum singura urmă vizibilă a autentificării era o
-// regulă în lista "Rules that fired", cu id-ul brut al regulii.
-//
-// Regula de aur a componentei: NU desenăm o verificare nereușită și una
-// neefectuată la fel. `getSenderAuthentication` întoarce trei stări exact ca să
-// putem spune "n-am putut verifica" fără să pară acuzație.
-//
-// Nu recalculează niciun risc; scorul rămâne al backendului.
+// Three mechanisms (sending server, signature, domain policy), each in one of
+// THREE states: passed, failed, or not verified. A check we could not run is
+// never drawn like a check that failed: that would invent an accusation.
+// ARC and the published DMARC policy are listed as facts underneath.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { CircleHelp, ShieldCheck, ShieldX } from 'lucide-react';
+import { Check, Minus, X } from 'lucide-react';
 
 import { getSenderAuthentication } from '@/lib/senderAuth';
 import { cn } from '@/lib/utils';
 
-// Cele trei stări, fiecare cu iconița și culoarea ei. `unknown` folosește
-// intenționat tonul neutru "unscanned", nu galbenul de avertisment: absența unei
-// verificări nu e un semnal de risc.
-const STATE_TONE = {
-    pass: {
-        icon: ShieldCheck,
-        hex: 'var(--color-risk-safe)',
-        srLabel: 'Passed',
-    },
-    fail: {
-        icon: ShieldX,
-        hex: 'var(--color-risk-quarantine)',
-        srLabel: 'Failed',
-    },
-    unknown: {
-        icon: CircleHelp,
-        hex: 'var(--color-risk-unscanned)',
-        srLabel: 'Not verified',
-    },
+const STATE = {
+  pass: { icon: Check, color: 'var(--color-risk-safe)', srLabel: 'Passed', word: 'pass' },
+  fail: { icon: X, color: 'var(--color-risk-quarantine)', srLabel: 'Failed', word: 'fail' },
+  unknown: { icon: Minus, color: 'var(--color-risk-unscanned)', srLabel: 'Not verified', word: 'not verified' },
 };
 
-function Mechanism({ label, state, description }) {
-    const tone = STATE_TONE[state] ?? STATE_TONE.unknown;
-    const Icon = tone.icon;
+const MECHANISM_CODE = { spf: 'SPF', dkim: 'DKIM', dmarc: 'DMARC' };
 
-    return (
-        <div className="grid grid-cols-[16px_minmax(0,1fr)] items-baseline gap-3 border-b border-border/70 py-3 last:border-b-0">
-            <Icon
-                aria-hidden="true"
-                className="h-4 w-4 translate-y-[3px]"
-                style={{ color: tone.hex }}
-            />
-            <div className="min-w-0">
-                <p className="text-[0.8125rem] font-medium text-foreground/90">
-                    {label}
-                    {/* Starea e purtată de culoare și de formă; screen readerele
-                        au nevoie de ea în text. */}
-                    <span className="sr-only"> — {tone.srLabel}</span>
-                </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground break-words">
-                    {description}
-                </p>
-            </div>
-        </div>
-    );
+function Mechanism({ id, label, state, description }) {
+  const tone = STATE[state] ?? STATE.unknown;
+  const Icon = tone.icon;
+  return (
+    <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-border py-2.5 last:border-b-0">
+      <span className="flex h-5 w-5 items-center justify-center rounded-full border" style={{ borderColor: tone.color, color: tone.color }}>
+        <Icon className="h-3 w-3" aria-hidden="true" strokeWidth={2.5} />
+      </span>
+      <div className="min-w-0">
+        <p className="text-[0.8125rem] font-medium">
+          {label}
+          <span className="sr-only">: {tone.srLabel}</span>
+        </p>
+        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
+      </div>
+      <span className="data text-[0.6875rem]" style={{ color: tone.color }}>
+        {MECHANISM_CODE[id]} {tone.word}
+      </span>
+    </div>
+  );
 }
 
 export function SenderAuthentication({ authResults, className }) {
-    const { available, tone, summary, mechanisms } = getSenderAuthentication(authResults);
+  const { available, tone, summary, mechanisms } = getSenderAuthentication(authResults);
+  const arc = authResults?.arc?.result;
+  const policy = authResults?.dmarc?.policy;
 
-    if (!available) {
-        return (
-            <p className={cn('mt-3 text-sm text-muted-foreground', className)}>{summary}</p>
-        );
-    }
+  if (!available) {
+    return <p className={cn('text-[0.8125rem] text-muted-foreground', className)}>{summary}</p>;
+  }
 
-    return (
-        <div className={cn('min-w-0', className)}>
-            <p
-                className="mt-3 text-[0.8125rem] font-medium"
-                style={{ color: STATE_TONE[tone]?.hex }}
-            >
-                {summary}
-            </p>
-            <div className="mt-1.5">
-                {mechanisms.map((mechanism) => (
-                    <Mechanism key={mechanism.id} {...mechanism} />
-                ))}
-            </div>
-        </div>
-    );
+  return (
+    <div className={cn('min-w-0', className)}>
+      <p className="text-[0.8125rem] font-medium" style={{ color: STATE[tone]?.color }}>
+        {summary}
+      </p>
+      <div className="mt-1">
+        {mechanisms.map((m) => (
+          <Mechanism key={m.id} {...m} />
+        ))}
+      </div>
+      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
+        <dt className="text-muted-foreground">Domain policy</dt>
+        <dd className="data">{policy ? `p=${policy}` : 'none published'}</dd>
+        <dt className="text-muted-foreground">Forwarding chain (ARC)</dt>
+        <dd className="data">{arc && arc !== 'none' ? arc : 'not present'}</dd>
+      </dl>
+    </div>
+  );
 }
 
 export default SenderAuthentication;
