@@ -1,0 +1,28 @@
+/* Round 7 — desktop rethink. Shared tokens for the three directions. */
+@font-face { font-family: 'Plex'; font-weight: 100 700; font-display: swap; src: url('../../frontend/public/fonts/plex/IBMPlexSans-Roman-100to700-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Plex Mono'; font-weight: 400; src: url('../../frontend/public/fonts/plex/IBMPlexMono-Roman-400-latin.woff2') format('woff2'); }
+@font-face { font-family: 'Plex Mono'; font-weight: 500; src: url('../../frontend/public/fonts/plex/IBMPlexMono-Roman-500-latin.woff2') format('woff2'); }
+
+:root {
+  --bg: #000;
+  --fg: #f3f2ed;
+  --fg-2: rgb(243 242 237 / 0.62);
+  --fg-3: rgb(243 242 237 / 0.4);
+  --line: rgb(255 255 255 / 0.09);
+  --line-2: rgb(255 255 255 / 0.16);
+  --lift: rgb(255 255 255 / 0.05);
+  --lift-2: rgb(255 255 255 / 0.09);
+  --bone: #e9e6dc;
+  --safe: #a3a199;
+  --amber: #e2a63a;
+  --orange: #f0703f;
+  --red: #ea4d52;
+  --sans: 'Plex', system-ui, sans-serif;
+  --mono: 'Plex Mono', ui-monospace, monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.num { font-variant-numeric: tabular-nums; }
+.screen { min-height: 100vh; }
+svg { display: block; }

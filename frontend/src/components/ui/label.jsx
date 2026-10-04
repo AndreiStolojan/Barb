@@ -5,10 +5,7 @@ import { cn } from '@/lib/utils';
 function Label({ className, ...props }) {
   return (
     <LabelPrimitive.Root
-      className={cn(
-        'text-sm font-medium leading-none text-foreground peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
-        className
-      )}
+      className={cn('block text-xs font-medium text-muted-foreground', className)}
       {...props}
     />
   );

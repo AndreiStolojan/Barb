@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R7 B — Reader</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* B — READER. Two columns, full width. A slim icon rail, a list, and a pane
+   that reads like a document: the subject is big, the verdict is a band
+   across the whole pane, and the sections are separated by air, not lines.
+   Almost no labels. Scale: 15px body, 28px subject, 88px score. */
+
+.app { display: grid; grid-template-columns: 64px 400px minmax(0, 1fr); height: 100vh; }
+.rail { border-right: 1px solid var(--line); display: flex; flex-direction: column; align-items: center; padding: 18px 0; gap: 6px; }
+.rail a { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: var(--fg-3); }
+.rail a.on { background: var(--lift-2); color: var(--fg); }
+.rail a svg { width: 20px; height: 20px; }
+.rail .mark { color: var(--fg); margin-bottom: 14px; }
+.rail .bottom { margin-top: auto; display: grid; gap: 6px; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; background: var(--lift-2); display: grid; place-items: center; font-size: 11px; font-weight: 600; }
+
+.list { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.list-head { padding: 24px 22px 10px; }
+.list-head h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.015em; }
+.tabs { display: flex; gap: 20px; padding: 10px 22px 0; border-bottom: 1px solid var(--line); }
+.tab { padding: 8px 0 12px; font-size: 14px; color: var(--fg-3); border-bottom: 2px solid transparent; margin-bottom: -1px; }
+.tab.on { color: var(--fg); border-color: var(--fg); }
+.rows { overflow: auto; }
+.row { padding: 16px 22px; border-bottom: 1px solid var(--line); display: grid; grid-template-columns: 1fr auto; gap: 3px 12px; }
+.row.on { background: var(--lift); }
+.row .who { font-weight: 600; font-size: 15px; }
+.row .t { color: var(--fg-3); font-size: 12.5px; }
+.row .sub { grid-column: 1 / -1; color: var(--fg-2); font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .v { grid-column: 1 / -1; margin-top: 6px; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+.pip { width: 8px; height: 8px; border-radius: 50%; }
+.v-safe { color: var(--safe); } .v-amber { color: var(--amber); } .v-orange { color: var(--orange); } .v-red { color: var(--red); }
+.b-safe { background: var(--safe); } .b-amber { background: var(--amber); } .b-orange { background: var(--orange); } .b-red { background: var(--red); }
+
+.pane { min-width: 0; overflow: auto; }
+.doc { padding: 40px 64px 80px; max-width: 1180px; }
+.doc h2 { font-size: 28px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.2; max-width: 30ch; }
+.from { margin-top: 12px; display: flex; gap: 14px; align-items: baseline; font-size: 15px; color: var(--fg-2); }
+.from .addr { font-family: var(--mono); font-size: 13.5px; color: var(--fg-3); }
+.band { margin: 32px 0 0; padding: 28px 32px; border-radius: 16px; background: linear-gradient(135deg, rgb(240 112 63 / 0.16), rgb(240 112 63 / 0.04) 60%, transparent); border: 1px solid rgb(240 112 63 / 0.25);
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 32px; }
+.score { font-family: var(--mono); font-size: 88px; font-weight: 500; line-height: 0.9; color: var(--orange); letter-spacing: -0.04em; }
+.vword { font-size: 24px; font-weight: 600; color: var(--orange); letter-spacing: -0.01em; }
+.vsub { color: var(--fg-2); margin-top: 6px; font-size: 15px; max-width: 40ch; }
+.btn { height: 40px; padding: 0 16px; border-radius: 10px; border: 1px solid var(--line-2); display: inline-flex; align-items: center; gap: 8px; font-size: 14.5px; white-space: nowrap; }
+.btn.primary { background: var(--bone); color: #000; border-color: var(--bone); font-weight: 500; }
+.btn.danger { color: var(--red); border-color: rgb(234 77 82 / 0.4); }
+.actions { display: grid; gap: 8px; }
+
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; margin-top: 44px; }
+.kicker { font-size: 13px; color: var(--fg-3); margin-bottom: 14px; }
+.reasons li { list-style: none; font-size: 16px; line-height: 1.5; padding: 6px 0; display: grid; grid-template-columns: 10px 1fr; gap: 14px; align-items: baseline; }
+.reasons li::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--orange); transform: translateY(-2px); }
+.rule { display: flex; justify-content: space-between; gap: 16px; padding: 9px 0; font-size: 15px; }
+.rule .pts { font-family: var(--mono); color: var(--fg-2); }
+.auth .m { display: grid; grid-template-columns: 24px 1fr auto; gap: 14px; align-items: center; padding: 9px 0; font-size: 15px; }
+.auth .s { width: 22px; height: 22px; border-radius: 50%; border: 1.5px solid currentColor; display: grid; place-items: center; font-size: 11px; }
+.auth .code { font-family: var(--mono); font-size: 13px; color: var(--fg-3); }
+.facts { display: grid; grid-template-columns: 96px 1fr; gap: 8px 16px; font-size: 15px; margin-top: 28px; }
+.facts dt { color: var(--fg-3); }
+.facts dd { font-family: var(--mono); font-size: 14px; }
+.body { margin-top: 52px; max-width: 70ch; font-size: 16px; line-height: 1.7; color: rgb(243 242 237 / 0.88); }
+.body p { margin-bottom: 1em; }
+.body a { color: inherit; text-decoration: underline dotted; text-underline-offset: 4px; }
+
+/* briefing */
+.bwrap { padding: 44px 64px 80px; overflow: auto; }
+.btop { display: flex; align-items: baseline; justify-content: space-between; }
+.btop h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.015em; }
+.hero { margin-top: 36px; display: grid; grid-template-columns: 300px 1fr; gap: 64px; align-items: center; }
+.gauge { width: 280px; height: 280px; position: relative; }
+.gauge .c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.gauge .c b { font-family: var(--mono); font-size: 84px; font-weight: 500; color: var(--amber); line-height: 1; letter-spacing: -0.04em; }
+.gauge .c span { color: var(--fg-3); font-size: 14px; display: block; margin-top: 8px; }
+.headline { font-size: 40px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.1; max-width: 18ch; }
+.sub { font-size: 17px; color: var(--fg-2); margin-top: 14px; }
+.figs { display: flex; gap: 56px; margin-top: 36px; }
+.fig b { display: block; font-family: var(--mono); font-size: 40px; font-weight: 500; line-height: 1; letter-spacing: -0.03em; }
+.fig span { display: block; margin-top: 8px; font-size: 14px; color: var(--fg-3); }
+.lower { margin-top: 64px; display: grid; grid-template-columns: 1.4fr 1fr; gap: 64px; }
+.q { display: grid; grid-template-columns: 1.1fr 1.5fr 60px; gap: 20px; align-items: center; padding: 16px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.q .a { font-family: var(--mono); font-size: 13px; color: var(--fg-3); }
+.q .s { font-family: var(--mono); font-size: 20px; text-align: right; font-weight: 500; }
+.dom { display: grid; grid-template-columns: 1fr 48px; gap: 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.dom .bar { height: 6px; border-radius: 3px; background: var(--lift-2); display: flex; overflow: hidden; margin-top: 8px; }
+.dom .n { font-family: var(--mono); font-size: 20px; text-align: right; }
+.label { position: fixed; right: 16px; bottom: 12px; font-size: 11px; color: var(--fg-3); }
+</style>
+</head>
+<body>
+
+<section class="screen" data-screen="inbox">
+<div class="app">
+  <aside class="rail">
+    <a class="mark" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2.75 4.75 5.6v5.5c0 4.36 2.94 8.43 7.25 9.65 4.31-1.22 7.25-5.29 7.25-9.65V5.6L12 2.75Z"/><path d="m8.9 11.9 2.2 2.2 4-4.4"/></svg></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 0 4-4"/><path d="M3.5 14.5a9 9 0 1 1 17 0"/></svg></a>
+    <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6l2-8Z"/></svg></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg></a>
+    <div class="bottom"><span class="avatar">AS</span></div>
+  </aside>
+
+  <div class="list">
+    <div class="list-head"><h1>Inbox</h1></div>
+    <div class="tabs"><span class="tab on">All</span><span class="tab">Phishing <span class="num">11</span></span><span class="tab">Suspicious <span class="num">24</span></span><span class="tab">Safe</span></div>
+    <div class="rows">
+      <div class="row on"><span class="who">Microsoft Account Team</span><span class="t num">02:34</span><span class="sub">Unusual sign-in attempt blocked — confirm it was you</span><span class="v v-orange"><span class="pip b-orange"></span>Likely phishing · <span class="mono">83</span></span></div>
+      <div class="row"><span class="who">GitHub</span><span class="t num">03:16</span><span class="sub">A third-party OAuth application has been added</span><span class="v v-safe"><span class="pip b-safe"></span>Safe</span></div>
+      <div class="row"><span class="who">Mihai Popescu</span><span class="t num">00:46</span><span class="sub">Re: Notițe curs joi</span><span class="v v-safe"><span class="pip b-safe"></span>Safe</span></div>
+      <div class="row"><span class="who">Revolut</span><span class="t num">Yesterday</span><span class="sub">Your card has been temporarily blocked</span><span class="v v-red"><span class="pip b-red"></span>Likely phishing · <span class="mono">100</span></span></div>
+      <div class="row"><span class="who">Dropbox</span><span class="t num">Yesterday</span><span class="sub">Your Dropbox is almost full</span><span class="v v-safe"><span class="pip b-safe"></span>Reviewed safe</span></div>
+      <div class="row"><span class="who">Google</span><span class="t num">Yesterday</span><span class="sub">Security alert: new sign-in on Linux</span><span class="v v-safe"><span class="pip b-safe"></span>Safe</span></div>
+      <div class="row"><span class="who">Anthropic</span><span class="t num">Yesterday</span><span class="sub">Your receipt #2241-8815</span><span class="v v-safe"><span class="pip b-safe"></span>Safe</span></div>
+    </div>
+  </div>
+
+  <main class="pane">
+    <div class="doc">
+      <h2>Unusual sign-in attempt blocked — confirm it was you</h2>
+      <div class="from"><b style="font-weight:500;color:var(--fg)">Microsoft Account Team</b><span class="addr">no-reply@microsoft-verify-login.net</span><span style="color:var(--fg-3)">Today, 02:34</span></div>
+
+      <div class="band">
+        <div class="score">83</div>
+        <div><div class="vword">Likely phishing</div><div class="vsub">The sender failed its own domain's checks and replies go somewhere else.</div></div>
+        <div class="actions"><span class="btn danger">Mark phishing</span><span class="btn">Mark safe</span></div>
+      </div>
+
+      <div class="cols">
+        <div>
+          <ul class="reasons">
+            <li><span>DMARC failed under the domain's quarantine policy.</span></li>
+            <li><span>The sending server is not authorised for this domain.</span></li>
+            <li><span>Replies go to <span class="mono">secure-mail-relay.ru</span>.</span></li>
+            <li><span>The only link is a shortened URL.</span></li>
+          </ul>
+          <dl class="facts">
+            <dt>Reply-To</dt><dd class="v-amber">recover@secure-mail-relay.ru</dd>
+            <dt>First seen</dt><dd>today</dd>
+            <dt>Links</dt><dd>bit.ly/ms-acct-verify</dd>
+          </dl>
+        </div>
+        <div>
+          <div class="auth">
+            <div class="m v-orange"><span class="s">✕</span><span style="color:var(--fg)">Sending server</span><span class="code">SPF fail</span></div>
+            <div class="m v-safe"><span class="s">–</span><span style="color:var(--fg)">Signature</span><span class="code">not signed</span></div>
+            <div class="m v-orange"><span class="s">✕</span><span style="color:var(--fg)">Domain policy</span><span class="code">DMARC fail</span></div>
+          </div>
+          <div style="margin-top:24px">
+            <div class="rule"><span>Sender authentication failed</span><span class="pts">+30</span></div>
+            <div class="rule"><span>Unauthorised sending server</span><span class="pts">+20</span></div>
+            <div class="rule"><span>Reply address differs</span><span class="pts">+18</span></div>
+            <div class="rule"><span>Shortened link</span><span class="pts">+15</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="body">
+        <p>Hello,</p>
+        <p>We detected an unusual sign-in attempt to your Microsoft account from <b>Lagos, Nigeria</b> at 03:12 UTC.</p>
+        <p>If this was not you, confirm your identity within 12 hours or your mailbox will be locked.</p>
+        <p><a>Review sign-in activity</a></p>
+        <p>Thank you,<br>The Microsoft Account Team</p>
+      </div>
+    </div>
+  </main>
+</div>
+<span class="label">B · Reader · inbox</span>
+</section>
+
+<section class="screen" data-screen="dashboard" style="border-top:1px solid var(--line)">
+<div class="app" style="grid-template-columns:64px 1fr">
+  <aside class="rail">
+    <a class="mark" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2.75 4.75 5.6v5.5c0 4.36 2.94 8.43 7.25 9.65 4.31-1.22 7.25-5.29 7.25-9.65V5.6L12 2.75Z"/><path d="m8.9 11.9 2.2 2.2 4-4.4"/></svg></a>
+    <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 0 4-4"/><path d="M3.5 14.5a9 9 0 1 1 17 0"/></svg></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6l2-8Z"/></svg></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg></a>
+    <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg></a>
+    <div class="bottom"><span class="avatar">AS</span></div>
+  </aside>
+  <main class="bwrap">
+    <div class="btop"><h1>Briefing</h1><div style="display:flex;gap:8px"><span class="btn">Last 30 days</span><span class="btn">Refresh</span></div></div>
+    <div class="hero">
+      <div class="gauge">
+        <svg viewBox="0 0 280 280"><circle cx="140" cy="140" r="122" fill="none" stroke="rgb(255 255 255 / 0.1)" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="75 25" transform="rotate(135 140 140)"/><circle cx="140" cy="140" r="122" fill="none" stroke="#e2a63a" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="48.75 51.25" transform="rotate(135 140 140)"/></svg>
+        <div class="c"><b>65</b><span>safe</span></div>
+      </div>
+      <div>
+        <div class="headline">Several messages need attention</div>
+        <div class="sub">7 look like phishing and 2 are worth a second look.</div>
+        <div class="figs">
+          <div class="fig"><b>31</b><span>scanned</span></div>
+          <div class="fig"><b class="v-amber">2</b><span>suspicious</span></div>
+          <div class="fig"><b class="v-orange">7</b><span>likely phishing</span></div>
+          <div class="fig"><b class="v-red">2</b><span>confirmed</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="lower">
+      <div>
+        <div class="kicker">Needs your review</div>
+        <div class="q"><div>Revolut<div class="a">alerts@revolut-support-team.com</div></div><div>Your card has been temporarily blocked</div><div class="s v-red">100</div></div>
+        <div class="q"><div>eToll Services<div class="a">billing@etoll-services-ro.com</div></div><div>Unpaid toll invoice, final reminder</div><div class="s v-red">88</div></div>
+        <div class="q"><div>Microsoft Account Team<div class="a">no-reply@microsoft-verify-login.net</div></div><div>Unusual sign-in attempt blocked</div><div class="s v-orange">83</div></div>
+        <div class="q"><div>Netflix<div class="a">billing@netflix-billing-update.com</div></div><div>Your membership has been suspended</div><div class="s v-orange">83</div></div>
+        <div class="q"><div>Dropbox<div class="a">no-reply@secure-docs-share.io</div></div><div>A document was shared with you</div><div class="s v-orange">80</div></div>
+      </div>
+      <div>
+        <div class="kicker">Where it came from</div>
+        <div class="dom"><div><span class="mono" style="font-size:14px">dhl-express-tracking.com</span><span class="bar"><i class="b-amber" style="width:50%"></i><i class="b-orange" style="width:33%"></i><i class="b-red" style="width:17%"></i></span></div><span class="n">12</span></div>
+        <div class="dom"><div><span class="mono" style="font-size:14px">paypa1-alerts.com</span><span class="bar" style="width:58%"><i class="b-amber" style="width:43%"></i><i class="b-orange" style="width:43%"></i><i class="b-red" style="width:14%"></i></span></div><span class="n">7</span></div>
+        <div class="dom"><div><span class="mono" style="font-size:14px">microsoft-verify.net</span><span class="bar" style="width:58%"><i class="b-amber" style="width:57%"></i><i class="b-orange" style="width:29%"></i><i class="b-red" style="width:14%"></i></span></div><span class="n">7</span></div>
+        <div class="dom"><div><span class="mono" style="font-size:14px">corp-benefits-portal.com</span><span class="bar" style="width:42%"><i class="b-amber" style="width:80%"></i><i class="b-orange" style="width:20%"></i></span></div><span class="n">5</span></div>
+      </div>
+    </div>
+  </main>
+</div>
+<span class="label">B · Reader · briefing</span>
+</section>
+</body>
+</html>

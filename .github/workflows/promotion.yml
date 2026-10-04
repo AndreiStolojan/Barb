@@ -1,0 +1,40 @@
+name: Promotion
+
+# The human gate for production. With one maintainer GitHub cannot accept an
+# approving review from the author, so instead the promotion PR must carry a
+# written release record: what ships, where to roll back to, and the backup
+# taken first. This check is required on `prod` and re-runs whenever the
+# description is edited.
+on:
+  pull_request:
+    branches: [prod]
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  promotion-record:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Require a release record in the PR description
+        # The body reaches the script through the environment, never through
+        # ${{ }} interpolation, so text in a PR description cannot run as code.
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "${BODY}" > body.md
+          status=0
+          if ! grep -qx '## Release record.*' body.md; then
+            echo "::error::The description needs a '## Release record' section (docs/repository-controls.md)."
+            status=1
+          fi
+          for field in 'Rollback target' 'Backup'; do
+            if ! grep -qiE "^[-*][[:space:]]+(\*\*)?${field}" body.md; then
+              echo "::error::The release record needs a '- ${field}: ...' line."
+              status=1
+            fi
+          done
+          exit "${status}"

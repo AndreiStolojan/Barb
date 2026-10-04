@@ -16,7 +16,7 @@
 // Astfel userul poate inspecta conținutul emailului în siguranță, fără ca acel
 // conținut să poată "rula" cod în aplicația noastră.
 //
-// Detalii: docs/EXPLICATIE_FRONTEND.md §8.
+// Detalii: docs/architecture.md.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import DOMPurify from 'dompurify';
@@ -33,9 +33,17 @@ const hardenLinks = (documentNode) => {
   }
 };
 
-// Verifică dacă o valoare (ex: un URL de imagine) e o adresă "remote", deci
-// încărcată de pe internet (http/https), nu inline (ex: data:image/...).
-const isRemote = (value) => /^https?:/i.test(value || '');
+// O sursă e "locală" doar dacă e inline (data:) sau o parte a mesajului
+// (cid:). Orice altceva e tratat ca remote: browserele rezolvă și "//host",
+// "\\host" sau "/\\host" la https://host, deci nu ne bazăm pe prefixul http.
+const isRemote = (value) => {
+  const v = String(value || '').trim();
+  return v.length > 0 && !/^(data|cid):/i.test(v);
+};
+
+// O declarație CSS care poate încărca ceva: url(...), image-set(...), sau
+// orice escape cu backslash (un "\\75 rl(" este tot url( pentru browser).
+const LOADS_RESOURCE = /url\s*\(|image-set\s*\(|\\/i;
 
 /**
  * Strip remote images and background images (common tracking-pixel vectors) and
@@ -56,15 +64,17 @@ const blockRemoteImages = (documentNode) => {
     }
   }
 
-  // Pasul 2: caută în atributele "style" inline orice background-image cu URL extern
-  // și îl șterge din acel style (fără a afecta restul stilurilor elementului).
+  // Pasul 2: orice declarație din atributul "style" care poate încărca o
+  // resursă (background, list-style-image, border-image, cursor...) e scoasă,
+  // fără a atinge restul stilurilor elementului.
   for (const el of Array.from(documentNode.querySelectorAll('[style]'))) {
     const style = el.getAttribute('style') || '';
-    if (/background(-image)?\s*:\s*[^;]*url\(\s*['"]?https?:/i.test(style)) {
-      el.setAttribute(
-        'style',
-        style.replace(/background(-image)?\s*:\s*[^;]*url\([^)]*\)[^;]*;?/gi, '')
-      );
+    if (LOADS_RESOURCE.test(style)) {
+      const kept = style
+        .split(';')
+        .filter((declaration) => !LOADS_RESOURCE.test(declaration))
+        .join(';');
+      el.setAttribute('style', kept);
       blocked += 1;
     }
   }
@@ -88,12 +98,22 @@ const blockRemoteImages = (documentNode) => {
  *
  * @returns {{ html: string, blockedImages: number }}
  */
-// Funcția principală, exportată: curăță HTML-ul unui email pentru afișare.
-// - Tagurile <script>, <iframe>, <form>, <object>, <embed> sunt scoase ÎNTOTDEAUNA
-//   (DOMPurify le elimină indiferent de configurare, dar le listăm explicit ca
-//   să fie clar din cod ce e interzis).
-// - Atributul "srcset" e interzis, ca să nu rămână o portiță pentru imagini extra.
-// - blockImages = true => activează și blocarea imaginilor remote (vezi mai sus).
+// Taguri scoase complet. Pe lângă cele care rulează cod (script, iframe,
+// object, embed, form), scoatem tot ce poate încărca resurse de pe internet
+// pe căi pe care blocarea imaginilor nu le vede (video/audio/source, input de
+// tip imagine, svg <image>, link, meta refresh, base) și <style>: o foaie de
+// stil dintr-un email se aplică ÎNTREGII aplicații, deci ar putea ascunde sau
+// rescrie verdictul afișat lângă mesaj și poate face @import de pe internet.
+const FORBIDDEN_TAGS = [
+  'script', 'iframe', 'frame', 'frameset', 'form', 'object', 'embed', 'applet',
+  'style', 'link', 'meta', 'base',
+  'video', 'audio', 'source', 'track', 'picture',
+  'input', 'button', 'select', 'textarea',
+  'svg', 'math',
+];
+
+// srcset/poster încarcă imagini prin surse alternative, formaction/ping pot
+// trimite cereri la click.
 export const sanitizeEmailHtml = (html, { blockImages = false } = {}) => {
   // Dacă nu avem text valid, returnăm un rezultat "gol" sigur.
   if (typeof html !== 'string' || html.trim().length === 0) {
@@ -103,8 +123,8 @@ export const sanitizeEmailHtml = (html, { blockImages = false } = {}) => {
   // DOMPurify face curățarea principală: scoate tagurile/atributele periculoase
   // și normalizează HTML-ul.
   const sanitized = DOMPurify.sanitize(html, {
-    FORBID_TAGS: ['script', 'iframe', 'form', 'object', 'embed'],
-    FORBID_ATTR: ['srcset'],
+    FORBID_TAGS: FORBIDDEN_TAGS,
+    FORBID_ATTR: ['srcset', 'poster', 'formaction', 'ping'],
   });
   // Parsăm HTML-ul curățat într-un DOM "în memorie" (nu e adăugat în pagină),
   // ca să putem manipula linkurile și imaginile înainte de afișare.

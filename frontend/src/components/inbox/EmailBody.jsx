@@ -66,7 +66,7 @@ export function EmailBody({ htmlBody, textBody, riskBucket }) {
     return (
       <div className="min-w-0 space-y-3">
         {blockImages && blockedImages > 0 && (
-          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+          <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-muted-foreground-subtle">
             <ImageOff className="h-3.5 w-3.5 shrink-0" />
             <span>
               {blockedImages} remote image{blockedImages > 1 ? 's' : ''} blocked — they can tell
@@ -99,7 +99,7 @@ export function EmailBody({ htmlBody, textBody, riskBucket }) {
 
   if (textBody) {
     return (
-      <pre className="min-w-0 whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-foreground/90">
+      <pre className="min-w-0 whitespace-pre-wrap break-words font-sans text-[0.96875rem] leading-[1.72] text-foreground/85">
         {textBody}
       </pre>
     );

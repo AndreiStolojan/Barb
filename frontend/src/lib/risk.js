@@ -12,7 +12,7 @@
 // de detecție (transformă un cod tehnic ca
 // "suspicious_link_pattern:ip_address_link" în text ușor de citit pentru user).
 //
-// Detalii: docs/EXPLICATIE_FRONTEND.md §6.1.
+// Detalii: docs/detection-engine.md.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import {
@@ -27,7 +27,7 @@ import {
 // pentru text/fundal/bordură, plus un "hex" care e de fapt o variabilă CSS
 // (--color-risk-*) definită în index.css — nu există culori hardcodate aici.
 // Cele 4 tonuri (safe/review/quarantine/phishing) + unscanned sunt distincte
-// pe tema întunecată (verde / chihlimbar / roz / violet / gri), verificate să
+// pe tema grafit (mentă / chihlimbar / coral / roz / gri), verificate să
 // respecte contrastul WCAG 2.1 AA (accesibilitate = text lizibil pentru toți).
 const TONES = {
   safe: {
@@ -35,6 +35,7 @@ const TONES = {
     emphasis: 'quiet',
     text: 'text-risk-safe',
     soft: 'bg-risk-safe-soft text-risk-safe border border-risk-safe/30',
+    softBg: 'bg-risk-safe-soft',
     dot: 'bg-risk-safe',
     bar: 'bg-risk-safe',
     hex: 'var(--color-risk-safe)',
@@ -44,6 +45,7 @@ const TONES = {
     emphasis: 'loud',
     text: 'text-risk-review',
     soft: 'bg-risk-review-soft text-risk-review border border-risk-review/30',
+    softBg: 'bg-risk-review-soft',
     dot: 'bg-risk-review',
     bar: 'bg-risk-review',
     hex: 'var(--color-risk-review)',
@@ -53,6 +55,7 @@ const TONES = {
     emphasis: 'loud',
     text: 'text-risk-quarantine',
     soft: 'bg-risk-quarantine-soft text-risk-quarantine border border-risk-quarantine/30',
+    softBg: 'bg-risk-quarantine-soft',
     dot: 'bg-risk-quarantine',
     bar: 'bg-risk-quarantine',
     hex: 'var(--color-risk-quarantine)',
@@ -62,6 +65,7 @@ const TONES = {
     emphasis: 'loud',
     text: 'text-risk-phishing',
     soft: 'bg-risk-phishing-soft text-risk-phishing border border-risk-phishing/30',
+    softBg: 'bg-risk-phishing-soft',
     dot: 'bg-risk-phishing',
     bar: 'bg-risk-phishing',
     hex: 'var(--color-risk-phishing)',
@@ -71,6 +75,7 @@ const TONES = {
     emphasis: 'quiet',
     text: 'text-risk-unscanned',
     soft: 'bg-risk-unscanned-soft text-risk-unscanned border border-risk-unscanned/30',
+    softBg: 'bg-risk-unscanned-soft',
     dot: 'bg-risk-unscanned',
     bar: 'bg-risk-unscanned',
     hex: 'var(--color-risk-unscanned)',
@@ -80,33 +85,33 @@ const TONES = {
 // RISK_BUCKET_META — pentru fiecare valoare posibilă a câmpului `riskBucket`
 // (categoria vizuală a unui email), ce etichetă și ce descriere se arată, și
 // cu ce ton (din TONES de mai sus). "reviewed_safe" și "confirmed_phishing"
-// sunt cazurile în care USERUL a decis manual (vezi §6.4 din docs).
+// sunt cazurile în care USERUL a decis manual (vezi docs/architecture.md).
 const RISK_BUCKET_META = {
-  safe: { label: 'Safe', tone: TONES.safe, description: 'No threats detected in this email.' },
+  safe: { label: 'Safe', tone: TONES.safe, description: 'Nothing in this message looks risky.' },
   reviewed_safe: {
     label: 'Reviewed safe',
     tone: TONES.safe,
-    description: 'You confirmed this email is safe.',
+    description: 'You marked this message as safe.',
   },
   needs_review: {
     label: 'Suspicious',
     tone: TONES.review,
-    description: 'This email has suspicious patterns — worth a closer look.',
+    description: 'Some patterns are worth a second look before you act.',
   },
   quarantine: {
     label: 'Likely phishing',
     tone: TONES.quarantine,
-    description: 'This email looks like phishing. Review it before taking any action.',
+    description: 'Don’t open the links or reply until you have reviewed it.',
   },
   confirmed_phishing: {
     label: 'Confirmed phishing',
     tone: TONES.phishing,
-    description: 'You marked this email as phishing.',
+    description: 'You marked this message as phishing.',
   },
   unscanned: {
     label: 'Unscanned',
     tone: TONES.unscanned,
-    description: 'This email has not been scanned yet.',
+    description: 'This message has not been scanned yet.',
   },
 };
 

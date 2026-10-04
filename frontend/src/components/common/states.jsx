@@ -1,36 +1,20 @@
-import { Link } from 'react-router-dom';
-import { AlertTriangle, Loader2, ShieldCheck, Mail, RotateCw, Inbox } from 'lucide-react';
+// Shared status screens: loading, error, empty, and the first-run "connect
+// Gmail" screen. Each one is a direction, not a mood: what happened and what
+// to do next.
+
+import { AlertTriangle, Link2, Loader2, RotateCw } from 'lucide-react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useAsyncAction } from '@/hooks/useAsyncAction';
+import { getGoogleConnectUrl } from '@/api/mailAccountsApi';
 import { cn } from '@/lib/utils';
-
-/*
-  Shared status screens. These are on-screen far more than usual in this app —
-  small dev dataset, backend that is sometimes down — so each one is composed
-  like a real screen: icon in a soft chip, a heading, exactly one line of
-  explanation, and an action where an action exists.
-
-  2026-07-30 — the surrounding card frame was removed. The pages these sit on
-  are card-free now, so a bordered panel made the empty/error case the only
-  boxed thing on the screen — the state that matters least drawing the most
-  attention. The centred composition and the generous vertical padding already
-  separate them from the page; they do not need a border to do it.
-*/
 
 export function LoadingState({ label = 'Loading…', className }) {
   return (
-    <div
-      role="status"
-      aria-live="polite"
-      className={cn(
-        'flex flex-col items-center justify-center gap-3 py-16 text-center',
-        className
-      )}
-    >
-      <span className="flex h-9 w-9 items-center justify-center rounded-lg border border-border bg-card">
-        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-      </span>
+    <div role="status" aria-live="polite" className={cn('flex flex-col items-center justify-center gap-3 py-16 text-center', className)}>
+      <Loader2 className="h-5 w-5 animate-spin text-muted-foreground-subtle" />
       <p className="text-sm text-muted-foreground">{label}</p>
     </div>
   );
@@ -38,25 +22,17 @@ export function LoadingState({ label = 'Loading…', className }) {
 
 export function ErrorState({ message, onRetry, className }) {
   return (
-    <div
-      role="alert"
-      className={cn(
-        'flex flex-col items-center justify-center gap-4 px-6 py-14 text-center',
-        className
-      )}
-    >
-      <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-destructive/25 bg-destructive/10 text-destructive">
-        <AlertTriangle className="h-5 w-5" />
-      </span>
-      <div className="space-y-1.5">
-        <h3 className="text-h3 font-semibold text-foreground">Couldn’t load this</h3>
+    <div role="alert" className={cn('flex flex-col items-center justify-center gap-4 px-6 py-14 text-center', className)}>
+      <AlertTriangle className="h-5 w-5 text-destructive" />
+      <div className="space-y-1">
+        <p className="text-[0.9375rem] font-medium">Could not load this</p>
         <p className="mx-auto max-w-sm text-sm text-muted-foreground">
-          {message || 'The server didn’t respond. It may be offline — try again in a moment.'}
+          {message || 'The server did not respond. It may be offline; try again in a moment.'}
         </p>
       </div>
       {onRetry && (
-        <Button variant="outline" size="sm" onClick={onRetry}>
-          <RotateCw className="h-3.5 w-3.5" />
+        <Button size="sm" onClick={onRetry}>
+          <RotateCw />
           Try again
         </Button>
       )}
@@ -64,166 +40,113 @@ export function ErrorState({ message, onRetry, className }) {
   );
 }
 
-export function EmptyState({ icon: Icon = Inbox, title, description, action, className }) {
+export function EmptyState({ icon: Icon, title, description, action, className }) {
   return (
-    <div
-      className={cn(
-        'flex flex-col items-center justify-center gap-4 px-6 py-16 text-center',
-        className
-      )}
-    >
-      {Icon && (
-        <span className="flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-muted text-muted-foreground">
-          <Icon className="h-5 w-5" />
-        </span>
-      )}
-      <div className="space-y-1.5">
-        {title && <h3 className="text-h3 font-semibold text-foreground">{title}</h3>}
-        {description && (
-          <p className="mx-auto max-w-sm text-sm text-muted-foreground">{description}</p>
-        )}
+    <div className={cn('flex flex-col items-center justify-center gap-3 px-6 py-14 text-center', className)}>
+      {Icon && <Icon className="h-5 w-5 text-muted-foreground-subtle" strokeWidth={1.5} />}
+      <div className="space-y-1">
+        {title && <p className="text-[0.9375rem] font-medium">{title}</p>}
+        {description && <p className="mx-auto max-w-[32ch] text-sm leading-relaxed text-muted-foreground">{description}</p>}
       </div>
       {action}
     </div>
   );
 }
 
-/*
-  Shown on full pages (Dashboard, Reports) when no Gmail account is connected.
-  Without a connected account there is nothing to display, so these pages return
-  this prompt instead of any data, counts, or charts.
-*/
-export function ConnectGmailState() {
-  return (
-    <div className="flex flex-col items-center gap-5 px-6 py-16 text-center">
-      <span className="flex h-12 w-12 items-center justify-center rounded-xl border border-primary/25 bg-primary/10 text-primary">
-        <ShieldCheck className="h-6 w-6" />
-      </span>
-      <div className="space-y-1.5">
-        <h3 className="text-h3 font-semibold text-foreground">Connect Gmail to get started</h3>
-        <p className="mx-auto max-w-md text-sm text-muted-foreground">
-          SecureInbox syncs your inbox, scans every message for phishing signals, and keeps a
-          security overlay on top — without you opening Gmail.
-        </p>
-      </div>
-      <Button asChild size="sm">
-        <Link to="/settings">
-          <Mail className="h-4 w-4" />
-          Connect Gmail
-        </Link>
-      </Button>
-    </div>
-  );
-}
+/* Starts the Google OAuth flow. Used on the first-run screen and in Settings. */
+export function ConnectGmailButton({ size = 'md', className, children = 'Connect Gmail' }) {
+  const connect = useAsyncAction(async () => {
+    const result = await getGoogleConnectUrl();
+    const url = result?.authUrl || result?.url;
+    if (!url) throw new Error('Google sign-in is not configured on this server.');
+    window.location.href = url;
+  });
 
-/* ── Skeleton screens ─────────────────────────────────────── */
-
-export function InboxSkeleton({ rows = 8 }) {
-  // Vary the line widths slightly so the skeleton reads like real content.
-  const widths = ['w-28', 'w-40', 'w-32', 'w-44', 'w-36', 'w-40', 'w-28', 'w-48'];
   return (
-    <div
-      role="status"
-      aria-label="Loading messages"
-      className="overflow-hidden rounded-xl border border-border bg-card"
+    <Button
+      variant="primary"
+      size={size}
+      className={className}
+      disabled={connect.loading}
+      onClick={() => connect.run().catch((e) => toast.error(e.message || 'Could not start the Google sign-in.'))}
     >
-      <div className="flex items-center justify-between border-b border-border px-4 py-2.5">
-        <Skeleton className="h-3 w-20" />
-        <Skeleton className="h-3 w-12" />
-      </div>
-      <div className="divide-y divide-border">
-        {Array.from({ length: rows }).map((_, i) => (
-          <div key={i} className="flex items-center gap-3 px-4 py-3">
-            <Skeleton className="h-8 w-8 shrink-0 rounded-full" />
-            <div className="min-w-0 flex-1 space-y-2">
-              <div className="flex items-center justify-between gap-2">
-                <Skeleton className={`h-3 ${widths[i % widths.length]}`} />
-                <Skeleton className="h-3 w-10" />
-              </div>
-              <Skeleton className="h-3 w-56" />
+      {connect.loading ? <Loader2 className="animate-spin" /> : <Link2 />}
+      {children}
+    </Button>
+  );
+}
+
+const STEPS = [
+  ['Connect your Gmail', 'SecureInbox reads your mail and never sends from your account. Marking a message as phishing moves it to Spam.'],
+  ['Every message is checked', 'Who sent it, where its links go, what it attaches, and how it is worded.'],
+  ['You decide on the few that matter', 'Each flagged message shows why, so the call takes seconds.'],
+];
+
+/*
+  First run. Shown by the briefing and the inbox while no mailbox is connected.
+  Three steps, one button. The steps are a sequence, so they are numbered.
+*/
+export function ConnectGmailState({ compact = false }) {
+  return (
+    <div className={cn('mx-auto w-full max-w-xl px-6', compact ? 'py-10' : 'py-16 md:py-24')}>
+      <h2 className="text-h1 font-medium">Connect Gmail to begin</h2>
+      <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-muted-foreground">
+        SecureInbox reads your inbox, checks every message, and shows you only what needs a decision.
+      </p>
+
+      <ol className="mt-8 grid gap-5">
+        {STEPS.map(([title, body], i) => (
+          <li key={title} className="grid grid-cols-[2rem_minmax(0,1fr)] gap-3.5">
+            <span className="data flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.07] text-sm text-muted-foreground">{i + 1}</span>
+            <div>
+              <p className="text-[0.9375rem] font-medium">{title}</p>
+              <p className="mt-0.5 text-sm leading-relaxed text-muted-foreground">{body}</p>
             </div>
-            <Skeleton className="h-5 w-16 shrink-0 rounded-full" />
-          </div>
+          </li>
         ))}
+      </ol>
+
+      <div className="mt-9">
+        <ConnectGmailButton size="lg" />
       </div>
     </div>
   );
 }
 
-/*
-  A skeleton is a promise about what is arriving. This one mirrors the four
-  blocks of the real dashboard — posture, review queue, trend, domains — and is
-  card-free like the page it precedes. The previous version drew four stat cards
-  and a donut, neither of which the dashboard has any more, so the layout
-  visibly rearranged itself the moment the data landed.
-*/
-export function DashboardSkeleton() {
-  return (
-    <div role="status" aria-label="Loading dashboard" className="space-y-10">
-      {/* Header */}
-      <div className="flex items-center justify-between gap-4">
-        <div className="space-y-2">
-          <Skeleton className="h-2.5 w-20" />
-          <Skeleton className="h-6 w-40" />
-        </div>
-        <Skeleton className="h-[34px] w-32 rounded-md" />
-      </div>
+/* ── Skeletons ───────────────────────────────────────────────────────────── */
 
-      {/* 1 — Posture: gauge beside the conclusion, counts on a hairline */}
-      <div className="space-y-6">
-        <div className="flex flex-col gap-8 min-[780px]:flex-row min-[780px]:items-center">
-          <Skeleton className="h-[216px] w-[216px] shrink-0 rounded-full max-[780px]:h-[180px] max-[780px]:w-[180px]" />
-          <div className="min-w-0 flex-1 space-y-3">
-            <Skeleton className="h-7 w-64 max-w-full" />
-            <Skeleton className="h-3.5 w-full max-w-[46ch]" />
-            <Skeleton className="h-3.5 w-3/4 max-w-[38ch]" />
+export function ListSkeleton({ rows = 7 }) {
+  const widths = ['w-28', 'w-36', 'w-24', 'w-40', 'w-32', 'w-28', 'w-36'];
+  return (
+    <div role="status" aria-label="Loading messages" className="grid gap-1 px-1 pt-2">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="grid grid-cols-[2.25rem_minmax(0,1fr)] gap-3 p-3">
+          <Skeleton className="h-9 w-9 rounded-full" />
+          <div className="space-y-2 pt-1">
+            <div className="flex justify-between">
+              <Skeleton className={cn('h-3', widths[i % widths.length])} />
+              <Skeleton className="h-3 w-9" />
+            </div>
+            <Skeleton className="h-3 w-4/5" />
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-6 border-t border-border/70 pt-5 min-[780px]:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="space-y-2">
-              <Skeleton className="h-2.5 w-20" />
-              <Skeleton className="h-6 w-12" />
-            </div>
-          ))}
-        </div>
-      </div>
+      ))}
+    </div>
+  );
+}
 
-      {/* 2 — Needs your review */}
-      <div className="space-y-4">
-        <Skeleton className="h-3.5 w-36" />
-        <div className="space-y-px">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 border-b border-border/70 py-3">
-              <div className="min-w-0 flex-1 space-y-2">
-                <Skeleton className="h-3.5 w-1/3 min-w-[8rem]" />
-                <Skeleton className="h-3 w-2/3" />
-              </div>
-              <Skeleton className="h-5 w-9 shrink-0" />
-            </div>
-          ))}
-        </div>
+export function BriefingSkeleton() {
+  return (
+    <div role="status" aria-label="Loading briefing" className="space-y-10">
+      <div className="space-y-3">
+        <Skeleton className="h-8 w-72 rounded-lg" />
+        <Skeleton className="h-3.5 w-64 max-w-full" />
       </div>
-
-      {/* 3 — Risk over time */}
-      <div className="space-y-4">
-        <Skeleton className="h-3.5 w-32" />
-        <Skeleton className="h-[220px] w-full rounded-lg" />
+      <div className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
+        <Skeleton className="h-52 rounded-[1.25rem]" />
+        <Skeleton className="h-52 rounded-[1.25rem]" />
       </div>
-
-      {/* 4 — Where the risky mail came from */}
-      <div className="space-y-4">
-        <Skeleton className="h-3.5 w-52" />
-        <div className="space-y-px">
-          {Array.from({ length: 3 }).map((_, i) => (
-            <div key={i} className="flex items-center gap-4 border-b border-border/70 py-3">
-              <Skeleton className="h-3.5 w-1/4 min-w-[7rem]" />
-              <Skeleton className="h-3 min-w-0 flex-1" />
-              <Skeleton className="h-5 w-8 shrink-0" />
-            </div>
-          ))}
-        </div>
-      </div>
+      <Skeleton className="h-48 rounded-[1.25rem]" />
     </div>
   );
 }

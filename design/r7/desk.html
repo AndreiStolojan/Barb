@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R7 A — Desk</title>
+<link rel="stylesheet" href="shared.css">
+<style>
+/* A — DESK. Three columns, full width. A labelled sidebar, a wide list,
+   and a pane whose verdict header spans the whole width. The evidence is a
+   two-column grid under it, the message below. Scale: 14/15px body, 22px
+   subject, 72px score. Hairlines only where two things need separating. */
+
+.app { display: grid; grid-template-columns: 208px 408px minmax(0, 1fr); height: 100vh; }
+
+/* sidebar */
+.side { border-right: 1px solid var(--line); padding: 20px 14px; display: flex; flex-direction: column; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 10px 22px; font-weight: 600; font-size: 15px; }
+.brand svg { width: 20px; height: 20px; }
+.nav a { display: flex; align-items: center; gap: 12px; padding: 9px 10px; border-radius: 8px; color: var(--fg-2); text-decoration: none; font-size: 14.5px; }
+.nav a.on { background: var(--lift-2); color: var(--fg); }
+.nav a svg { width: 18px; height: 18px; }
+.nav .count { margin-left: auto; font-size: 12.5px; color: var(--fg-3); }
+.side .foot { margin-top: auto; display: flex; align-items: center; gap: 10px; padding: 10px; color: var(--fg-2); font-size: 13px; }
+.avatar { width: 28px; height: 28px; border-radius: 50%; background: var(--lift-2); display: grid; place-items: center; font-size: 11px; font-weight: 600; color: var(--fg); }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: var(--safe); }
+
+/* list */
+.list { border-right: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; }
+.list-head { padding: 22px 20px 12px; display: flex; align-items: baseline; gap: 10px; }
+.list-head h1 { font-size: 20px; font-weight: 600; letter-spacing: -0.01em; }
+.list-head .n { color: var(--fg-3); font-size: 14px; }
+.search { margin: 0 20px 14px; height: 38px; border: 1px solid var(--line-2); border-radius: 10px; display: flex; align-items: center; gap: 10px; padding: 0 12px; color: var(--fg-3); }
+.search svg { width: 16px; height: 16px; }
+.chips { display: flex; gap: 6px; padding: 0 20px 14px; }
+.chip { padding: 6px 12px; border-radius: 999px; font-size: 13px; color: var(--fg-2); border: 1px solid transparent; }
+.chip.on { background: var(--lift-2); color: var(--fg); }
+.chip b { font-weight: 500; color: var(--fg-3); margin-left: 5px; }
+.chip.on b { color: var(--fg-2); }
+.rows { overflow: auto; }
+.group { padding: 14px 20px 6px; font-size: 12px; color: var(--fg-3); }
+.row { padding: 14px 20px; display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; border-left: 2px solid transparent; }
+.row.on { background: var(--lift); border-left-color: var(--bone); }
+.row .who { font-weight: 600; font-size: 14.5px; }
+.row .t { color: var(--fg-3); font-size: 12.5px; }
+.row .sub { grid-column: 1 / -1; color: var(--fg-2); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .meta { grid-column: 1 / -1; margin-top: 6px; display: flex; align-items: center; gap: 10px; font-size: 13px; }
+.meter { width: 52px; height: 3px; border-radius: 2px; background: var(--lift-2); position: relative; }
+.meter i { position: absolute; inset: 0 auto 0 0; border-radius: 2px; }
+.v-safe { color: var(--safe); } .v-amber { color: var(--amber); } .v-orange { color: var(--orange); } .v-red { color: var(--red); }
+.b-safe { background: var(--safe); } .b-amber { background: var(--amber); } .b-orange { background: var(--orange); } .b-red { background: var(--red); }
+
+/* pane */
+.pane { min-width: 0; overflow: auto; }
+.pane-head { padding: 26px 36px 0; display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.pane-head h2 { font-size: 22px; font-weight: 600; letter-spacing: -0.012em; line-height: 1.25; max-width: 44ch; }
+.from { margin-top: 8px; display: flex; gap: 12px; align-items: baseline; color: var(--fg-2); font-size: 14px; }
+.from .addr { font-family: var(--mono); font-size: 13px; color: var(--fg-3); }
+.btn { height: 36px; padding: 0 14px; border-radius: 9px; border: 1px solid var(--line-2); display: inline-flex; align-items: center; gap: 8px; font-size: 14px; color: var(--fg); white-space: nowrap; }
+.btn.primary { background: var(--bone); color: #000; border-color: var(--bone); font-weight: 500; }
+.btn.danger { color: var(--red); border-color: rgb(234 77 82 / 0.4); }
+.btn svg { width: 16px; height: 16px; }
+
+.verdict { margin: 26px 0 0; padding: 26px 36px; display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 28px;
+  border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  background: linear-gradient(90deg, rgb(240 112 63 / 0.1), transparent 50%); }
+.score { font-family: var(--mono); font-size: 72px; font-weight: 500; line-height: 1; color: var(--orange); letter-spacing: -0.03em; }
+.score small { font-size: 16px; color: var(--fg-3); font-weight: 400; letter-spacing: 0; margin-left: 6px; }
+.vword { font-size: 20px; font-weight: 600; color: var(--orange); }
+.vsub { color: var(--fg-2); margin-top: 2px; font-size: 14px; }
+.actions { display: flex; gap: 8px; }
+
+.grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 0 48px; padding: 30px 36px 8px; }
+h3 { font-size: 13px; font-weight: 500; color: var(--fg-3); margin-bottom: 14px; }
+.reasons li { list-style: none; display: grid; grid-template-columns: 8px 1fr; gap: 12px; align-items: baseline; padding: 7px 0; font-size: 15px; line-height: 1.45; }
+.reasons li::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--orange); transform: translateY(-2px); }
+.rules { margin-top: 26px; }
+.rule { display: grid; grid-template-columns: 1fr auto; gap: 16px; padding: 11px 0; border-top: 1px solid var(--line); }
+.rule .d { color: var(--fg-3); font-size: 13.5px; margin-top: 2px; }
+.rule .pts { font-family: var(--mono); font-size: 15px; }
+.facts { display: grid; grid-template-columns: 92px 1fr; gap: 10px 14px; font-size: 14px; }
+.facts dt { color: var(--fg-3); }
+.facts dd { font-family: var(--mono); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.auth { margin-top: 26px; display: grid; gap: 0; }
+.auth .m { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 14.5px; }
+.auth .m .s { width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid currentColor; display: grid; place-items: center; font-size: 11px; }
+.auth .m .code { font-family: var(--mono); font-size: 12.5px; }
+.body { padding: 10px 36px 60px; }
+.body .box { max-width: 72ch; font-size: 15px; line-height: 1.65; color: rgb(243 242 237 / 0.88); }
+.body .box p { margin: 0 0 1em; }
+.body .box a { color: inherit; text-decoration: underline dotted; text-underline-offset: 3px; }
+.sep { height: 1px; background: var(--line); margin: 20px 36px 26px; }
+
+/* briefing */
+.brief { padding: 36px 48px 60px; display: grid; grid-template-columns: 1fr; gap: 40px; }
+.brief-top { display: grid; grid-template-columns: 260px 1fr; gap: 56px; align-items: center; }
+.gauge { width: 240px; height: 240px; position: relative; }
+.gauge .c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.gauge .c b { font-family: var(--mono); font-size: 64px; font-weight: 500; color: var(--amber); line-height: 1; letter-spacing: -0.03em; }
+.gauge .c span { color: var(--fg-3); font-size: 13px; margin-top: 6px; display: block; }
+.headline { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; line-height: 1.15; max-width: 20ch; }
+.sub { font-size: 16px; color: var(--fg-2); margin-top: 10px; max-width: 48ch; }
+.figures { display: flex; gap: 48px; margin-top: 28px; }
+.figure b { display: block; font-family: var(--mono); font-size: 32px; font-weight: 500; line-height: 1; letter-spacing: -0.02em; }
+.figure span { display: block; margin-top: 6px; font-size: 13px; color: var(--fg-3); }
+.two { display: grid; grid-template-columns: 1.3fr 1fr; gap: 56px; }
+.queue .q { display: grid; grid-template-columns: 1fr 1.4fr 72px 56px; gap: 18px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); font-size: 14.5px; }
+.queue .q .a { font-family: var(--mono); font-size: 12.5px; color: var(--fg-3); }
+.queue .q .s { font-family: var(--mono); text-align: right; font-weight: 500; }
+.queue .q .w { color: var(--fg-3); font-size: 13px; text-align: right; }
+.dom { display: grid; grid-template-columns: 1fr 1.3fr 40px; gap: 18px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); font-size: 14px; }
+.dom .bar { height: 5px; border-radius: 3px; background: var(--lift-2); display: flex; overflow: hidden; }
+.dom .n { font-family: var(--mono); text-align: right; }
+.trend { grid-column: 1 / -1; }
+.trend svg { width: 100%; height: 160px; }
+.topbar { display: flex; align-items: center; justify-content: space-between; padding: 22px 48px 0; }
+.topbar h1 { font-size: 20px; font-weight: 600; }
+.topbar .r { display: flex; gap: 8px; }
+.label { position: fixed; right: 16px; bottom: 12px; font-size: 11px; color: var(--fg-3); }
+</style>
+</head>
+<body>
+
+<section class="screen" data-screen="inbox">
+<div class="app">
+  <aside class="side">
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2.75 4.75 5.6v5.5c0 4.36 2.94 8.43 7.25 9.65 4.31-1.22 7.25-5.29 7.25-9.65V5.6L12 2.75Z"/><path d="m8.9 11.9 2.2 2.2 4-4.4"/></svg>SecureInbox</div>
+    <nav class="nav">
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 0 4-4"/><path d="M3.5 14.5a9 9 0 1 1 17 0"/></svg>Briefing</a>
+      <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6l2-8Z"/></svg>Inbox <span class="count">7</span></a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 4.5a3.5 3.5 0 0 1 0 7M18 14c2 .8 3 2.6 3 6"/></svg>Senders</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg>Settings</a>
+    </nav>
+    <div class="foot"><span class="avatar">AS</span><span>Andrei</span><span class="dot" style="margin-left:auto"></span></div>
+  </aside>
+
+  <div class="list">
+    <div class="list-head"><h1>Inbox</h1><span class="n num">342</span></div>
+    <div class="search"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>Search</div>
+    <div class="chips"><span class="chip on">All<b>342</b></span><span class="chip">Phishing<b>11</b></span><span class="chip">Suspicious<b>24</b></span><span class="chip">Safe<b>289</b></span></div>
+    <div class="rows">
+      <div class="group">Today</div>
+      <div class="row on"><span class="who">Microsoft Account Team</span><span class="t num">02:34</span><span class="sub">Unusual sign-in attempt blocked — confirm it was you</span><span class="meta"><span class="meter"><i class="b-orange" style="width:83%"></i></span><span class="mono v-orange">83</span><span class="v-orange">Likely phishing</span></span></div>
+      <div class="row"><span class="who">GitHub</span><span class="t num">03:16</span><span class="sub">A third-party OAuth application has been added</span><span class="meta"><span class="meter"><i class="b-safe" style="width:2%"></i></span><span class="mono v-safe">0</span><span class="v-safe">Safe</span></span></div>
+      <div class="row"><span class="who">Mihai Popescu</span><span class="t num">00:46</span><span class="sub">Re: Notițe curs joi</span><span class="meta"><span class="meter"><i class="b-safe" style="width:2%"></i></span><span class="mono v-safe">0</span><span class="v-safe">Safe</span></span></div>
+      <div class="group">Yesterday</div>
+      <div class="row"><span class="who">Revolut</span><span class="t num">22:46</span><span class="sub">Your card has been temporarily blocked</span><span class="meta"><span class="meter"><i class="b-red" style="width:100%"></i></span><span class="mono v-red">100</span><span class="v-red">Likely phishing</span></span></div>
+      <div class="row"><span class="who">Dropbox</span><span class="t num">18:46</span><span class="sub">Your Dropbox is almost full</span><span class="meta"><span class="meter"><i class="b-amber" style="width:36%"></i></span><span class="mono v-amber">36</span><span class="v-safe">Reviewed safe</span></span></div>
+      <div class="row"><span class="who">Google</span><span class="t num">15:46</span><span class="sub">Security alert: new sign-in on Linux</span><span class="meta"><span class="meter"><i class="b-safe" style="width:2%"></i></span><span class="mono v-safe">0</span><span class="v-safe">Safe</span></span></div>
+      <div class="row"><span class="who">Anthropic</span><span class="t num">13:46</span><span class="sub">Your receipt #2241-8815</span><span class="meta"><span class="meter"><i class="b-safe" style="width:2%"></i></span><span class="mono v-safe">0</span><span class="v-safe">Safe</span></span></div>
+    </div>
+  </div>
+
+  <main class="pane">
+    <div class="pane-head">
+      <div>
+        <h2>Unusual sign-in attempt blocked — confirm it was you</h2>
+        <div class="from"><b style="font-weight:500;color:var(--fg)">Microsoft Account Team</b><span class="addr">no-reply@microsoft-verify-login.net</span><span class="t">Today, 02:34</span></div>
+      </div>
+      <span class="btn">Trust / block</span>
+    </div>
+
+    <div class="verdict">
+      <div class="score">83<small>/100</small></div>
+      <div><div class="vword">Likely phishing</div><div class="vsub">4 rules fired. The sender failed its own domain's checks.</div></div>
+      <div class="actions"><span class="btn danger">Mark phishing</span><span class="btn">Mark safe</span><span class="btn" style="border-color:transparent;color:var(--fg-2)">Rescan</span></div>
+    </div>
+
+    <div class="grid">
+      <div>
+        <h3>Why</h3>
+        <ul class="reasons">
+          <li><span>DMARC failed under the domain's quarantine policy.</span></li>
+          <li><span>The sending server is not authorised for this domain.</span></li>
+          <li><span>Replies go to <span class="mono">secure-mail-relay.ru</span>, not the sender.</span></li>
+          <li><span>The only link is a shortened URL.</span></li>
+        </ul>
+        <div class="rules">
+          <h3>Rules</h3>
+          <div class="rule"><div>Sender authentication failed<div class="d">DMARC fail, policy quarantine</div></div><span class="pts">+30</span></div>
+          <div class="rule"><div>Unauthorised sending server<div class="d">SPF hard fail</div></div><span class="pts">+20</span></div>
+          <div class="rule"><div>Reply address differs<div class="d">secure-mail-relay.ru vs microsoft-verify-login.net</div></div><span class="pts">+18</span></div>
+          <div class="rule"><div>Shortened link<div class="d">bit.ly/ms-acct-verify</div></div><span class="pts">+15</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>Identity</h3>
+        <dl class="facts">
+          <dt>From</dt><dd>no-reply@microsoft-verify-login.net</dd>
+          <dt>Reply-To</dt><dd class="v-amber">recover@secure-mail-relay.ru</dd>
+          <dt>First seen</dt><dd>today</dd>
+          <dt>Links</dt><dd>1 · bit.ly</dd>
+        </dl>
+        <div class="auth">
+          <h3 style="margin-top:26px">Verification</h3>
+          <div class="m v-orange"><span class="s">✕</span><span style="color:var(--fg)">Sending server</span><span class="code">SPF fail</span></div>
+          <div class="m v-safe"><span class="s">–</span><span style="color:var(--fg)">Signature</span><span class="code">DKIM none</span></div>
+          <div class="m v-orange"><span class="s">✕</span><span style="color:var(--fg)">Domain policy</span><span class="code">DMARC fail</span></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sep"></div>
+    <div class="body">
+      <h3>Message <span style="font-weight:400">· links disabled</span></h3>
+      <div class="box">
+        <p>Hello,</p>
+        <p>We detected an unusual sign-in attempt to your Microsoft account from <b>Lagos, Nigeria</b> at 03:12 UTC.</p>
+        <p>If this was not you, confirm your identity within 12 hours or your mailbox will be locked.</p>
+        <p><a>Review sign-in activity</a></p>
+        <p>Thank you,<br>The Microsoft Account Team</p>
+      </div>
+    </div>
+  </main>
+</div>
+<span class="label">A · Desk · inbox</span>
+</section>
+
+<section class="screen" data-screen="dashboard" style="border-top:1px solid var(--line)">
+<div class="app" style="grid-template-columns:208px 1fr">
+  <aside class="side">
+    <div class="brand"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 2.75 4.75 5.6v5.5c0 4.36 2.94 8.43 7.25 9.65 4.31-1.22 7.25-5.29 7.25-9.65V5.6L12 2.75Z"/><path d="m8.9 11.9 2.2 2.2 4-4.4"/></svg>SecureInbox</div>
+    <nav class="nav">
+      <a class="on" href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm0 0 4-4"/><path d="M3.5 14.5a9 9 0 1 1 17 0"/></svg>Briefing</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 13h5l2 3h4l2-3h5"/><path d="M5 5h14l2 8v6H3v-6l2-8Z"/></svg>Inbox <span class="count">7</span></a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="9" cy="8" r="3.5"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/></svg>Senders</a>
+      <a href="#"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8"/></svg>Settings</a>
+    </nav>
+    <div class="foot"><span class="avatar">AS</span><span>Andrei</span><span class="dot" style="margin-left:auto"></span></div>
+  </aside>
+  <main style="overflow:auto">
+    <div class="topbar"><h1>Briefing</h1><div class="r"><span class="btn">Last 30 days</span><span class="btn">Refresh</span></div></div>
+    <div class="brief">
+      <div class="brief-top">
+        <div class="gauge">
+          <svg viewBox="0 0 240 240"><circle cx="120" cy="120" r="104" fill="none" stroke="rgb(255 255 255 / 0.1)" stroke-width="6" stroke-linecap="round" pathLength="100" stroke-dasharray="75 25" transform="rotate(135 120 120)"/><circle cx="120" cy="120" r="104" fill="none" stroke="#e2a63a" stroke-width="6" stroke-linecap="round" pathLength="100" stroke-dasharray="48.75 51.25" transform="rotate(135 120 120)"/></svg>
+          <div class="c"><b>65</b><span>safe</span></div>
+        </div>
+        <div>
+          <div class="headline">Several messages need attention</div>
+          <div class="sub">7 look like phishing and 2 are worth a second look.</div>
+          <div class="figures">
+            <div class="figure"><b>31</b><span>scanned</span></div>
+            <div class="figure"><b class="v-amber">2</b><span>suspicious</span></div>
+            <div class="figure"><b class="v-orange">7</b><span>likely phishing</span></div>
+            <div class="figure"><b class="v-red">2</b><span>confirmed</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="two">
+        <div class="queue">
+          <h3>Needs your review</h3>
+          <div class="q"><div>Revolut<div class="a">alerts@revolut-support-team.com</div></div><div>Your card has been temporarily blocked</div><div class="s v-red">100</div><div class="w">5h</div></div>
+          <div class="q"><div>eToll Services<div class="a">billing@etoll-services-ro.com</div></div><div>Unpaid toll invoice, final reminder</div><div class="s v-red">88</div><div class="w">3d</div></div>
+          <div class="q"><div>Microsoft Account Team<div class="a">no-reply@microsoft-verify-login.net</div></div><div>Unusual sign-in attempt blocked</div><div class="s v-orange">83</div><div class="w">1h</div></div>
+          <div class="q"><div>Netflix<div class="a">billing@netflix-billing-update.com</div></div><div>Your membership has been suspended</div><div class="s v-orange">83</div><div class="w">4d</div></div>
+          <div class="q"><div>Dropbox<div class="a">no-reply@secure-docs-share.io</div></div><div>A document was shared with you</div><div class="s v-orange">80</div><div class="w">2d</div></div>
+        </div>
+        <div>
+          <h3>Where it came from</h3>
+          <div class="dom"><span class="mono" style="font-size:13px">dhl-express-tracking.com</span><span class="bar"><i class="b-amber" style="width:50%"></i><i class="b-orange" style="width:33%"></i><i class="b-red" style="width:17%"></i></span><span class="n">12</span></div>
+          <div class="dom"><span class="mono" style="font-size:13px">paypa1-alerts.com</span><span class="bar" style="width:58%"><i class="b-amber" style="width:43%"></i><i class="b-orange" style="width:43%"></i><i class="b-red" style="width:14%"></i></span><span class="n">7</span></div>
+          <div class="dom"><span class="mono" style="font-size:13px">microsoft-verify.net</span><span class="bar" style="width:58%"><i class="b-amber" style="width:57%"></i><i class="b-orange" style="width:29%"></i><i class="b-red" style="width:14%"></i></span><span class="n">7</span></div>
+          <div class="dom"><span class="mono" style="font-size:13px">corp-benefits-portal.com</span><span class="bar" style="width:42%"><i class="b-amber" style="width:80%"></i><i class="b-orange" style="width:20%"></i></span><span class="n">5</span></div>
+          <div class="dom"><span class="mono" style="font-size:13px">secure-docs-share.io</span><span class="bar" style="width:42%"><i class="b-amber" style="width:60%"></i><i class="b-orange" style="width:20%"></i><i class="b-red" style="width:20%"></i></span><span class="n">5</span></div>
+        </div>
+        <div class="trend">
+          <h3>Risk over time</h3>
+          <svg viewBox="0 0 1200 160" preserveAspectRatio="none">
+            <line x1="0" y1="150" x2="1200" y2="150" stroke="rgb(255 255 255 / 0.12)"/>
+            <polyline fill="none" stroke="#e2a63a" stroke-width="1.5" points="0,150 40,120 80,150 120,90 160,120 200,120 240,60 280,90 320,150 360,120 400,90 440,30 480,60 520,120 560,90 600,150 640,120 680,60 720,90 760,0 800,30 840,90 880,120 920,60 960,90 1000,30 1040,60 1080,120 1120,90 1160,120 1200,150"/>
+            <polyline fill="none" stroke="#f0703f" stroke-width="1.5" points="0,150 40,150 80,120 120,150 160,120 200,150 240,120 280,90 320,120 360,150 400,150 440,120 480,90 520,120 560,150 600,120 640,150 680,90 720,60 760,90 800,120 840,150 880,120 920,90 960,120 1000,60 1040,90 1080,120 1120,120 1160,90 1200,120"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+<span class="label">A · Desk · briefing</span>
+</section>
+</body>
+</html>
