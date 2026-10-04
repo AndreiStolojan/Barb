@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { EventEmitter } from 'node:events';
-import { readFile } from 'node:fs/promises';
 import {
   metricsHandler,
   metricsRegistry,
@@ -121,24 +120,4 @@ test('Gmail push metrics accept only bounded outcomes and numeric latency', asyn
   assert.throws(() => recordGmailPushNotification('mailbox@example.test'));
   assert.throws(() => recordGmailWatchRenewal('retrying'));
   assert.throws(() => recordGmailPushLatency(-1));
-});
-
-test('every custom metric is shown in the operational dashboard', async () => {
-  const dashboard = await readFile(new URL('../../../monitoring/grafana/dashboards/secureinbox-local.json', import.meta.url), 'utf8');
-  for (const metric of [
-    'secureinbox_http_requests_total',
-    'secureinbox_http_request_duration_seconds',
-    'secureinbox_scheduled_tasks_total',
-    'secureinbox_scheduled_task_last_success_timestamp_seconds',
-    'secureinbox_detection_provider_total',
-    'secureinbox_gmail_sync_total',
-    'secureinbox_gmail_messages_ingested_total',
-    'secureinbox_gmail_history_gap_total',
-    'secureinbox_gmail_push_notifications_total',
-    'secureinbox_gmail_watch_renewals_total',
-    'secureinbox_gmail_push_latency_seconds',
-  ]) {
-    assert.match(dashboard, new RegExp(metric));
-  }
-  assert.doesNotMatch(dashboard, /application_operations|scheduler_last_success/);
 });

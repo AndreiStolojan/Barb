@@ -93,6 +93,14 @@ increments `secureinbox_detection_provider_total{provider,result}`, where
 The AI provider is optional. If it fails, `runDetection()` supplies the normal
 failed-AI fallback payload so explanation generation remains deterministic.
 
+The AI provider runs last and receives the rule signals collected before it.
+It skips the model call, recording `aiSignals.status: 'skipped'`, when rules
+alone fix the verdict: with a rule score of 0, AI is capped below
+`suspicious`, and at `likelyPhishing` or above it can only add points. On the
+Raspberry Pi each call costs tens of seconds at full CPU. The explanation is
+always the deterministic template in `scan-explanation.service.js`, which
+includes the AI signals when the semantic call succeeded.
+
 ## Centralized scoring
 
 Providers describe evidence only. `scorer.js` is the only code that assigns

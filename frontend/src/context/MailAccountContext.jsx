@@ -5,8 +5,9 @@
 // practic un singur cont Gmail), starea de sincronizare (`syncing`,
 // `lastSync`) și expune funcția `sync()` pentru butonul "Sync now".
 //
-// Mecanismul "syncVersion": de fiecare dată când `sync()` reușește, se
-// incrementează `syncVersion`. Paginile (Dashboard, Inbox etc.) pun
+// Mecanismul "syncVersion": după un sync manual, sau după un poll în fundal
+// care a găsit schimbări în cutia poștală, se incrementează `syncVersion`.
+// Paginile (Dashboard, Inbox etc.) pun
 // `syncVersion` în array-ul de dependențe al lui `useApi`, deci atunci când
 // crește, TOATE se reîncarcă automat cu emailurile noi — un singur semnal
 // reîmprospătează tot UI-ul, fără să fie nevoie ca paginile să comunice
@@ -45,10 +46,13 @@ export function MailAccountProvider({ children }) {
     setLoading(true);
     try {
       const result = await getMailAccounts();
-      setAccounts(Array.isArray(result) ? result : result?.items || []);
+      const nextAccounts = Array.isArray(result) ? result : result?.items || [];
+      setAccounts(nextAccounts);
       setError(null);
+      return nextAccounts;
     } catch (err) {
       setError(err.message || 'Failed to load mail accounts.');
+      return null;
     } finally {
       setLoading(false);
     }
@@ -65,19 +69,25 @@ export function MailAccountProvider({ children }) {
   const isConnected = Boolean(account);
 
   // sync — singurul mod corect de a sincroniza: cheamă API-ul de sync pentru
-  // contul curent, salvează rezultatul ca `lastSync`, incrementează
-  // `syncVersion` (declanșează reîncărcarea automată în toate paginile) și
-  // reîncarcă lista de conturi (ex. ca să se actualizeze data ultimei sincronizări).
+  // contul curent, salvează rezultatul ca `lastSync`, reîncarcă lista de
+  // conturi și incrementează `syncVersion` (reîncărcarea automată a paginilor).
   // `silent` is for the background poll below: it must not flip the Refresh
-  // button into its busy state every 45 seconds.
+  // button into its busy state every 45 seconds, and it bumps `syncVersion`
+  // only when the mailbox changed. Gmail's history id moves on any mailbox
+  // change, including mail the server's own cron synced between two polls, so
+  // an idle inbox no longer reruns every dashboard aggregation each tick.
   const sync = useCallback(async ({ silent = false } = {}) => {
     if (!account) return null;
     if (!silent) setSyncing(true);
     try {
       const result = await syncMailAccount(accountId(account));
       setLastSync(result);
-      setSyncVersion((v) => v + 1);
-      await reload();
+      const refreshed = await reload();
+      const mailboxChanged =
+        refreshed?.[0]?.lastHistoryId !== account.lastHistoryId ||
+        result?.insertedCount > 0 ||
+        result?.updatedCount > 0;
+      if (!silent || mailboxChanged) setSyncVersion((v) => v + 1);
       return result;
     } finally {
       if (!silent) setSyncing(false);

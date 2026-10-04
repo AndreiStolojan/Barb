@@ -50,6 +50,8 @@ try {
     const emails = await Email.insertMany(Array.from({ length: 600 }, (_, index) => ({
         userId: user._id, mailAccountId: accountId, providerMessageId: `synthetic-${index}`,
         subject: 'Urgent: verify your account', from: 'support@example.test', senderDomain: 'example.test',
+        // One mid-weight rule, so the AI scan is not skipped as already decided.
+        replyTo: 'help@reply.example', replyToDomain: 'reply.example',
         textBody: 'Your account will be suspended. Reply with your password and verification code to keep access.',
         receivedAt: new Date(Date.UTC(2026, 8, 1) + index * 60000),
         links: [], attachments: [],

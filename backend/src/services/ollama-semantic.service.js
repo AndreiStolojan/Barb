@@ -52,7 +52,13 @@ const DEFAULT_OLLAMA_TIMEOUT_MS = 45000;
 // Măsurat pe qwen2.5:7b, v4 dădea fals-negativ pe toate cele 4 phishinguri reale
 // (modelul considera `paypal-verify-account.com` plauzibil al PayPal) și
 // fals-pozitiv pe mailul care LIVREAZĂ un cod OTP. v5: 0% fals-pozitive.
-const SEMANTIC_PROMPT_VERSION = 'semantic-v5';
+// v6: textul promptului e identic cu v5, dar schema nu mai cere `summary`.
+// Nimeni nu citea câmpul, iar pe CPU-ul Pi-ului timpul e dominat de tokenii
+// GENERAȚI (~7/s la 1.5B). Fiind ultimul câmp, scoaterea lui nu schimbă
+// tokenii de dinainte, deci nici semnalele. O variantă care scurta și promptul
+// (fără `language`, JSON pe o linie) a urcat fals-pozitivele de la 6,7% la
+// 36,7% pe evaluarea semantică, așa că promptul a rămas neatins.
+const SEMANTIC_PROMPT_VERSION = 'semantic-v6';
 
 // Convertește o valoare (care poate veni din env ca string, ex. "true"/"1") într-un
 // boolean adevărat. Dacă valoarea nu e recunoscută, întoarce `defaultValue`.
@@ -289,7 +295,8 @@ technical checks run alongside you.`;
 // Aceleași chei ca SEMANTIC_JSON_CONTRACT, dar în formă executabilă: trimisă ca
 // `format` către Ollama, constrânge decodarea la această gramatică. Cele două
 // trebuie ținute sincronizate — contractul text explică modelului DE CE, schema
-// îl împiedică fizic să greșească forma.
+// îl împiedică fizic să greșească forma. Excepție deliberată: `summary` rămâne
+// în text (vezi v6), dar gramatica închide obiectul după `confidence`.
 const LEVEL_VALUES = ['none', 'low', 'medium', 'high'];
 
 const SEMANTIC_JSON_SCHEMA = Object.freeze({
@@ -303,7 +310,6 @@ const SEMANTIC_JSON_SCHEMA = Object.freeze({
         brandImpersonationSuspected: { type: 'boolean' },
         evidence: { type: 'string' },
         confidence: { type: 'number', minimum: 0, maximum: 1 },
-        summary: { type: 'string' },
     },
     required: [
         'language',
@@ -314,7 +320,6 @@ const SEMANTIC_JSON_SCHEMA = Object.freeze({
         'brandImpersonationSuspected',
         'evidence',
         'confidence',
-        'summary',
     ],
 });
 
@@ -559,6 +564,44 @@ export const analyzeEmailSemanticsWithOllama = async ({
         };
     }
 
+    // Ollama a căzut sau a expirat de curând: nu-l mai așteptăm încă un timeout
+    // întreg pentru fiecare email din același sync. Scanarea merge pe reguli,
+    // iar emailul se reîncearcă la sync-ul următor (scanul nu e "la zi").
+    if (Date.now() < cooldown.until) {
+        return {
+            status: 'failed',
+            ...baseMeta,
+            latencyMs: 0,
+            evaluatedAt: now,
+            error: cooldown.error,
+            cooldown: true,
+        };
+    }
+
+    const result = await requestSemanticSignals({ analysisInput, brandContext, baseMeta });
+
+    if (COOLDOWN_ERRORS.has(result.error)) {
+        cooldown.until = Date.now() + OLLAMA_FAILURE_COOLDOWN_MS;
+        cooldown.error = result.error;
+    }
+
+    return result;
+};
+
+// Pauza după un timeout sau o conexiune refuzată. Un Ollama blocat ar costa
+// altfel OLLAMA_TIMEOUT_MS (implicit 5 minute în Docker) pe fiecare email.
+const OLLAMA_FAILURE_COOLDOWN_MS = 60_000;
+const COOLDOWN_ERRORS = new Set(['ollama_timeout', 'ollama_unreachable']);
+const cooldown = { until: 0, error: null };
+
+// Folosit de teste: uită un eșec anterior.
+export const resetOllamaSemanticCooldown = () => {
+    cooldown.until = 0;
+    cooldown.error = null;
+};
+
+// Cererea propriu-zisă către Ollama, încercând pe rând adresele candidat.
+const requestSemanticSignals = async ({ analysisInput, brandContext, baseMeta }) => {
     const candidateBaseUrls = buildCandidateBaseUrls();
     // Timeout configurabil din env (OLLAMA_TIMEOUT_MS), plafonat între 5 secunde
     // și 10 minute (600000 ms) — pentru scanări în fundal pe modele mai lente.
@@ -576,6 +619,9 @@ export const analyzeEmailSemanticsWithOllama = async ({
     const requestBody = JSON.stringify({
         model: baseMeta.model,
         stream: false,
+        // Modelele noi (qwen3.5, granite4.2) gândesc implicit: sute de tokeni
+        // generați înainte de răspuns, adică minute în plus pe CPU-ul Pi-ului.
+        think: false,
         // Schemă completă, nu `format: 'json'` generic. Ollama constrânge decodarea
         // la gramatica schemei, deci modelul nu POATE emite chei greșite, niveluri
         // inventate sau JSON invalid — parserul de rezervă bazat pe regex devine

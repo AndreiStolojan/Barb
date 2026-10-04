@@ -54,7 +54,7 @@ or against live third-party services.
 | --- | --- | --- |
 | Rule scoring, thresholds, provider contracts, fallbacks, authentication parsing, URL safety, attachment bounds | Focused backend unit tests and immutable detection fixtures | 380 tests passed on 2026-08-13 |
 | Frontend risk mapping, authentication state, evidence rendering, and HTML sanitization | Frontend Vitest suites | 76 tests passed on 2026-08-13 |
-| Six-service local stack, demo data, readiness, metrics target, Grafana dashboard, backup and restore | `Quality / integration` workflow | Covered in disposable CI |
+| Four-service local stack, demo data, readiness, metrics endpoint, backup and restore | `Quality / integration` workflow | Covered in disposable CI |
 | Shell syntax, provisioning behavior, Compose parsing, production environment validation, nginx config, pinned ARM64 image manifests | `Quality / infra` workflow | Covered in CI |
 | Static JavaScript and workflow vulnerability analysis | GitHub CodeQL required check | Covered by repository automation |
 | Current Cloudflare, Atlas, Google OAuth, Gmail push, DNS, threat-intelligence, MalwareBazaar, Pi firewall, temperature, storage, and backup state | Requires live account and device inspection | Not verified by this handoff |
@@ -237,7 +237,7 @@ failure modes. Local dashboards do not prove production monitoring exists.
 
 CI should test the deployable shape, not just source files. SecureInbox checks
 Compose parsing, nginx, environment validation, image architecture, a complete
-disposable stack, seed data, monitoring, backup, and restore. Production rollout
+disposable stack, seed data, the metrics endpoint, backup, and restore. Production rollout
 is still manual, so CI proves inputs rather than the live outcome.
 
 ### Incident risk

@@ -124,6 +124,13 @@ No measured idle problem justifies weakening health checks or Gmail polling.
 Memory limits also need the kernel memory controller and a workload-specific
 margin, so none were added from these measurements.
 
+Correction, 2026-10-04: the healthcheck conclusion above came from 1 s medians,
+which hide short periodic work. Measured per probe through the container
+cgroup, `mongosh` costs about 0.63 CPU-s and the backend's `node -e fetch`
+about 0.23 CPU-s. At 10 s and 15 s intervals that is about 9% of one core
+across the dev and prod stacks, all the time. Every probe now runs every 60 s,
+with `start_interval: 2s` inside `start_period` so startup stays fast.
+
 TypeScript is worthwhile gradually for contracts and maintainability, not runtime
 speed: [its type annotations are erased](https://www.typescriptlang.org/docs/handbook/2/basic-types.html#erased-types).
 A Rust backend rewrite would leave MongoDB aggregation and the separate Ollama

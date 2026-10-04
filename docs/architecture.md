@@ -19,9 +19,8 @@ scale problem.
 | Express backend | Authentication, validation, Gmail sync, scanning, reports, metrics | `backend/src/server.js`, `backend/src/app.js` |
 | Detection engine | Independent evidence providers, centralized weights and verdicts | `backend/src/detection/` |
 | MongoDB | Users, encrypted OAuth tokens, normalized emails, scan results, caches | `backend/src/models/` |
-| Ollama | Optional local semantic signal and natural-language explanation | `backend/src/services/ollama-*.service.js` |
+| Ollama | Optional local semantic signal, called only when it can change the verdict | `backend/src/services/ollama-semantic.service.js` |
 | Scheduler and Gmail push | Incremental polling, watch renewal, and queued push-triggered sync | `backend/src/services/scheduler.service.js`, `backend/src/services/gmail-push-runtime.service.js` |
-| Prometheus and Grafana | Local metrics, alerts, and dashboard | `monitoring/`, `docker-compose.monitoring.yml` |
 
 ## Data flow
 
@@ -118,16 +117,13 @@ precision, recall, and uplift require the independent corpus work tracked in
 127.0.0.1:8080 -> nginx -> Express -> MongoDB
                                |
                                +-> Ollama
-
-127.0.0.1:9090 -> Prometheus -> Express /metrics
-127.0.0.1:3000 -> Grafana -> Prometheus
 ```
 
-`docker-compose.yml` runs six services: MongoDB, backend, frontend, Ollama,
-Prometheus, and Grafana. Published ports bind to loopback. Named volumes retain
-database, model, and monitoring data. `docker-compose.monitoring.yml` repeats
-the two monitoring services as a standalone overlay entry point; the default
-local Compose file already includes them.
+`docker-compose.yml` runs four services: MongoDB, backend, frontend and
+Ollama. Published ports bind to loopback. Named volumes retain database and
+model data. Prometheus and Grafana were removed on 2026-10-04: nothing read
+their alerts, and they cost CPU on the Pi. The backend still exposes its
+counters on the private `/metrics` endpoint.
 
 ### Raspberry Pi production
 
@@ -138,8 +134,7 @@ Browser -> Cloudflare edge -> cloudflared -> nginx -> Express -> MongoDB Atlas
 ```
 
 `docker-compose.prod.yml` runs four services: backend, frontend, Ollama, and
-`cloudflared`. It publishes no host ports. MongoDB Atlas is external, and the
-production Compose file does not include Prometheus or Grafana. Production
+`cloudflared`. It publishes no host ports. MongoDB Atlas is external. Production
 rollout is manual from the reviewed `prod` branch; CI validates the Compose
 configuration but does not deploy to the Pi.
 
@@ -153,8 +148,7 @@ configuration but does not deploy to the Pi.
 - The encryption key for OAuth tokens is configuration, not database data. A
   database restore without the matching `MAIL_TOKEN_ENCRYPTION_KEY` cannot
   recover Gmail access.
-- Local Docker volumes store MongoDB data, the Ollama model, and monitoring
-  history. Production application data lives in Atlas; Ollama model data stays
+- Local Docker volumes store MongoDB data and the Ollama model. Production application data lives in Atlas; Ollama model data stays
   on the Pi.
 - Raw RFC 822 messages used for DKIM/ARC verification and attachment bytes used
   for analysis are transient and are not persisted by the application.
@@ -170,7 +164,7 @@ operational decisions tracked in
 - One connected Gmail account is supported per application user.
 - Detection providers currently execute serially to preserve observable
   evidence order. Bounded concurrency may occur inside a provider, such as
-  attachment analysis. The explanation can add a second Ollama call.
+  attachment analysis. A scan makes at most one Ollama call.
 - Third-party signals depend on configuration, network availability, quotas,
   and provider behavior.
 - The production deployment is single-node at the application layer and has no

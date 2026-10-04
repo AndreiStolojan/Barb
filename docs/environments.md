@@ -65,10 +65,6 @@ Add `ai` to `COMPOSE_PROFILES` and set `AI_SEMANTIC_ENABLED=true` for local Olla
 Provisioning pulls `OLLAMA_MODEL` only when the `ai` profile is active. For an
 existing Ollama host, set `OLLAMA_BASE_URL` without enabling the profile.
 
-Add `monitoring` to start Prometheus and Grafana. Development defaults to ports
-9091 and 3001 so production can keep 9090 and 3000. For example:
-`COMPOSE_PROFILES=local-db,ai,monitoring`.
-
 When removing a profile, stop its services first, for example
 `docker compose --profile ai stop ollama`. Changing profiles does not remove
 previously started containers or their volumes.
@@ -81,13 +77,11 @@ Copy `.env.example` to the production configuration and set:
 NODE_ENV=production
 COMPOSE_PROJECT_NAME=secureinbox
 COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml
-COMPOSE_PROFILES=monitoring
+COMPOSE_PROFILES=
 DB_URI=mongodb+srv://PROD_USER:URL_ENCODED_PASSWORD@YOUR_CLUSTER/secureinbox
 FRONTEND_APP_URL=https://YOUR_HOSTNAME
 GOOGLE_REDIRECT_URI=https://YOUR_HOSTNAME/api/v1/mail-accounts/google/callback
 SEED_DEMO=false
-PROMETHEUS_PORT=9090
-GRAFANA_PORT=3000
 ```
 
 Fill the tunnel token, existing encryption/JWT secrets, Google credentials and
@@ -95,7 +89,7 @@ email delivery credentials. Preserve `MAIL_TOKEN_ENCRYPTION_KEY` exactly when
 migrating an installation, because it decrypts stored Gmail tokens. Production
 provisioning validates existing values and never generates replacement secrets.
 The application is accessible through Cloudflare Tunnel, with no published app
-or MongoDB port. Monitoring is loopback-only.
+or MongoDB port.
 
 `./provision` works in both modes. To keep development `.env` active and use a
 separate production config, use the same file for every Compose command:

@@ -19,17 +19,16 @@
 // nu doar tagurile care le delimitează: un mail de brand are frecvent 3.000–8.000
 // de caractere de CSS în <style>, iar dacă păstrăm doar conținutul, acesta umple
 // tot bugetul MAX_AI_BODY_CHARS și modelul nu mai vede niciun cuvânt din mesajul
-// real. Backreference-ul \1 închide exact eticheta deschisă.
-const HTML_NON_TEXT_ELEMENTS = /<(script|style|head|noscript|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi;
-// Un <style> sau <script> fără etichetă de închidere (mail malformat, sau
-// construit intenționat așa): browserele consideră tot restul documentului ca
-// fiind în interiorul elementului, deci facem la fel. Fără această a doua
-// trecere, un singur tag neînchis readuce tot CSS-ul în input.
-const HTML_UNTERMINATED_NON_TEXT = /<(script|style|head|noscript|svg)\b[^>]*>[\s\S]*$/i;
-const HTML_COMMENTS = /<!--[\s\S]*?-->/g;
+// real.
+const NON_TEXT_ELEMENTS = new Set(['script', 'style', 'head', 'noscript', 'svg']);
 // Sfârșiturile de bloc devin linie nouă, ca propozițiile să nu se lipească între
 // ele când tagurile dispar ("Salut Andrei" + "Contul tău" != "Salut AndreiContul").
-const HTML_BLOCK_BOUNDARIES = /<\/?(p|div|br|tr|li|h[1-6]|table|blockquote)\b[^>]*>/gi;
+const BLOCK_ELEMENTS = new Set([
+    'p', 'div', 'br', 'tr', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'table', 'blockquote',
+]);
+// Începutul unui tag: "<p", "</p", "<!DOCTYPE". Un "<" urmat de altceva
+// (ex. "pret < 5 lei") e text obișnuit, ca în browser.
+const TAG_START = /<(\/?)([a-z][a-z0-9]*)?/iy;
 
 // Entitățile HTML uzuale. Le decodăm ca modelul să vadă text natural, nu "&amp;".
 const HTML_ENTITIES = {
@@ -40,14 +39,65 @@ const HTML_ENTITIES = {
 // Transformă HTML în text simplu pentru analiza semantică. Folosit ca rezervă
 // (fallback) când emailul nu are versiune de text simplu — adică exact cazul
 // mailurilor de marketing și tranzacționale de brand.
-const stripHtmlTags = (htmlValue) =>
-    String(htmlValue || '')
-        .replace(HTML_COMMENTS, ' ')
-        .replace(HTML_NON_TEXT_ELEMENTS, ' ')
-        .replace(HTML_UNTERMINATED_NON_TEXT, ' ')
-        .replace(HTML_BLOCK_BOUNDARIES, '\n')
-        .replace(/<[^>]*>/g, ' ')
-        .replace(/&[a-z]+;|&#\d+;/gi, (entity) => HTML_ENTITIES[entity.toLowerCase()] ?? ' ');
+//
+// O singură trecere înainte cu indexOf, deci timp liniar. Varianta cu regex
+// rescana până la finalul documentului la fiecare "<" sau "<!--" neînchis:
+// 60 KB ostili costau ~5 s de CPU. Ca browserele, un comentariu, un tag sau un
+// <style>/<script> neînchis ascunde tot restul documentului.
+const stripHtmlTags = (htmlValue) => {
+    const html = String(htmlValue || '');
+    let text = '';
+    let position = 0;
+
+    while (position < html.length) {
+        const tagStart = html.indexOf('<', position);
+
+        if (tagStart === -1) {
+            text += html.slice(position);
+            break;
+        }
+
+        text += html.slice(position, tagStart);
+
+        if (html.startsWith('<!--', tagStart)) {
+            const commentEnd = html.indexOf('-->', tagStart + 4);
+            if (commentEnd === -1) break;
+            text += ' ';
+            position = commentEnd + 3;
+            continue;
+        }
+
+        TAG_START.lastIndex = tagStart;
+        const [, closing, rawName] = TAG_START.exec(html);
+        const isTag = Boolean(rawName) || /[!?/]/.test(html[tagStart + 1] || '');
+
+        if (!isTag) {
+            text += '<';
+            position = tagStart + 1;
+            continue;
+        }
+
+        const tagEnd = html.indexOf('>', tagStart + 1);
+        if (tagEnd === -1) break;
+        position = tagEnd + 1;
+
+        const name = (rawName || '').toLowerCase();
+
+        if (!closing && NON_TEXT_ELEMENTS.has(name)) {
+            const closeTag = new RegExp(`</${name}\\s*>`, 'gi');
+            closeTag.lastIndex = position;
+            const closeMatch = closeTag.exec(html);
+            if (!closeMatch) break;
+            text += ' ';
+            position = closeMatch.index + closeMatch[0].length;
+            continue;
+        }
+
+        text += BLOCK_ELEMENTS.has(name) ? '\n' : ' ';
+    }
+
+    return text.replace(/&[a-z]+;|&#\d+;/gi, (entity) => HTML_ENTITIES[entity.toLowerCase()] ?? ' ');
+};
 
 // Înlocuiește orice succesiune de spații/taburi/linii noi cu un singur spațiu și
 // elimină spațiile de la margini — curăță textul înainte de a-l trimite la AI.

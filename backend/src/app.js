@@ -50,8 +50,9 @@ if (!APP_READ_ONLY && isGmailPushConfigured()) {
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
 
-// This endpoint is deliberately outside /api/v1: nginx does not proxy it and
-// Prometheus reaches it only over the private Docker network.
+// This endpoint is deliberately outside /api/v1: nginx does not proxy it, so
+// only the private Docker network can read it. No scraper runs today; the
+// counters stay so a future one needs no code change.
 app.get('/metrics', metricsHandler);
 
 const apiRateLimiter = rateLimit({

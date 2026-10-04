@@ -25,25 +25,48 @@ const serialize = (value) => `${JSON.stringify(value, null, 2)}\n`;
 // change is recorded here instead, fixture by fixture, with its justification.
 // Every other fixture stays locked byte-for-byte, which is the point of the file:
 // the lock keeps working while one intended divergence is stated out loud.
+// AI gating (rules-ai-v13). The model is no longer called when rules alone fix
+// the verdict: with no rule evidence it is capped below `suspicious`, and at
+// `likelyPhishing` it can only add points. These fixtures keep their verdict;
+// their AI points and AI evidence disappear because no model call happens.
+const AI_NOT_RUN = { since: 'rules-ai-v13', withoutAi: true };
+
 const INTENTIONAL_DEVIATIONS = {
-    // Invariant 4 (AI_UNCORROBORATED_SCORE_MAX). This fixture is precisely the
-    // behaviour being corrected: five AI signals, zero deterministic evidence,
-    // and a `suspicious` verdict authored by the model alone. Measured against
-    // qwen2.5:1.5b — the model in the Raspberry Pi deployment — the semantic
-    // layer asserted social engineering on all 30 benign fixtures in
-    // tests/fixtures/semantic-eval.fixtures.js, so an AI-only verdict is not
-    // trustworthy. The evidence is still emitted and still shown; only the score
-    // is withheld until a rule provider corroborates it.
-    'ai-cap': {
-        since: 'rules-ai-v12',
-        overrides: { score: 25, aiScore: 25, verdict: 'safe' },
-    },
+    // Invariant 4 (AI_UNCORROBORATED_SCORE_MAX), rules-ai-v12. This fixture is
+    // precisely the behaviour being corrected: five AI signals, zero
+    // deterministic evidence, and a `suspicious` verdict authored by the model
+    // alone. Measured against qwen2.5:1.5b — the model in the Raspberry Pi
+    // deployment — the semantic layer asserted social engineering on all 30
+    // benign fixtures in tests/fixtures/semantic-eval.fixtures.js, so an
+    // AI-only verdict is not trustworthy. Since v13 the model is not called at
+    // all for it (see AI_NOT_RUN).
+    'ai-cap': { ...AI_NOT_RUN, overrides: { verdict: 'safe' } },
+    'ai-urgency-high': AI_NOT_RUN,
+    'ai-urgency-medium': AI_NOT_RUN,
+    'ai-sensitive-data': AI_NOT_RUN,
+    'ai-login-action': AI_NOT_RUN,
+    'ai-social-engineering-high': AI_NOT_RUN,
+    'ai-social-engineering-medium': AI_NOT_RUN,
+    'ai-brand-impersonation': AI_NOT_RUN,
+    'allowlist-critical-signals': AI_NOT_RUN,
+    'final-score-cap': AI_NOT_RUN,
 };
+
+// The baseline result with every AI contribution removed, as if AI were off.
+const withoutAi = (result) => ({
+    ...result,
+    score: Math.min(100, result.ruleScore),
+    aiScore: 0,
+    reasons: result.reasons.filter((reason) => !reason.startsWith('AI semantic:')),
+    triggeredRules: result.triggeredRules.filter(({ rule }) => !rule.startsWith('ai_semantic:')),
+});
 
 const applyIntentionalDeviations = (result) => {
     const deviation = INTENTIONAL_DEVIATIONS[result.id];
+    if (!deviation) return result;
 
-    return deviation ? { ...result, ...deviation.overrides } : result;
+    const base = deviation.withoutAi ? withoutAi(result) : result;
+    return { ...base, ...deviation.overrides };
 };
 
 const buildAiSignals = (fixture) =>
