@@ -1,93 +1,70 @@
-// ─────────────────────────────────────────────────────────────────────────────
-// LoginPage.jsx — sign in / create account.
-//
-// Two columns. The left one shows what the product does with a single rendered
-// verdict: one address, one score, three reasons. No slogans. The right one is
-// the form. On narrow screens the verdict moves above the form.
-// ─────────────────────────────────────────────────────────────────────────────
-
 import { useMemo, useState } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
-import { Check, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import {
+  Check,
+  Eye,
+  EyeOff,
+  Loader2,
+  Lock,
+  Mail,
+  User,
+  X,
+} from 'lucide-react';
 
-import { Mark } from '@/components/layout/Rail';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { useAuth } from '@/hooks/useAuth';
+import { ease } from '@/lib/motion';
 import { cn } from '@/lib/utils';
+import './LoginPage.css';
 
-const PASSWORD_RULES = [
-  { label: 'At least 8 characters', test: (v) => v.length >= 8 },
-  { label: 'A lowercase letter', test: (v) => /[a-z]/.test(v) },
-  { label: 'An uppercase letter', test: (v) => /[A-Z]/.test(v) },
-  { label: 'A number', test: (v) => /\d/.test(v) },
-  { label: 'A symbol', test: (v) => /[^A-Za-z\d]/.test(v) },
+const THEME = {
+  id: 'graphite',
+  description: 'Your inbox should feel simple and safe. SecureInbox highlights what deserves your attention before you open, click, or reply.',
+  loginKicker: 'Protected session',
+  loginTitle: 'Return to your inbox',
+  loginIntro: 'Continue to an AI-reviewed, sanitized view of every message.',
+  submitLabel: 'Open protected inbox',
+  registerLabel: 'Create protected account',
+};
+
+const SECURITY_BENEFITS = [
+  'Spot suspicious emails before they catch you off guard',
+  'Know which links and senders you can trust',
+  'Stay focused with a clear next step for every message',
 ];
 
-/* A static rendering of one verdict: the product in one glance. */
-function VerdictSample() {
+const PASSWORD_RULES = [
+  { label: '8+ characters', test: (value) => value.length >= 8 },
+  { label: 'Lowercase letter', test: (value) => /[a-z]/.test(value) },
+  { label: 'Uppercase letter', test: (value) => /[A-Z]/.test(value) },
+  { label: 'One number', test: (value) => /\d/.test(value) },
+  { label: 'Special character', test: (value) => /[^A-Za-z\d]/.test(value) },
+];
+
+const modeTransition = {
+  initial: { opacity: 0, y: 8, filter: 'blur(4px)' },
+  animate: { opacity: 1, y: 0, filter: 'blur(0px)' },
+  exit: { opacity: 0, y: -6, filter: 'blur(4px)' },
+  transition: { duration: 0.24, ease },
+};
+
+const collapse = {
+  initial: { opacity: 0, height: 0, y: -6 },
+  animate: { opacity: 1, height: 'auto', y: 0 },
+  exit: { opacity: 0, height: 0, y: -6 },
+  transition: { duration: 0.28, ease },
+};
+
+function Field({ icon: Icon, id, label, type = 'text', trailing, ...props }) {
   return (
-    <figure className="w-full max-w-sm">
-      <div className="border-t border-border-strong pt-4">
-        <p className="text-[0.9375rem] font-medium leading-snug">Your account access has been limited</p>
-        <p className="data mt-1.5 text-xs text-muted-foreground">security@paypa1-alerts.com</p>
-      </div>
-
-      <div className="mt-5 flex items-baseline gap-3">
-        <span className="data text-[2.75rem] font-semibold leading-none text-risk-quarantine">87</span>
-        <div>
-          <p className="text-sm font-semibold text-risk-quarantine">Likely phishing</p>
-          <p className="text-xs text-muted-foreground">3 rules fired · sender unverified</p>
-        </div>
-      </div>
-
-      <ul className="mt-5 grid gap-2 text-[0.8125rem] leading-relaxed text-foreground/85">
-        {[
-          ['Lookalike domain', 'paypa1 uses the digit 1 where paypal has the letter l.'],
-          ['Sender authentication failed', 'The domain rejects mail it did not send. This one failed.'],
-          ['Pressures to act', 'A 24-hour deadline to “confirm billing details”.'],
-        ].map(([rule, detail]) => (
-          <li key={rule} className="grid grid-cols-[0.5rem_minmax(0,1fr)] items-baseline gap-2.5">
-            <span aria-hidden="true" className="h-1.5 w-1.5 translate-y-[-1px] rounded-full bg-risk-quarantine" />
-            <span>
-              <span className="font-medium text-foreground">{rule}</span>
-              <span className="block text-xs text-muted-foreground">{detail}</span>
-            </span>
-          </li>
-        ))}
-      </ul>
-      <figcaption className="mt-5 border-t border-border pt-3 text-xs text-muted-foreground">
-        Every verdict ships with its evidence. The link is disabled until you decide.
-      </figcaption>
-    </figure>
-  );
-}
-
-function Field({ id, label, trailing, hint, ...props }) {
-  return (
-    <div className="grid gap-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <div className="relative">
-        <Input id={id} className={cn('h-10 text-sm', trailing && 'pr-10')} {...props} />
+    <label className="si-field" htmlFor={id}>
+      <span className="si-label">{label}</span>
+      <span className="si-input-wrap">
+        <Icon className="si-field-icon" aria-hidden="true" />
+        <input id={id} type={type} {...props} />
         {trailing}
-      </div>
-      {hint}
-    </div>
-  );
-}
-
-function RevealButton({ shown, onToggle, disabled }) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      disabled={disabled}
-      aria-label={shown ? 'Hide password' : 'Show password'}
-      className="focus-ring absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
-    >
-      {shown ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-    </button>
+      </span>
+    </label>
   );
 }
 
@@ -95,158 +72,318 @@ export function LoginPage() {
   const { login, register, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || '/inbox';
+  const from = location.state?.from?.pathname || '/dashboard';
 
-  const [mode, setMode] = useState('login');
+  const [isRegistering, setIsRegistering] = useState(false);
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [show, setShow] = useState(false);
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const registering = mode === 'register';
-  const checks = useMemo(() => PASSWORD_RULES.map((r) => ({ ...r, ok: r.test(password) })), [password]);
-  const passwordValid = checks.every((r) => r.ok);
+  const theme = THEME;
+  const passwordChecks = useMemo(
+    () => PASSWORD_RULES.map((rule) => ({ ...rule, ok: rule.test(password) })),
+    [password]
+  );
+  const passwordValid = passwordChecks.every((rule) => rule.ok);
+  const strength = passwordChecks.filter((rule) => rule.ok).length;
 
-  if (!loading && isAuthenticated) return <Navigate to={from} replace />;
+  if (!loading && isAuthenticated) {
+    return <Navigate to={from} replace />;
+  }
 
-  const switchMode = (next) => {
-    setMode(next);
+  const toggleMode = () => {
+    setIsRegistering((value) => !value);
     setPassword('');
-    setConfirm('');
+    setConfirmPassword('');
     setError(null);
   };
 
-  const bind = (setter) => (e) => {
-    setter(e.target.value);
+  const updateField = (setter) => (event) => {
+    setter(event.target.value);
     setError(null);
   };
 
-  const submit = async (event) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
     setError(null);
-    if (!email.trim()) return setError('Enter your email.');
-    if (registering) {
-      if (name.trim().length < 2) return setError('Enter your name.');
-      if (!passwordValid) return setError('The password does not meet every rule yet.');
-      if (password !== confirm) return setError('The passwords do not match.');
+
+    if (!email.trim()) {
+      setError('Enter your email.');
+      return;
+    }
+
+    if (isRegistering) {
+      if (name.trim().length < 2) {
+        setError('Enter your full name.');
+        return;
+      }
+      if (!passwordValid) {
+        setError('Complete the password checks.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('Passwords do not match.');
+        return;
+      }
     } else if (!password) {
-      return setError('Enter your password.');
+      setError('Enter your password.');
+      return;
     }
 
     setSubmitting(true);
     try {
-      if (registering) await register({ name: name.trim(), email: email.trim(), password });
-      else await login({ email: email.trim(), password });
+      if (isRegistering) {
+        await register({ name: name.trim(), email: email.trim(), password });
+      } else {
+        await login({ email: email.trim(), password });
+      }
       navigate(from, { replace: true });
-    } catch (err) {
-      const message = err.message || '';
-      if (/invalid (email|password)/i.test(message)) setError('Email or password is incorrect.');
-      else if (/already|exists|duplicate/i.test(message)) setError('An account already uses this email.');
-      else setError(registering ? 'Could not create the account.' : 'Could not sign you in.');
+    } catch (authError) {
+      const message = authError.message || '';
+
+      if (/invalid (email|password)/i.test(message)) {
+        setError('Email or password is incorrect.');
+      } else if (/already|exists|duplicate/i.test(message)) {
+        setError('An account already uses this email.');
+      } else {
+        setError(isRegistering ? 'Could not create the account.' : 'Could not sign you in.');
+      }
     } finally {
       setSubmitting(false);
     }
-    return undefined;
   };
 
   return (
-    <main className="grid min-h-dvh grid-rows-[auto_1fr_auto] bg-background">
-      <header className="flex items-center gap-2 px-6 py-5 md:px-10">
-        <Mark className="h-5 w-5" />
-        <span className="text-sm font-semibold">SecureInbox</span>
-      </header>
-
-      <div className="mx-auto grid w-full max-w-5xl items-center gap-12 px-6 py-8 md:grid-cols-[minmax(0,1fr)_22rem] md:gap-20 md:px-10">
-        <section>
-          <h1 className="max-w-md text-display font-semibold">Read the evidence before you read the mail.</h1>
-          <p className="mt-4 max-w-md text-[0.9375rem] leading-relaxed text-muted-foreground">
-            SecureInbox scans every Gmail message for sender identity, link and attachment risk, and
-            manipulation patterns, then explains each verdict so you can decide in seconds.
-          </p>
-          <div className="mt-10">
-            <VerdictSample />
-          </div>
-        </section>
-
-        <section aria-labelledby="auth-title">
-          <div role="tablist" aria-label="Sign in or create an account" className="mb-6 flex gap-5 border-b border-border">
-            {[
-              ['login', 'Sign in'],
-              ['register', 'Create account'],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={mode === key}
-                onClick={() => switchMode(key)}
-                className={cn(
-                  'focus-ring -mb-px border-b-2 pb-2.5 text-sm transition-colors',
-                  mode === key ? 'border-foreground font-medium text-foreground' : 'border-transparent text-muted-foreground hover:text-foreground'
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <h2 id="auth-title" className="sr-only">
-            {registering ? 'Create account' : 'Sign in'}
-          </h2>
-
-          <form onSubmit={submit} className="grid gap-4" noValidate>
-            {registering && (
-              <Field id="name" label="Name" value={name} onChange={bind(setName)} autoComplete="name" placeholder="Your name" disabled={submitting} />
-            )}
-            <Field id="email" label="Email" type="email" value={email} onChange={bind(setEmail)} autoComplete="email" placeholder="you@example.com" disabled={submitting} />
-            <Field
-              id="password"
-              label="Password"
-              type={show ? 'text' : 'password'}
-              value={password}
-              onChange={bind(setPassword)}
-              autoComplete={registering ? 'new-password' : 'current-password'}
-              placeholder={registering ? 'Choose a password' : 'Your password'}
-              disabled={submitting}
-              trailing={<RevealButton shown={show} onToggle={() => setShow((v) => !v)} disabled={submitting} />}
-              hint={
-                registering && (
-                  <ul className="mt-1 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                    {checks.map((rule) => (
-                      <li key={rule.label} className={cn('flex items-center gap-1.5', rule.ok ? 'text-foreground' : 'text-muted-foreground-subtle')}>
-                        <Check className={cn('h-3 w-3', rule.ok ? 'opacity-100' : 'opacity-30')} aria-hidden="true" />
-                        {rule.label}
-                      </li>
-                    ))}
-                  </ul>
-                )
-              }
-            />
-            {registering && (
-              <Field id="confirm" label="Confirm password" type={show ? 'text' : 'password'} value={confirm} onChange={bind(setConfirm)} autoComplete="new-password" placeholder="Repeat the password" disabled={submitting} />
-            )}
-
-            {error && (
-              <p role="alert" className="text-xs text-destructive">
-                {error}
-              </p>
-            )}
-
-            <Button type="submit" variant="primary" size="lg" className="mt-1 w-full" disabled={submitting || loading}>
-              {submitting && <Loader2 className="animate-spin" />}
-              {submitting ? (registering ? 'Creating account…' : 'Signing in…') : registering ? 'Create account' : 'Sign in'}
-            </Button>
-          </form>
-        </section>
+    <main
+      className={cn('si-auth', isRegistering && 'is-registering')}
+      data-theme="graphite"
+    >
+      <div className="si-noise" aria-hidden="true" />
+      <div className="si-theme-scene" aria-hidden="true">
+        <div className="si-grid-layer" />
+        <div className="si-orb si-orb-one" />
+        <div className="si-orb si-orb-two" />
       </div>
 
-      <footer className="flex items-center gap-3 px-6 py-5 text-xs text-muted-foreground-subtle md:px-10">
+      <header className="si-topbar">
+        <div className="si-brand si-brand-code">
+          <span className="si-code-logo">
+            <strong>SecureInbox</strong>
+          </span>
+        </div>
+      </header>
+
+      <section className="si-stage">
+        <div className="si-story">
+          <h1>
+            <span className="si-title-line">See the risk.</span>
+            <span className="si-title-line">Keep moving.</span>
+          </h1>
+          <p className="si-description">{theme.description}</p>
+          <ul className="si-benefits">
+            {SECURITY_BENEFITS.map((benefit) => (
+              <li key={benefit}>
+                <Check aria-hidden="true" />
+                <span>{benefit}</span>
+              </li>
+            ))}
+          </ul>
+
+        </div>
+
+        <motion.section
+          className="si-panel"
+          initial={false}
+          aria-labelledby="auth-title"
+        >
+          <div className="si-mode-tabs" role="group" aria-label="Authentication mode">
+            <button
+              type="button"
+              aria-pressed={!isRegistering}
+              className={!isRegistering ? 'is-active' : ''}
+              onClick={() => isRegistering && toggleMode()}
+            >
+              Sign in
+            </button>
+            <button
+              type="button"
+              aria-pressed={isRegistering}
+              className={isRegistering ? 'is-active' : ''}
+              onClick={() => !isRegistering && toggleMode()}
+            >
+              Create account
+            </button>
+          </div>
+
+          <AnimatePresence mode="wait" initial={false}>
+            <motion.div
+              key={isRegistering ? 'register-copy' : 'login-copy'}
+              className="si-panel-copy"
+              {...modeTransition}
+            >
+              <p className="si-panel-kicker">
+                {isRegistering ? 'Start a protected workspace' : theme.loginKicker}
+              </p>
+              <h2 id="auth-title">{isRegistering ? 'Create your account' : theme.loginTitle}</h2>
+              <p className="si-panel-intro">
+                {isRegistering
+                  ? 'Set up your SecureInbox profile in a few seconds.'
+                  : theme.loginIntro}
+              </p>
+            </motion.div>
+          </AnimatePresence>
+
+          <form className="si-form" onSubmit={handleSubmit}>
+            <AnimatePresence initial={false}>
+              {isRegistering && (
+                <motion.div {...collapse} className="si-collapsible">
+                  <Field
+                    icon={User}
+                    id="name"
+                    label="Full name"
+                    value={name}
+                    onChange={updateField(setName)}
+                    placeholder="Alex Morgan"
+                    autoComplete="name"
+                    disabled={submitting}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <Field
+              icon={Mail}
+              id="email"
+              label="Email address"
+              type="email"
+              value={email}
+              onChange={updateField(setEmail)}
+              placeholder="name@company.com"
+              autoComplete="email"
+              disabled={submitting}
+            />
+
+            <Field
+              icon={Lock}
+              id="password"
+              label="Password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={updateField(setPassword)}
+              placeholder="Enter your password"
+              autoComplete={isRegistering ? 'new-password' : 'current-password'}
+              disabled={submitting}
+              trailing={(
+                <button
+                  type="button"
+                  className="si-reveal"
+                  onClick={() => setShowPassword((value) => !value)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  disabled={submitting}
+                >
+                  {showPassword ? <EyeOff /> : <Eye />}
+                </button>
+              )}
+            />
+
+            <AnimatePresence initial={false}>
+              {isRegistering && (
+                <motion.div {...collapse} className="si-collapsible">
+                  <Field
+                    icon={Lock}
+                    id="confirm-password"
+                    label="Confirm password"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={confirmPassword}
+                    onChange={updateField(setConfirmPassword)}
+                    placeholder="Repeat your password"
+                    autoComplete="new-password"
+                    disabled={submitting}
+                    trailing={(
+                      <button
+                        type="button"
+                        className="si-reveal"
+                        onClick={() => setShowConfirmPassword((value) => !value)}
+                        aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                        disabled={submitting}
+                      >
+                        {showConfirmPassword ? <EyeOff /> : <Eye />}
+                      </button>
+                    )}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence initial={false}>
+              {isRegistering && (
+                <motion.div {...collapse} className="si-collapsible">
+                  <div className="si-password-status">
+                    <div className="si-strength-head">
+                      <span>Strong password</span>
+                      <span>{strength}/5 checks</span>
+                    </div>
+                    <div className="si-strength-bars" aria-hidden="true">
+                      {PASSWORD_RULES.map((rule, index) => (
+                        <span key={rule.label} className={index < strength ? 'is-complete' : ''} />
+                      ))}
+                    </div>
+                    <ul>
+                      {passwordChecks.map((rule) => (
+                        <li key={rule.label} className={rule.ok ? 'is-complete' : ''}>
+                          <span aria-hidden="true">
+                            {rule.ok ? <Check aria-hidden="true" /> : <X aria-hidden="true" />}
+                          </span>
+                          {rule.label}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <motion.button
+              className={cn('si-submit', !isRegistering && 'si-submit-login')}
+              type="submit"
+              whileTap={submitting ? undefined : { scale: 0.985 }}
+              disabled={submitting || loading}
+            >
+              <span>
+                {submitting
+                  ? (isRegistering ? 'Creating account…' : 'Signing in…')
+                  : (isRegistering ? theme.registerLabel : theme.submitLabel)}
+              </span>
+              {submitting && <Loader2 className="si-spinner" aria-hidden="true" />}
+            </motion.button>
+
+            <AnimatePresence>
+              {error && (
+                <motion.p
+                  className="si-auth-error"
+                  role="alert"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                >
+                  <span aria-hidden="true" />
+                  <span>{error}</span>
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </form>
+        </motion.section>
+      </section>
+
+      <footer className="si-footer">
         <span>© {new Date().getFullYear()} SecureInbox</span>
-        <span aria-hidden="true">·</span>
-        <span>Read-only access to Gmail. Nothing is sent on your behalf.</span>
+        <span className="si-footer-line" />
+        <span>Designed for clarity under pressure</span>
       </footer>
     </main>
   );

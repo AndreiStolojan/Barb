@@ -7,10 +7,8 @@
 // wants a continuous ramp instead — 68 and 71 should not look identical just
 // because they share a bucket. This file owns that ramp and nothing else.
 //
-// The ramp is warm and one-directional: quiet bone at the healthy end, then
-// amber, orange-red and red. "Healthy" is deliberately NOT green: safe is the
-// absence of alarm, so it carries no colour of its own. Red is reserved for
-// the dangerous end, so the only chromatic things on a screen are warnings.
+// The ramp runs mint, amber, coral, rose: the same four colours as the
+// severity buckets in risk.js, so a number and the word beside it agree.
 //
 // Two screens read the ramp in opposite directions:
 //   - dashboard safe rate: 100 is GOOD  -> getHealthColor(100) = bone
@@ -22,13 +20,13 @@
 // suspicious, 60 = likely phishing, read as 70 / 40 on the health axis) so the
 // colour of a number agrees with the word next to it.
 const STOPS = [
-  { at: 100, hex: '#c9c6bd' }, // bone        — nothing to do
-  { at: 85, hex: '#c0b89b' }, // warm bone
-  { at: 70, hex: '#d7a84b' }, // amber       — suspicious begins here
-  { at: 55, hex: '#e38f3c' }, // orange
-  { at: 40, hex: '#f0703f' }, // orange-red  — likely phishing begins here
-  { at: 20, hex: '#ec5b47' },
-  { at: 0, hex: '#ea4d52' }, // red         — act now
+  { at: 100, hex: '#8ccbb0' }, // mint        — nothing to do
+  { at: 85, hex: '#b5c78f' },
+  { at: 70, hex: '#f1bb63' }, // amber       — suspicious begins here
+  { at: 55, hex: '#f8a46f' },
+  { at: 40, hex: '#ff8e7c' }, // coral       — likely phishing begins here
+  { at: 20, hex: '#f77a7d' },
+  { at: 0, hex: '#f1677d' }, // rose        — act now
 ];
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -84,8 +82,8 @@ export const UNSCORED_COLOR = 'var(--color-risk-unscanned)';
 // Ramp colours are used as large tinted numerals on the canvas; they have to
 // stay legible, and the guarantee lives in code rather than in a comment.
 
-// Must track --color-background in index.css.
-const BACKGROUND = '#000000';
+// Numbers are drawn on the raised panel; must track --color-panel in index.css.
+const BACKGROUND = '#1c1c21';
 
 const relativeLuminance = (hex) => {
   const [r, g, b] = toRgb(hex).map((c) => {
@@ -104,7 +102,7 @@ export const contrastRatio = (fg, bg = BACKGROUND) => {
 
 /**
  * Nudges a colour toward white until it clears `min` contrast on the page
- * background. Every stop already passes 4.5:1 on black; this is a guard that
+ * background. Every stop already passes 4.5:1 on the panel; this is a guard that
  * only bites if someone retunes a stop darker.
  */
 export function ensureReadable(hex, min = 4.5, bg = BACKGROUND) {

@@ -1,0 +1,696 @@
+/* The sign-in screen keeps its own face. The signed-in app uses IBM Plex. */
+@font-face {
+  font-family: 'InterVariable';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/InterVariable.woff2') format('woff2');
+}
+
+.si-auth,
+html:has(.si-auth),
+body:has(.si-auth),
+#root:has(.si-auth) {
+  /* Tracks --color-background in index.css (2026-07-31). Signing in should not
+     feel like the lights came up: if the app canvas is charcoal, the door to it
+     is the same charcoal. The scene layers below are alpha-based, so they ride
+     the change without retuning. */
+  background-color: #121319;
+}
+
+.si-auth {
+  --si-accent: #c9c5bf;
+  --si-accent-rgb: 201 197 191;
+  --si-accent-two: #8d8984;
+  --si-bg: #121319;
+  --si-panel: rgb(22 22 24 / 0.62);
+  --si-panel-border: rgb(255 255 255 / 0.095);
+  --si-grid: rgb(255 255 255 / 0.038);
+  --si-cta: #e9e8e6;
+  --si-cta-foreground: #09090b;
+  --parallax-x: 0px;
+  --parallax-y: 0px;
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  overflow: hidden auto;
+  color: #fafafa;
+  background: var(--si-bg);
+  font-family: 'InterVariable', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  font-feature-settings: 'cv11', 'ss01';
+}
+
+.si-noise {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  opacity: 0.12;
+  pointer-events: none;
+  background-image:
+    radial-gradient(circle at 20% 35%, rgb(255 255 255 / 0.16) 0 0.5px, transparent 0.7px),
+    radial-gradient(circle at 72% 65%, rgb(255 255 255 / 0.12) 0 0.45px, transparent 0.7px);
+  background-position: 0 0, 5px 7px;
+  background-size: 11px 13px, 15px 17px;
+  mix-blend-mode: soft-light;
+}
+
+.si-theme-scene {
+  position: fixed;
+  z-index: -2;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 72% 45%, rgb(var(--si-accent-rgb) / 0.075), transparent 31rem),
+    linear-gradient(140deg, color-mix(in srgb, var(--si-bg) 91%, var(--si-accent)), var(--si-bg) 38%);
+}
+
+.si-auth[data-theme='graphite'] .si-theme-scene {
+  background:
+    radial-gradient(circle at 72% 45%, rgb(201 197 191 / 0.035), transparent 27rem),
+    #121319;
+}
+
+.si-grid-layer {
+  position: absolute;
+  inset: -8%;
+  background-image:
+    linear-gradient(var(--si-grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--si-grid) 1px, transparent 1px);
+  background-size: 48px 48px;
+  mask-image: linear-gradient(to bottom, transparent 2%, black 28%, black 76%, transparent 98%);
+  transform: translate3d(
+    calc(var(--parallax-x) * -0.12),
+    calc(var(--parallax-y) * -0.12),
+    0
+  );
+}
+
+.si-orb {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px solid rgb(var(--si-accent-rgb) / 0.13);
+}
+
+.si-orb-one {
+  right: -15%;
+  bottom: -56%;
+  width: min(48vw, 690px);
+  aspect-ratio: 1;
+  translate:
+    calc(var(--parallax-x) * 0.3)
+    calc(var(--parallax-y) * 0.3);
+  box-shadow:
+    0 0 100px rgb(var(--si-accent-rgb) / 0.05),
+    inset 0 0 100px rgb(var(--si-accent-rgb) / 0.035);
+}
+
+.si-orb-two {
+  top: 18%;
+  right: 8%;
+  width: 190px;
+  aspect-ratio: 1;
+  border-style: dashed;
+  opacity: 0.55;
+  translate:
+    calc(var(--parallax-x) * 0.55)
+    calc(var(--parallax-y) * 0.55);
+}
+
+.si-auth[data-theme='graphite'] .si-orb {
+  opacity: 0.24;
+}
+
+.si-topbar {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  width: min(100% - 48px, 1180px);
+  margin: 0 auto;
+  padding-top: 28px;
+}
+
+.si-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.si-brand > span:last-child {
+  display: grid;
+  gap: 1px;
+}
+
+.si-brand strong {
+  font-size: 0.94rem;
+  letter-spacing: -0.02em;
+}
+
+.si-code-logo {
+  display: flex !important;
+  align-items: baseline;
+}
+
+.si-code-logo strong {
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.025em;
+}
+
+.si-stage {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  width: min(100% - 48px, 1180px);
+  min-height: calc(100svh - 134px);
+  grid-template-columns: minmax(0, 1fr) minmax(410px, 470px);
+  align-items: start;
+  gap: clamp(52px, 9vw, 150px);
+  margin: 0 auto;
+  padding: 72px 0 40px;
+}
+
+.si-story {
+  align-self: start;
+  max-width: 610px;
+  margin-top: clamp(46px, 6vh, 62px);
+}
+
+.si-story h1 {
+  min-height: 1.84em;
+  max-width: 690px;
+  margin: 0;
+  color: #fafafa;
+  font-size: clamp(3.25rem, 5.45vw, 5.8rem);
+  font-weight: 600;
+  line-height: 0.92;
+  letter-spacing: -0.065em;
+  text-wrap: balance;
+}
+
+.si-story h1 span {
+  color: #fafafa;
+}
+
+.si-title-line {
+  display: block;
+  white-space: nowrap;
+}
+
+.si-description {
+  max-width: 540px;
+  margin: 28px 0 0;
+  color: rgb(250 250 250 / 0.54);
+  font-size: 0.92rem;
+  font-weight: 430;
+  line-height: 1.65;
+}
+
+.si-benefits {
+  display: grid;
+  gap: 14px;
+  margin: 30px 0 0;
+  padding: 0;
+  color: rgb(250 250 250 / 0.7);
+  font-size: 0.88rem;
+  font-weight: 460;
+  line-height: 1.45;
+  list-style: none;
+}
+
+.si-benefits li {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+
+.si-benefits svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  color: #56d98a;
+  stroke-width: 2;
+}
+
+.si-panel {
+  position: relative;
+  display: flex;
+  overflow: hidden;
+  margin-top: clamp(46px, 6vh, 62px);
+  padding: 26px 34px 24px;
+  flex-direction: column;
+  border: 1px solid #303236;
+  border-radius: 18px;
+  background: #1a1b1d;
+  box-shadow: 0 20px 48px rgb(0 0 0 / 0.22);
+}
+
+.si-auth.is-registering .si-panel {
+  margin-top: calc(clamp(46px, 6vh, 62px) - 78px);
+}
+
+.si-panel-copy { order: 1; }
+.si-form { order: 2; }
+.si-mode-tabs { order: 3; }
+
+.si-panel-copy {
+  transition:
+    margin-bottom 280ms var(--ease-out),
+    transform 280ms var(--ease-out);
+}
+
+.si-mode-tabs {
+  position: relative;
+  display: flex;
+  gap: 8px;
+  margin: 17px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.si-mode-tabs button {
+  position: relative;
+  z-index: 1;
+  width: auto;
+  height: 32px;
+  flex: 1;
+  border: 1px solid rgb(255 255 255 / 0.07);
+  border-radius: 999px;
+  color: rgb(235 235 235 / 0.56);
+  background: rgb(0 0 0 / 0.1);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 600;
+  transition:
+    color 180ms ease,
+    border-color 180ms ease,
+    background 180ms ease;
+}
+
+.si-mode-tabs button.is-active {
+  border-color: rgb(var(--si-accent-rgb) / 0.25);
+  color: #fafafa;
+  background: rgb(var(--si-accent-rgb) / 0.09);
+}
+
+.si-mode-indicator {
+  display: none;
+}
+
+.si-panel-kicker {
+  margin: 0 0 6px;
+  color: var(--si-accent);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.si-panel h2 {
+  margin: 0;
+  font-size: 1.75rem;
+  font-weight: 620;
+  letter-spacing: -0.045em;
+  transition:
+    font-size 280ms var(--ease-out),
+    transform 280ms var(--ease-out);
+}
+
+.si-panel-intro {
+  margin: 7px 0 20px;
+  color: rgb(235 235 235 / 0.61);
+  font-size: 0.76rem;
+  font-weight: 430;
+  line-height: 1.5;
+}
+
+.si-form {
+  display: grid;
+  gap: 13px;
+}
+
+.si-collapsible {
+  overflow: hidden;
+}
+
+.si-field {
+  display: grid;
+  gap: 6px;
+}
+
+.si-label {
+  color: rgb(242 242 242 / 0.76);
+  font-size: 0.68rem;
+  font-weight: 590;
+}
+
+.si-input-wrap {
+  position: relative;
+  display: block;
+}
+
+.si-field input {
+  width: 100%;
+  height: 43px;
+  padding: 0 42px;
+  border: 1px solid rgb(255 255 255 / 0.085);
+  border-radius: 999px;
+  outline: 0;
+  color: #fafafa;
+  background:
+    linear-gradient(100deg, rgb(var(--si-accent-rgb) / 0.035), transparent 70%),
+    rgb(0 0 0 / 0.16);
+  caret-color: var(--si-accent);
+  font: inherit;
+  font-size: 0.78rem;
+  box-shadow: inset 0 1px 7px rgb(0 0 0 / 0.1);
+  transition:
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    background 180ms ease;
+}
+
+.si-field input::placeholder {
+  color: rgb(230 230 230 / 0.38);
+}
+
+.si-field input:hover {
+  border-color: rgb(255 255 255 / 0.14);
+}
+
+.si-field input:focus {
+  border-color: rgb(var(--si-accent-rgb) / 0.56);
+  background: rgb(0 0 0 / 0.21);
+  box-shadow: 0 0 0 3px rgb(var(--si-accent-rgb) / 0.08);
+}
+
+.si-auth[data-theme='graphite'] .si-field input {
+  border-radius: 12px;
+}
+
+.si-field-icon {
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 14px;
+  width: 15px;
+  color: rgb(232 232 232 / 0.44);
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.si-reveal {
+  position: absolute;
+  top: 50%;
+  right: 12px;
+  display: grid;
+  width: 27px;
+  height: 27px;
+  place-items: center;
+  border: 0;
+  border-radius: 8px;
+  color: rgb(232 232 232 / 0.48);
+  background: transparent;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.si-reveal:hover {
+  color: #fafafa;
+  background: rgb(255 255 255 / 0.045);
+}
+
+.si-reveal svg { width: 15px; }
+
+.si-password-status {
+  padding: 11px 12px;
+  border: 1px solid rgb(255 255 255 / 0.11);
+  border-radius: 12px;
+  background: rgb(0 0 0 / 0.17);
+}
+
+.si-strength-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 7px;
+  color: rgb(238 238 238 / 0.68);
+  font-size: 0.62rem;
+  font-weight: 620;
+}
+
+.si-strength-head span:last-child { color: var(--si-accent); }
+
+.si-strength-bars {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 9px;
+}
+
+.si-strength-bars span {
+  height: 3px;
+  flex: 1;
+  border-radius: 99px;
+  background: rgb(255 255 255 / 0.12);
+  transition: background 220ms ease;
+}
+
+.si-strength-bars span.is-complete { background: var(--si-accent); }
+
+.si-password-status ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px 10px;
+  list-style: none;
+}
+
+.si-password-status li {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: rgb(235 235 235 / 0.52);
+  font-size: 0.61rem;
+  font-weight: 480;
+  transition: color 180ms ease;
+}
+
+.si-password-status li > span {
+  display: grid;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid rgb(255 255 255 / 0.07);
+  background: rgb(255 255 255 / 0.055);
+}
+
+.si-password-status li svg { width: 8px; }
+.si-password-status li.is-complete { color: rgb(250 250 250 / 0.82); }
+.si-password-status li.is-complete > span {
+  border-color: rgb(var(--si-accent-rgb) / 0.25);
+  background: rgb(var(--si-accent-rgb) / 0.13);
+}
+
+.si-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 45px;
+  gap: 10px;
+  margin-top: 1px;
+  padding: 0 18px;
+  border: 1px solid rgb(255 255 255 / 0.1);
+  border-radius: 999px;
+  color: var(--si-cta-foreground);
+  background: var(--si-cta);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 750;
+  box-shadow:
+    0 12px 32px rgb(0 0 0 / 0.22),
+    inset 0 1px rgb(255 255 255 / 0.25);
+  transition:
+    filter 180ms ease,
+    transform 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.si-submit-login {
+  margin-top: 9px;
+}
+
+.si-submit:hover {
+  filter: brightness(1.06);
+  transform: translateY(-1px);
+  box-shadow:
+    0 15px 38px rgb(0 0 0 / 0.28),
+    inset 0 1px rgb(255 255 255 / 0.3);
+}
+
+.si-submit svg {
+  width: 16px;
+  order: -1;
+}
+
+.si-auth[data-theme='graphite'] .si-submit {
+  border-radius: 12px;
+}
+
+.si-auth-error {
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 1px 2px;
+  color: rgb(245 245 245 / 0.66);
+  font-size: 0.65rem;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.si-auth-error > span:first-child {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: rgb(248 160 160 / 0.82);
+  box-shadow: 0 0 8px rgb(248 160 160 / 0.24);
+}
+
+.si-submit:disabled {
+  cursor: wait;
+  filter: saturate(0.4);
+  opacity: 0.72;
+  transform: none;
+}
+
+.si-spinner {
+  animation: si-spin 0.85s linear infinite;
+}
+
+@keyframes si-spin {
+  to { transform: rotate(360deg); }
+}
+
+.si-footer {
+  position: absolute;
+  z-index: 2;
+  right: 24px;
+  bottom: 20px;
+  left: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+  color: rgb(218 222 231 / 0.27);
+  font-size: 0.55rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.si-footer-line {
+  width: 24px;
+  height: 1px;
+  background: rgb(255 255 255 / 0.1);
+}
+
+@media (max-width: 960px) {
+  .si-stage {
+    grid-template-columns: 1fr minmax(380px, 440px);
+    gap: 40px;
+  }
+
+  .si-story h1 {
+    font-size: clamp(3rem, 7vw, 4.8rem);
+  }
+
+  .si-description {
+    font-size: 0.86rem;
+  }
+
+}
+
+@media (max-width: 780px) {
+  .si-auth {
+    overflow-y: auto;
+  }
+
+  .si-topbar {
+    width: min(100% - 32px, 620px);
+    padding-top: 18px;
+  }
+
+  .si-stage {
+    width: min(100% - 32px, 540px);
+    min-height: auto;
+    grid-template-columns: 1fr;
+    gap: 34px;
+    padding: 58px 0 84px;
+  }
+
+  .si-story {
+    margin-top: 0;
+    text-align: center;
+  }
+
+  .si-story h1 {
+    font-size: clamp(2.65rem, 11.5vw, 4rem);
+  }
+
+  .si-description {
+    margin-inline: auto;
+  }
+
+  .si-benefits {
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+    text-align: left;
+  }
+
+  .si-panel {
+    margin-top: 0;
+    padding-inline: 24px;
+  }
+
+  .si-footer {
+    position: absolute;
+    bottom: 18px;
+  }
+
+}
+
+@media (max-width: 420px) {
+  .si-stage {
+    width: min(100% - 24px, 540px);
+    padding-top: 44px;
+  }
+
+  .si-panel {
+    padding-inline: 20px;
+    border-radius: 20px;
+  }
+
+  .si-password-status ul {
+    grid-template-columns: 1fr;
+  }
+
+  .si-footer span:last-child,
+  .si-footer-line {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .si-grid-layer {
+    animation: none;
+  }
+}

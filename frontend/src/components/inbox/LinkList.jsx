@@ -37,7 +37,7 @@ export function LinkList({ links, flaggedHosts = new Set() }) {
   };
 
   if (links.length === 0) {
-    return <p className="text-[0.8125rem] text-muted-foreground">This message has no links.</p>;
+    return <p className="text-sm text-muted-foreground">No links.</p>;
   }
 
   return (
@@ -48,15 +48,15 @@ export function LinkList({ links, flaggedHosts = new Set() }) {
         const flagged = flaggedHosts.has(host);
         return (
           <li key={`${url}-${i}`} className="flex min-w-0 items-center gap-3 py-2">
-            <span aria-hidden="true" className={flagged ? 'h-1.5 w-1.5 shrink-0 rounded-full bg-risk-quarantine' : 'h-1.5 w-1.5 shrink-0 rounded-full bg-white/[0.15]'} />
-            <span title={url} className="data min-w-0 flex-1 truncate text-xs text-foreground/85">
+            <span aria-hidden="true" className={flagged ? 'h-1.5 w-1.5 shrink-0 rounded-full bg-risk-quarantine' : 'h-1.5 w-1.5 shrink-0 rounded-full bg-white/[0.18]'} />
+            <span title={url} className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
               {truncateUrl(url)}
             </span>
             <button
               type="button"
               onClick={() => copy(url, i)}
               aria-label={`Copy link ${url}`}
-              className="focus-ring flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[0.6875rem] text-muted-foreground transition-colors hover:text-foreground"
+              className="focus-ring flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-[0.8125rem] text-muted-foreground-subtle transition-colors hover:text-foreground"
             >
               {copied === i ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied === i ? 'Copied' : 'Copy'}

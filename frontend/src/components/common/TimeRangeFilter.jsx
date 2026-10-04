@@ -28,7 +28,7 @@ const yearOptions = (now) => {
 };
 
 const select =
-  'focus-ring h-7 rounded-md border border-input bg-transparent px-1.5 text-xs text-foreground hover:border-border-strong';
+  'focus-ring h-8 rounded-lg bg-white/[0.04] px-2 text-[0.8125rem] text-foreground shadow-[inset_0_0_0_1px_var(--color-input)]';
 
 function MonthGrid({ year, month, today, start, end, hovered, onHover, onPick, onMonth, years }) {
   const weeks = getMonthMatrix(year, month);
@@ -72,7 +72,7 @@ function MonthGrid({ year, month, today, start, end, hovered, onHover, onPick, o
               onClick={() => onPick(day)}
               aria-current={isToday ? 'date' : undefined}
               className={cn(
-                'data focus-ring mx-auto flex h-7 w-7 items-center justify-center rounded-md text-xs transition-colors',
+                'data focus-ring mx-auto flex h-8 w-8 items-center justify-center rounded-lg text-[0.8125rem] transition-colors',
                 disabled && 'cursor-not-allowed opacity-25',
                 !disabled && !inMonth && 'text-muted-foreground-subtle',
                 !disabled && inMonth && 'text-foreground hover:bg-white/[0.08]',
@@ -159,12 +159,12 @@ export function TimeRangeFilter({ className, size = 'md' }) {
         aria-haspopup="dialog"
         aria-expanded={open}
         className={cn(
-          'focus-ring inline-flex items-center gap-1.5 rounded-md border border-input px-2.5 text-foreground transition-colors hover:border-border-strong hover:bg-white/[0.05]',
-          size === 'sm' ? 'h-7 text-xs' : 'h-8 text-[0.8125rem]',
+          'focus-ring inline-flex items-center gap-2 rounded-[0.625rem] px-3.5 text-foreground shadow-[inset_0_0_0_1px_var(--color-border-strong)] transition-colors hover:bg-white/[0.05]',
+          size === 'sm' ? 'h-8 text-[0.8125rem]' : 'h-9 text-sm',
           open && 'bg-white/[0.06]'
         )}
       >
-        <CalendarDays className={cn('shrink-0 text-muted-foreground', size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4')} />
+        <CalendarDays className="h-4 w-4 shrink-0 text-muted-foreground-subtle" />
         {label}
       </button>
 
@@ -172,7 +172,7 @@ export function TimeRangeFilter({ className, size = 'md' }) {
         <div
           role="dialog"
           aria-label="Select time range"
-          className="absolute right-0 z-50 mt-1.5 rounded-lg border border-border-strong bg-popover p-1.5 shadow-lg"
+          className="absolute right-0 z-50 mt-2 rounded-2xl bg-popover p-1.5 shadow-lg ring-1 ring-white/[0.06]"
         >
           {view === 'presets' ? (
             <div className="flex w-48 flex-col gap-0.5">
@@ -182,7 +182,7 @@ export function TimeRangeFilter({ className, size = 'md' }) {
                   key={p.key}
                   onClick={() => choosePreset(p)}
                   aria-current={preset === p.key ? 'true' : undefined}
-                  className="focus-ring flex h-8 w-full items-center justify-between rounded-md px-2.5 text-[0.8125rem] text-foreground hover:bg-white/[0.07]"
+                  className="focus-ring flex h-9 w-full items-center justify-between rounded-lg px-3 text-sm text-foreground hover:bg-white/[0.07]"
                 >
                   {p.label}
                   {preset === p.key && <Check className="h-3.5 w-3.5" />}
@@ -192,7 +192,7 @@ export function TimeRangeFilter({ className, size = 'md' }) {
               <button
                 type="button"
                 onClick={() => setView('custom')}
-                className="focus-ring flex h-8 w-full items-center justify-between rounded-md px-2.5 text-[0.8125rem] text-foreground hover:bg-white/[0.07]"
+                className="focus-ring flex h-9 w-full items-center justify-between rounded-lg px-3 text-sm text-foreground hover:bg-white/[0.07]"
               >
                 Custom range
                 <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />

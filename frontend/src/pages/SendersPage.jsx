@@ -11,9 +11,10 @@
 
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { ArrowLeftRight, Loader2, Plus, Search, ShieldCheck, ShieldOff, Trash2, X } from 'lucide-react';
+import { ArrowLeftRight, AtSign, Globe, Loader2, Plus, Search, ShieldCheck, ShieldOff, Trash2, X } from 'lucide-react';
 
 import { ErrorState } from '@/components/common/states';
+import { PagePanel } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,7 +33,7 @@ const COLUMNS = {
     label: 'Trusted',
     icon: ShieldCheck,
     text: 'text-risk-safe',
-    semantics: 'Contextual signals like urgency are damped. Password requests and dangerous attachments still count in full.',
+    semantics: 'Urgency and similar signals count for less. Password requests and dangerous attachments still count in full.',
   },
   block: {
     key: 'block',
@@ -91,7 +92,7 @@ const describe = (categories, total) =>
 function CategoryBar({ categories, total, width = 100, className, title }) {
   return (
     <div
-      className={cn('h-[4px] overflow-hidden rounded-full bg-white/[0.08]', className)}
+      className={cn('h-1.5 overflow-hidden rounded-full bg-white/[0.06]', className)}
       style={{ width: `${Math.max(width, total > 0 ? 3 : 0)}%` }}
       role="img"
       aria-label={`${title ? `${title}: ` : ''}${describe(categories, total)}`}
@@ -110,10 +111,10 @@ function CategoryBar({ categories, total, width = 100, className, title }) {
 function Legend({ categories }) {
   return (
     <ul className="flex flex-wrap items-center gap-x-4 gap-y-1">
-      {CATEGORIES.map((key) => {
+      {CATEGORIES.filter((key) => categories[key] > 0).map((key) => {
         const count = categories[key] || 0;
         return (
-          <li key={key} className={cn('flex items-center gap-1.5 text-xs', count > 0 ? 'text-muted-foreground' : 'text-muted-foreground-subtle')}>
+          <li key={key} className={cn('flex items-center gap-1.5 text-[0.8125rem]', count > 0 ? 'text-muted-foreground' : 'text-muted-foreground-subtle')}>
             <span aria-hidden="true" className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: CATEGORY_COLORS[key], opacity: count > 0 ? 1 : 0.35 }} />
             <b className="data font-medium text-foreground">{count}</b>
             {CATEGORY_LABELS[key]}
@@ -128,7 +129,7 @@ function Legend({ categories }) {
 
 function Segmented({ options, value, onChange, ariaLabel }) {
   return (
-    <div role="radiogroup" aria-label={ariaLabel} className="flex shrink-0 items-center rounded-md border border-input p-0.5">
+    <div role="radiogroup" aria-label={ariaLabel} className="flex shrink-0 items-center rounded-[0.625rem] bg-white/[0.04] p-[3px] shadow-[inset_0_0_0_1px_var(--color-input)]">
       {options.map((option) => {
         const active = option.key === value;
         return (
@@ -139,7 +140,7 @@ function Segmented({ options, value, onChange, ariaLabel }) {
             aria-checked={active}
             onClick={() => onChange(option.key)}
             className={cn(
-              'focus-ring rounded-[0.3rem] px-2.5 py-1 text-xs transition-colors',
+              'focus-ring rounded-[0.4375rem] px-3 py-1.5 text-[0.8125rem] transition-colors',
               active ? cn('bg-white/[0.1] font-medium', option.text || 'text-foreground') : 'text-muted-foreground hover:text-foreground'
             )}
           >
@@ -175,7 +176,7 @@ function AddBar({ value, setValue, listType, setListType, kind, kindOverridden, 
           onChange={(e) => setValue(e.target.value)}
           aria-label="Address or domain"
           placeholder="name@example.com or example.com"
-          className="data min-w-0 flex-1 basis-64"
+          className="h-10 min-w-0 flex-1 basis-64"
         />
         <Segmented
           ariaLabel="What the rule covers"
@@ -186,12 +187,12 @@ function AddBar({ value, setValue, listType, setListType, kind, kindOverridden, 
             { key: 'domain', label: 'Domain' },
           ]}
         />
-        <Button type="submit" variant="primary" disabled={!canSubmit}>
+        <Button type="submit" variant="primary" size="lg" disabled={!canSubmit}>
           {loading ? <Loader2 className="animate-spin" /> : <Plus />}
           Add rule
         </Button>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">
+      <p className="mt-2.5 text-[0.8125rem] text-muted-foreground-subtle">
         {kindHint(kind, value)}
         {kindOverridden && value.trim() && <span className="text-muted-foreground-subtle"> · set by you</span>}
       </p>
@@ -207,12 +208,15 @@ function SenderRow({ entry, busy, maxMatches, onMove, onRemove }) {
   const toColumn = COLUMNS[OPPOSITE[entry.listType]];
 
   return (
-    <li className={cn('group grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 border-b border-border py-2.5 transition-colors', busy && 'opacity-60')}>
+    <li className={cn('group -mx-2 grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/[0.035]', busy && 'opacity-60')}>
+      <span aria-hidden="true" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/[0.07] text-muted-foreground">
+        {entry.kind === 'domain' ? <Globe className="h-4 w-4" /> : <AtSign className="h-4 w-4" />}
+      </span>
       <div className="min-w-0">
-        <span className="data block truncate text-[0.8125rem]" title={entry.value}>
+        <span className="block truncate text-[0.90625rem] font-medium" title={entry.value}>
           {entry.value}
         </span>
-        <span className="mt-0.5 flex items-center gap-2 text-xs text-muted-foreground">
+        <span className="mt-0.5 flex items-center gap-2 text-[0.8125rem] text-muted-foreground-subtle">
           <span>{entry.kind === 'domain' ? 'whole domain' : 'single sender'}</span>
           <span aria-hidden="true" className="text-muted-foreground-subtle">·</span>
           {matched > 0 ? (
@@ -231,11 +235,11 @@ function SenderRow({ entry, busy, maxMatches, onMove, onRemove }) {
           </span>
         ) : (
           <>
-            <button type="button" aria-label={`Move ${entry.value} to ${toColumn.label}`} title={`Move to ${toColumn.label}`} onClick={() => onMove(entry)} className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-white/[0.07] hover:text-foreground">
-              <ArrowLeftRight className="h-3.5 w-3.5" />
+            <button type="button" aria-label={`Move ${entry.value} to ${toColumn.label}`} title={`Move to ${toColumn.label}`} onClick={() => onMove(entry)} className="focus-ring rounded-lg p-2 text-muted-foreground hover:bg-white/[0.07] hover:text-foreground">
+              <ArrowLeftRight className="h-4 w-4" />
             </button>
-            <button type="button" aria-label={`Remove ${entry.value}`} title="Remove" onClick={() => onRemove(entry)} className="focus-ring rounded-md p-1.5 text-muted-foreground hover:bg-white/[0.07] hover:text-risk-phishing">
-              <Trash2 className="h-3.5 w-3.5" />
+            <button type="button" aria-label={`Remove ${entry.value}`} title="Remove" onClick={() => onRemove(entry)} className="focus-ring rounded-lg p-2 text-muted-foreground hover:bg-white/[0.07] hover:text-risk-phishing">
+              <Trash2 className="h-4 w-4" />
             </button>
           </>
         )}
@@ -250,30 +254,22 @@ function Column({ column, entries, filtered, maxMatches, busyId, onMove, onRemov
   const total = totalOf(categories);
 
   return (
-    <section className="min-w-0">
-      <header className="border-b border-border pb-3">
-        <div className="flex items-center gap-2">
-          <Icon className={cn('h-4 w-4', column.text)} aria-hidden="true" />
-          <h2 className="text-h3 font-semibold">{column.label}</h2>
-          <span className="data ml-auto text-xs text-muted-foreground">{entries.length}</span>
+    <section className="card min-w-0 p-5 md:px-[26px] md:py-6">
+      <header className="mb-3">
+        <div className="flex items-center gap-2.5">
+          <span className={cn('flex h-8 w-8 items-center justify-center rounded-[0.625rem]', column.key === 'allow' ? 'bg-risk-safe-soft' : 'bg-risk-quarantine-soft')}>
+            <Icon className={cn('h-4 w-4', column.text)} aria-hidden="true" />
+          </span>
+          <h2 className="text-[0.9375rem] font-semibold">{column.label}</h2>
+          <span className="data ml-auto text-sm text-muted-foreground-subtle">{entries.length}</span>
         </div>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{column.semantics}</p>
-        {entries.length > 0 && (
-          <div className="mt-3">
-            <CategoryBar categories={categories} total={total} title={column.label} />
-            <p className="data mt-1.5 text-xs text-muted-foreground">{total === 0 ? 'no messages covered yet' : `${total} ${plural(total, 'match', 'matches')} covered`}</p>
-          </div>
-        )}
+        <p className="mt-2.5 text-[0.8125rem] leading-relaxed text-muted-foreground">{column.semantics}</p>
+        {entries.length > 0 && total > 0 && <CategoryBar categories={categories} total={total} title={column.label} className="mt-3.5" />}
       </header>
 
       {entries.length === 0 ? (
-        <p className="py-6 text-xs leading-relaxed text-muted-foreground">
-          {filtered
-            ? 'Nothing here matches that search.'
-            : column.key === 'block'
-              ? 'Nothing blocked yet. Blocking a sender flags every message from them as likely phishing, even a harmless-looking one.'
-              : 'Nothing trusted yet. Trusting a sender quiets the contextual signals on their mail; the critical ones keep full weight.'}
-          {!filtered && <span className="mt-1.5 block text-muted-foreground-subtle">The Trust / block control on any open message writes here too.</span>}
+        <p className="py-4 text-sm leading-relaxed text-muted-foreground-subtle">
+          {filtered ? 'Nothing here matches that search.' : column.key === 'block' ? 'Nobody blocked yet.' : 'Nobody trusted yet.'}
         </p>
       ) : (
         <ul>
@@ -370,53 +366,42 @@ export function SendersPage() {
   const pending = loading && entries.length === 0;
 
   return (
-    <>
-      <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 md:px-6">
-        <h1 className="text-sm font-semibold max-md:hidden">Senders</h1>
-        {!pending && <span className="data text-xs text-muted-foreground max-md:hidden">{entries.length}</span>}
-        <div className="relative ml-auto w-full max-w-xs">
-          <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground-subtle" />
-          <Input value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search rules" placeholder="Search rules…" className="h-8 pl-8 pr-8 text-xs" />
-          {search && (
-            <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="focus-ring absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground-subtle hover:text-foreground">
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      </header>
+    <PagePanel>
+      <div className="mx-auto w-full max-w-[90rem] px-5 pb-12 pt-6 md:px-11 md:pt-9">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-h1 font-medium">Senders</h1>
+            <p className="mt-1 text-[0.9375rem] text-muted-foreground">People and domains you have already made a call on.</p>
+          </div>
+          <div className="relative w-full max-w-64">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground-subtle" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} aria-label="Search rules" placeholder="Search rules" className="pl-9 pr-9" />
+            {search && (
+              <button type="button" onClick={() => setSearch('')} aria-label="Clear search" className="focus-ring absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted-foreground-subtle hover:text-foreground">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+        </header>
 
-      <div className="mx-auto w-full max-w-[64rem] px-4 pb-16 md:px-6">
-        <div className="border-b border-border py-6">
+        <section className="card mt-7 p-5 md:px-[26px] md:py-6">
+          <h2 className="mb-3.5 text-[0.9375rem] font-semibold">Add a rule</h2>
           <AddBar value={value} setValue={handleValueChange} listType={listType} setListType={setListType} kind={kind} kindOverridden={kindOverride !== null} setKind={setKindOverride} onAdd={() => add.run().catch((e) => toast.error(e.message || 'Could not add the rule.'))} loading={add.loading} />
-        </div>
+        </section>
 
-        {!pending && !error && (
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-b border-border py-4">
-            <p className="text-xs text-muted-foreground">
-              {entries.length === 0 ? (
-                query ? 'No rules match that search' : 'No rules yet. Rules you add show up here with the messages they touch.'
-              ) : (
-                <>
-                  <b className="data font-medium text-foreground">{boardTotal}</b> {plural(boardTotal, 'match', 'matches')} across{' '}
-                  <b className="data font-medium text-foreground">{visible.length}</b> {plural(visible.length, 'rule', 'rules')}
-                  {query && ' matching your search'}
-                </>
-              )}
+        {!pending && !error && boardTotal > 0 && (
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 px-1 pb-1 pt-5">
+            <p className="text-[0.8125rem] text-muted-foreground">
+              Your rules cover <b className="data font-medium text-foreground">{boardTotal}</b> {plural(boardTotal, 'message', 'messages')}
+              {query && ' matching your search'}
             </p>
-            {boardTotal > 0 && <Legend categories={boardCategories} />}
+            <Legend categories={boardCategories} />
           </div>
         )}
 
-        <div className="grid gap-8 py-6 md:grid-cols-2 md:gap-12">
+        <div className="mt-4 grid items-start gap-4 lg:grid-cols-2">
           {pending ? (
-            [0, 1].map((i) => (
-              <div key={i} className="space-y-3">
-                <Skeleton className="h-4 w-24" />
-                <Skeleton className="h-3 w-full" />
-                <Skeleton className="mt-4 h-9 w-full" />
-                <Skeleton className="h-9 w-full" />
-              </div>
-            ))
+            [0, 1].map((i) => <Skeleton key={i} className="h-60 rounded-[1.25rem]" />)
           ) : error ? (
             <div className="col-span-full">
               <ErrorState message={error} onRetry={reload} />
@@ -429,7 +414,7 @@ export function SendersPage() {
           )}
         </div>
       </div>
-    </>
+    </PagePanel>
   );
 }
 

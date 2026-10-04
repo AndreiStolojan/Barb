@@ -11,15 +11,13 @@ import {
 } from '../../src/lib/scoreScale.js';
 
 // The dashboard and the inbox read their numbers in OPPOSITE directions but
-// must agree on one thing: red means danger, and the healthy end carries no
-// colour at all. Getting it backwards would paint a phishing message calm.
-
-const redness = (hex) => parseInt(hex.slice(1, 3), 16) - parseInt(hex.slice(3, 5), 16);
+// must agree on one thing: rose means danger, mint means nothing to do.
+// Getting it backwards would paint a phishing message calm.
 
 describe('getHealthColor — 100 is good', () => {
-  it('is quiet bone at the top and red at the bottom', () => {
-    expect(getHealthColor(100)).toBe('#c9c6bd');
-    expect(getHealthColor(0)).toBe('#ea4d52');
+  it('is mint at the top and rose at the bottom', () => {
+    expect(getHealthColor(100)).toBe('#8ccbb0');
+    expect(getHealthColor(0)).toBe('#f1677d');
   });
 
   it('lands on every declared stop exactly', () => {
@@ -34,11 +32,12 @@ describe('getHealthColor — 100 is good', () => {
     expect(mid).not.toBe(getHealthColor(100));
   });
 
-  it('gets redder, never calmer, as the value falls', () => {
-    let previous = -Infinity;
-    for (const value of [100, 85, 70, 55, 40, 20, 0]) {
-      const current = redness(getHealthColor(value));
-      expect(current).toBeGreaterThan(previous);
+  it('loses green, never gains it, as the value falls', () => {
+    const green = (hex) => parseInt(hex.slice(3, 5), 16);
+    let previous = Infinity;
+    for (const value of [100, 70, 55, 40, 20, 0]) {
+      const current = green(getHealthColor(value));
+      expect(current).toBeLessThan(previous);
       previous = current;
     }
   });
@@ -52,9 +51,9 @@ describe('getHealthColor — 100 is good', () => {
 });
 
 describe('getRiskColor — 100 is bad, mirroring health', () => {
-  it('is red at the top and bone at the bottom', () => {
-    expect(getRiskColor(100)).toBe('#ea4d52');
-    expect(getRiskColor(0)).toBe('#c9c6bd');
+  it('is rose at the top and mint at the bottom', () => {
+    expect(getRiskColor(100)).toBe('#f1677d');
+    expect(getRiskColor(0)).toBe('#8ccbb0');
   });
 
   it('is exactly the health ramp inverted', () => {
@@ -63,10 +62,10 @@ describe('getRiskColor — 100 is bad, mirroring health', () => {
     }
   });
 
-  it('turns amber at the suspicious threshold and orange-red at likely phishing', () => {
+  it('turns amber at the suspicious threshold and coral at likely phishing', () => {
     // Backend thresholds: 30 = suspicious, 60 = likely phishing.
-    expect(getRiskColor(30)).toBe('#d7a84b');
-    expect(getRiskColor(60)).toBe('#f0703f');
+    expect(getRiskColor(30)).toBe('#f1bb63');
+    expect(getRiskColor(60)).toBe('#ff8e7c');
   });
 });
 
@@ -80,14 +79,14 @@ describe('unscanned messages', () => {
 });
 
 describe('contrast', () => {
-  it('every stop is readable as text on the black canvas', () => {
+  it('every stop is readable as text on the panel', () => {
     for (const stop of SCORE_STOPS) {
       expect(contrastRatio(stop.hex)).toBeGreaterThanOrEqual(4.5);
     }
   });
 
   it('ensureReadable leaves a readable colour alone and lifts a dark one', () => {
-    expect(ensureReadable('#ea4d52')).toBe('#ea4d52');
+    expect(ensureReadable('#f1677d')).toBe('#f1677d');
     expect(contrastRatio(ensureReadable('#3a1010'))).toBeGreaterThanOrEqual(4.5);
   });
 });

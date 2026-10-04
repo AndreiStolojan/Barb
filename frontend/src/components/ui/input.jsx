@@ -1,34 +1,15 @@
 import { cn } from '@/lib/utils';
 
-/* Text input. Transparent on the canvas, a hairline that brightens on focus. */
+/* Text input: a soft hairline that brightens on hover and focus. */
+const fieldClass =
+  'focus-ring w-full min-w-0 rounded-[0.625rem] bg-white/[0.03] px-3 text-sm text-foreground caret-primary shadow-[inset_0_0_0_1px_var(--color-input)] transition-[box-shadow,background-color] duration-[var(--duration-fast)] placeholder:text-muted-foreground-subtle hover:shadow-[inset_0_0_0_1px_var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-50';
+
 function Input({ className, type = 'text', ...props }) {
-  return (
-    <input
-      type={type}
-      className={cn(
-        'focus-ring flex h-8 w-full min-w-0 rounded-md border border-input bg-transparent px-2.5 text-[0.8125rem] text-foreground caret-foreground transition-[border-color] duration-[var(--duration-fast)]',
-        'placeholder:text-muted-foreground-subtle hover:border-border-strong focus-visible:border-border-strong',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        className
-      )}
-      {...props}
-    />
-  );
+  return <input type={type} className={cn(fieldClass, 'flex h-9', className)} {...props} />;
 }
 
-/* Multi-line variant with the same skin. */
 function Textarea({ className, ...props }) {
-  return (
-    <textarea
-      className={cn(
-        'focus-ring flex min-h-20 w-full rounded-md border border-input bg-transparent px-2.5 py-2 text-[0.8125rem] leading-relaxed text-foreground caret-foreground transition-[border-color] duration-[var(--duration-fast)]',
-        'placeholder:text-muted-foreground-subtle hover:border-border-strong focus-visible:border-border-strong',
-        'disabled:cursor-not-allowed disabled:opacity-50',
-        className
-      )}
-      {...props}
-    />
-  );
+  return <textarea className={cn(fieldClass, 'flex min-h-24 py-2.5 leading-relaxed', className)} {...props} />;
 }
 
 export { Input, Textarea };

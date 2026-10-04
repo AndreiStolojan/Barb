@@ -1,26 +1,27 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// MessagePane.jsx — the evidence pane: everything about one message.
+// MessagePane.jsx — one message, read on the raised panel.
 //
-// Fixed order, top to bottom:
-//   1. Header   — subject, who sent it, when; the sender-scoped Trust/Block.
-//   2. Verdict strip — the decision: score, verdict word, and the three
-//      actions with their keys. The only large colour on the screen.
-//   3. Three tabs:
-//        Verdict  — why we flagged it, what the AI read, how the score was
-//                   reached, the rules that fired.
-//        Message  — the sanitised body (links dead), links, attachments.
-//        Evidence — identity (From vs Reply-To), sender verification, links
-//                   at a glance, your decision, what Gmail did, scan metadata.
+// Top to bottom, and why:
+//   1. Who sent it and what it says it is: sender, address, time, subject.
+//   2. The verdict card: score ring, verdict, one sentence, the two decisions.
+//      The only tinted surface on the screen.
+//   3. Why it was flagged (the reasons) beside the sender check (SPF, DKIM,
+//      DMARC as three short lines). Enough to decide without scrolling.
+//   4. The message itself, in a recessed well, links disabled.
+//   5. Scoring details, folded: the score breakdown, every rule that fired,
+//      the AI reading, the links, and the scan and Gmail facts. Nothing is
+//      hidden from the audit trail; it just does not compete with the decision.
 //
 // Data: getEmail (detail + state), getEmailRaw (body, links), getLatestScan
 // (score, reasons, rules, AI metadata), getSenderLists (trust/block state).
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AlertTriangle, ArrowLeft, Loader2, Paperclip, ScanLine } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, ChevronDown, ChevronRight, ChevronUp, Loader2, Lock, Paperclip, RotateCw } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { ErrorState, LoadingState } from '@/components/common/states';
+import { Avatar } from '@/components/inbox/EmailRow';
 import { EmailBody } from '@/components/inbox/EmailBody';
 import { LinkList } from '@/components/inbox/LinkList';
 import { ScoreMeter } from '@/components/inbox/ScoreMeter';
@@ -28,7 +29,6 @@ import { ReviewActions } from '@/components/security/ReviewActions';
 import { SenderAuthentication } from '@/components/security/SenderAuthentication';
 import { SenderListActions } from '@/components/security/SenderListActions';
 import { Button } from '@/components/ui/button';
-import { Kbd } from '@/components/ui/kbd';
 import { useApi, bustCache, bustCacheByPrefix } from '@/hooks/useApi';
 import { getEmail, getEmailRaw } from '@/api/emailsApi';
 import { getLatestScan, scanEmail } from '@/api/scansApi';
@@ -37,36 +37,12 @@ import { useRegisterCommands } from '@/lib/commands';
 import { emailId, getSenderAddress, getSenderName } from '@/lib/email';
 import { getRiskMeta, getRuleDescription, getRuleLabel } from '@/lib/risk';
 import { findListEntries } from '@/lib/senderLists';
-import { getRiskTextColor, isScored, UNSCORED_COLOR } from '@/lib/scoreScale';
+import { isScored } from '@/lib/scoreScale';
 import { AI_SCORE_MAX, RULE_SCORE_MAX, SCORE_MAX, getAiStatus } from '@/lib/scoring';
 import { formatDateTime } from '@/utils/formatDate';
 import { cn } from '@/lib/utils';
 
 /* ─── small pieces ────────────────────────────────────────────────────────── */
-
-function Section({ title, note, children, className }) {
-  return (
-    <section className={cn('pt-7 first:pt-0', className)}>
-      <div className="mb-3 flex items-baseline gap-3 border-b border-border pb-2">
-        <h3 className="label-section text-foreground">{title}</h3>
-        {note && <span className="data ml-auto text-[0.6875rem] text-muted-foreground-subtle">{note}</span>}
-      </div>
-      {children}
-    </section>
-  );
-}
-
-const Quiet = ({ children }) => <p className="text-[0.8125rem] text-muted-foreground">{children}</p>;
-
-/* A fact: label on the left, value on the right, in mono. */
-function Fact({ label, children, tone }) {
-  return (
-    <div className="grid grid-cols-[9rem_minmax(0,1fr)] gap-x-4 border-b border-border py-2 text-xs last:border-b-0 max-sm:grid-cols-1 max-sm:gap-y-0.5">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className={cn('data min-w-0 break-words', tone)}>{children}</dd>
-    </div>
-  );
-}
 
 const formatSize = (bytes) => {
   if (!Number.isFinite(bytes) || bytes < 0) return null;
@@ -74,6 +50,60 @@ const formatSize = (bytes) => {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
+
+/* The score as a ring, drawn in the verdict's colour. */
+function ScoreRing({ score, color }) {
+  const scored = isScored(score);
+  return (
+    <div className="relative h-[68px] w-[68px] shrink-0" role="img" aria-label={scored ? `Risk score ${score} of ${SCORE_MAX}` : 'Not scored'}>
+      <svg viewBox="0 0 68 68" className="h-full w-full -rotate-90">
+        <circle cx="34" cy="34" r="29" fill="none" stroke="currentColor" strokeWidth="5" className="opacity-20" style={{ color }} />
+        {scored && score > 0 && (
+          <circle cx="34" cy="34" r="29" fill="none" strokeWidth="5" strokeLinecap="round" pathLength="100" strokeDasharray={`${score} 100`} style={{ stroke: color }} />
+        )}
+      </svg>
+      <span className="data absolute inset-0 flex items-center justify-center text-[1.3125rem] font-semibold tracking-[-0.02em]" style={{ color }}>
+        {scored ? score : '–'}
+      </span>
+    </div>
+  );
+}
+
+/* A label / value line inside the folded details. */
+function Fact({ label, children, tone }) {
+  return (
+    <div className="grid grid-cols-[9.5rem_minmax(0,1fr)] gap-x-4 py-1.5 text-sm max-sm:grid-cols-1">
+      <dt className="text-muted-foreground-subtle">{label}</dt>
+      <dd className={cn('min-w-0 break-words text-muted-foreground', tone)}>{children}</dd>
+    </div>
+  );
+}
+
+function DetailBlock({ title, children }) {
+  return (
+    <section className="min-w-0">
+      <h4 className="mb-2 text-sm font-semibold">{title}</h4>
+      {children}
+    </section>
+  );
+}
+
+function ScoreFigure({ label, value, max, valueLabel, note }) {
+  const scored = isScored(value);
+  return (
+    <div className="min-w-0">
+      <p className="text-[0.8125rem] text-muted-foreground-subtle">{label}</p>
+      <p className="data mt-1 text-xl font-medium">
+        {valueLabel ?? (scored ? value : '–')}
+        {scored && <span className="text-sm font-normal text-muted-foreground-subtle"> / {max}</span>}
+      </p>
+      <ScoreMeter score={scored ? value : null} max={max} className="mt-2 w-full" />
+      <p className="mt-1.5 text-[0.8125rem] text-muted-foreground-subtle">{note}</p>
+    </div>
+  );
+}
+
+/* ─── rescan after a proxy timeout ────────────────────────────────────────── */
 
 const RESCAN_TIMEOUT_STATUSES = new Set([502, 503, 504, 524]);
 const RESCAN_POLL_INTERVAL_MS = 5_000;
@@ -103,29 +133,20 @@ const waitForTimedOutRescan = async ({ emailId: targetId, previousScan, requeste
   return null;
 };
 
-export function MessagePaneEmpty({ hint = 'Select a message to see its verdict and the evidence behind it.' }) {
+/* ─── empty pane ──────────────────────────────────────────────────────────── */
+
+export function MessagePaneEmpty({ hint = 'Pick a message to see its verdict and why.' }) {
   return (
-    <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-2 px-8 py-16 text-center">
-      <p className="text-sm font-medium text-foreground/80">Nothing open</p>
-      <p className="max-w-[36ch] text-xs text-muted-foreground">{hint}</p>
-      <p className="mt-2 flex items-center gap-1.5 text-xs text-muted-foreground-subtle max-md:hidden">
-        <Kbd>J</Kbd>
-        <Kbd>K</Kbd>
-        to move, <Kbd>?</Kbd> for every shortcut
-      </p>
+    <div className="flex h-full min-h-[320px] flex-col items-center justify-center gap-1.5 px-8 py-16 text-center">
+      <p className="text-[0.9375rem] font-medium">Nothing open</p>
+      <p className="max-w-[34ch] text-sm text-muted-foreground">{hint}</p>
     </div>
   );
 }
 
-const TABS = [
-  { key: 'verdict', label: 'Verdict', keys: 'v' },
-  { key: 'message', label: 'Message', keys: 'm' },
-  { key: 'evidence', label: 'Evidence', keys: 'e' },
-];
-
 /* ─── the pane ────────────────────────────────────────────────────────────── */
 
-export function MessagePane({ id, onReviewed, onBack }) {
+export function MessagePane({ id, onReviewed, onBack, onMove }) {
   const [email, setEmail] = useState(null);
   const [raw, setRaw] = useState(null);
   const [scan, setScan] = useState(null);
@@ -133,9 +154,9 @@ export function MessagePane({ id, onReviewed, onBack }) {
   const [error, setError] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [scanError, setScanError] = useState(null);
-  const [tab, setTab] = useState('verdict');
+  const [details, setDetails] = useState(false);
   const reviewRef = useRef(null);
-  const scrollRef = useRef(null);
+  const topRef = useRef(null);
 
   const senderLists = useApi(getSenderLists, [], 'sender-lists');
 
@@ -161,7 +182,8 @@ export function MessagePane({ id, onReviewed, onBack }) {
     setRaw(null);
     setScan(null);
     setScanError(null);
-    scrollRef.current?.scrollTo?.({ top: 0 });
+    setDetails(false);
+    topRef.current?.scrollIntoView?.({ block: 'nearest' });
     load();
   }, [load]);
 
@@ -195,6 +217,7 @@ export function MessagePane({ id, onReviewed, onBack }) {
           return;
         }
       }
+      // The previous verdict stays exactly as it was; the failure is said inline.
       setScanError(err.message || 'The scan failed. The previous result is unchanged.');
     } finally {
       setScanning(false);
@@ -216,10 +239,10 @@ export function MessagePane({ id, onReviewed, onBack }) {
   useRegisterCommands(
     'message',
     [
-      { id: 'mark-phishing', label: 'Mark phishing', group: 'Message', keys: 'p', disabled: !ready || scanning || userVerdict === 'phishing', run: () => reviewRef.current?.review('phishing') },
-      { id: 'mark-safe', label: 'Mark safe', group: 'Message', keys: 's', disabled: !ready || scanning || userVerdict === 'safe', run: () => reviewRef.current?.review('safe') },
+      { id: 'mark-phishing', label: 'Mark as phishing', group: 'Message', keys: 'p', disabled: !ready || scanning || userVerdict === 'phishing', run: () => reviewRef.current?.review('phishing') },
+      { id: 'mark-safe', label: 'Mark as safe', group: 'Message', keys: 's', disabled: !ready || scanning || userVerdict === 'safe', run: () => reviewRef.current?.review('safe') },
       { id: 'rescan', label: 'Rescan this message', group: 'Message', keys: 'r', disabled: !ready || scanning, run: handleRescan },
-      ...TABS.map((t) => ({ id: `tab-${t.key}`, label: `Show ${t.label.toLowerCase()}`, group: 'Message', keys: t.keys, disabled: !ready, run: () => setTab(t.key) })),
+      { id: 'details', label: 'Show or hide scoring details', group: 'Message', keys: 'd', disabled: !ready, run: () => setDetails((v) => !v) },
     ],
     [ready, scanning, userVerdict, id]
   );
@@ -235,8 +258,6 @@ export function MessagePane({ id, onReviewed, onBack }) {
   const aiScore = scan?.aiScore ?? email.latestScan?.aiScore ?? null;
   const ai = getAiStatus(scan || email.latestScan);
   const aiOff = ai.state !== 'ok';
-  const scored = isScored(score);
-  const scoreColor = scored ? getRiskTextColor(score) : UNSCORED_COLOR;
 
   const senderName = getSenderName(email);
   const senderAddress = getSenderAddress(email);
@@ -244,278 +265,241 @@ export function MessagePane({ id, onReviewed, onBack }) {
   const summary = scan?.aiExplanation?.summary;
   const rules = Array.isArray(scan?.triggeredRules) ? scan.triggeredRules : [];
   const links = raw?.links || [];
-  const attachments = Array.isArray(email.attachments) && email.attachments.length > 0
-    ? email.attachments
-    : (raw?.attachmentExtensions || email.attachmentExtensions || []).map((ext) => ({ filename: `.${String(ext).replace(/^\./, '')}`, declaredMimeType: null, size: null }));
+  const attachments =
+    Array.isArray(email.attachments) && email.attachments.length > 0
+      ? email.attachments
+      : (raw?.attachmentExtensions || email.attachmentExtensions || []).map((ext) => ({ filename: `.${String(ext).replace(/^\./, '')}`, declaredMimeType: null, size: null }));
   const analysisItems = Array.isArray(email.attachmentAnalysis?.items) ? email.attachmentAnalysis.items : [];
   const { senderEntry, domainEntry } = findListEntries(senderLists.data?.entries, senderAddress, email.senderDomain);
   const replyToDiffers = Boolean(email.replyToDomain) && email.replyToDomain !== email.senderDomain;
+  const auth = email.authResults;
 
   return (
-    <div ref={scrollRef} className="flex h-full min-w-0 flex-col">
-      {/* 1 ─ header */}
-      <div className="shrink-0 border-b border-border px-4 pb-4 pt-4 md:px-6">
+    <div ref={topRef} className="min-w-0">
+      {/* toolbar */}
+      <div className="flex items-center gap-1 px-3 pt-3 md:px-4">
         {onBack && (
-          <button type="button" onClick={onBack} className="focus-ring mb-3 -ml-1 flex items-center gap-1 rounded px-1 text-xs text-muted-foreground hover:text-foreground md:hidden">
-            <ArrowLeft className="h-3.5 w-3.5" />
-            Back to list
-          </button>
+          <Button variant="ghost" size="sm" onClick={onBack} className="md:hidden">
+            <ArrowLeft />
+            Inbox
+          </Button>
         )}
-        <h2 className="text-h2 font-semibold break-words">{email.subject || '(no subject)'}</h2>
-        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
-          <div className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5 text-xs">
-            <span className="font-medium text-foreground">{senderName}</span>
-            {senderAddress && senderAddress !== senderName && <span className="data min-w-0 truncate text-muted-foreground">{senderAddress}</span>}
-            <span className="data whitespace-nowrap text-muted-foreground-subtle">{formatDateTime(email.receivedAt)}</span>
+        {onMove && (
+          <div className="flex gap-0.5 max-md:hidden">
+            <Button variant="ghost" size="icon" aria-label="Previous message" onClick={() => onMove(-1)}>
+              <ChevronUp />
+            </Button>
+            <Button variant="ghost" size="icon" aria-label="Next message" onClick={() => onMove(1)}>
+              <ChevronDown />
+            </Button>
           </div>
+        )}
+        <div className="ml-auto flex items-center gap-0.5">
           <SenderListActions senderAddress={senderAddress} senderDomain={email.senderDomain} senderEntry={senderEntry} domainEntry={domainEntry} onChanged={handleListChanged} />
+          <Button variant="ghost" size="icon" aria-label={scanning ? 'Scanning' : 'Rescan this message'} title="Rescan" disabled={scanning} onClick={handleRescan}>
+            {scanning ? <Loader2 className="animate-spin" /> : <RotateCw />}
+          </Button>
         </div>
       </div>
 
-      {/* 2 ─ verdict strip */}
-      <div
-        className="shrink-0 border-b border-border border-l-[3px] px-4 py-4 md:px-6"
-        style={{ borderLeftColor: tone.hex, background: `linear-gradient(90deg, color-mix(in srgb, ${tone.hex} 9%, transparent), transparent 55%)` }}
-      >
-        <div className="flex flex-wrap items-center gap-x-6 gap-y-4">
-          <div className="flex items-center gap-4">
-            <div className="data flex items-baseline gap-1 text-[2.75rem] font-medium leading-none" style={{ color: scoreColor }}>
-              {scored ? score : '–'}
-              <span className="text-xs font-normal text-muted-foreground">/{SCORE_MAX}</span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-[0.9375rem] font-semibold" style={{ color: tone.hex }}>{verdictLabel}</p>
-              <p className="max-w-[40ch] text-xs text-muted-foreground">{verdictDescription}</p>
-              <ScoreMeter score={score} className="mt-2 w-32" />
-            </div>
+      <div className="px-5 pb-12 pt-3 md:px-12 md:pt-4">
+        {/* 1 ─ sender and subject */}
+        <div className="flex items-center gap-3.5">
+          <Avatar name={senderName || senderAddress} size="lg" />
+          <div className="min-w-0">
+            <p className="truncate text-[0.9375rem] font-semibold">{senderName}</p>
+            {senderAddress && senderAddress !== senderName && <p className="truncate text-sm text-muted-foreground-subtle">{senderAddress}</p>}
           </div>
+          <time className="ml-auto shrink-0 text-[0.8125rem] text-muted-foreground-subtle max-sm:hidden">{formatDateTime(email.receivedAt)}</time>
+        </div>
+        <h2 className="mt-5 max-w-[40ch] text-h1 font-medium break-words">{email.subject || '(no subject)'}</h2>
 
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
-            <ReviewActions ref={reviewRef} email={email} hints disabled={scanning} onReviewed={(result) => { setEmail((prev) => ({ ...prev, ...result })); afterChange(result); }} />
-            <Button variant="ghost" disabled={scanning} onClick={handleRescan}>
-              {scanning ? <Loader2 className="animate-spin" /> : <ScanLine />}
-              {scanning ? 'Scanning…' : 'Rescan'}
-              {!scanning && <Kbd className="max-md:hidden">R</Kbd>}
-            </Button>
+        {/* 2 ─ verdict */}
+        <div
+          className="mt-6 grid items-center gap-x-5 gap-y-4 rounded-[1.125rem] p-5 sm:grid-cols-[auto_minmax(0,1fr)] lg:grid-cols-[auto_minmax(0,1fr)_auto] md:px-6"
+          style={{
+            background: `linear-gradient(120deg, color-mix(in srgb, ${tone.hex} 9%, transparent), color-mix(in srgb, ${tone.hex} 2.5%, transparent) 60%, transparent)`,
+            boxShadow: `inset 0 0 0 1px color-mix(in srgb, ${tone.hex} 15%, transparent)`,
+          }}
+        >
+          <div className="flex items-center gap-5 sm:contents">
+            <ScoreRing score={score} color={tone.hex} />
+            <div className="min-w-0">
+              <p className="text-[1.1875rem] font-semibold tracking-[-0.01em]" style={{ color: tone.hex }}>
+                {verdictLabel}
+              </p>
+              <p className="mt-0.5 text-[0.90625rem] text-muted-foreground">{verdictDescription}</p>
+            </div>
           </div>
+          <ReviewActions
+            ref={reviewRef}
+            email={email}
+            disabled={scanning}
+            className="sm:col-span-2 lg:col-span-1"
+            onReviewed={(result) => {
+              setEmail((prev) => ({ ...prev, ...result }));
+              afterChange(result);
+            }}
+          />
         </div>
         {scanError && (
-          <p role="alert" className="mt-2 flex items-start gap-1.5 text-xs text-destructive">
-            <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" />
+          <p role="alert" className="mt-3 flex items-start gap-2 text-sm text-destructive">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
             <span className="min-w-0 break-words">{scanError}</span>
           </p>
         )}
-      </div>
 
-      {/* 3 ─ tabs */}
-      <div role="tablist" aria-label="Message sections" className="flex shrink-0 gap-0.5 border-b border-border px-2 md:px-4">
-        {TABS.map((t) => {
-          const count = t.key === 'verdict' ? rules.length : t.key === 'message' ? links.length + attachments.length : null;
-          const isActive = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              type="button"
-              role="tab"
-              aria-selected={isActive}
-              onClick={() => setTab(t.key)}
-              className={cn(
-                'focus-ring relative flex items-center gap-1.5 px-2.5 py-2.5 text-xs transition-colors',
-                isActive ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {t.label}
-              {count > 0 && <span className="data text-[0.6875rem] text-muted-foreground-subtle">{count}</span>}
-              <Kbd className="max-md:hidden">{t.keys.toUpperCase()}</Kbd>
-              {isActive && <span aria-hidden="true" className="absolute inset-x-2 -bottom-px h-[2px] rounded-full bg-foreground" />}
-            </button>
-          );
-        })}
-      </div>
+        {/* 3 ─ why, beside the sender check */}
+        <div className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)] lg:gap-14">
+          <section className="min-w-0">
+            <h3 className="mb-3 text-[0.9375rem] font-semibold">{reasons.length > 0 ? 'Why it was flagged' : 'What we found'}</h3>
+            {reasons.length > 0 ? (
+              <ul className="grid gap-2">
+                {reasons.map((reason, i) => (
+                  <li key={i} className="grid grid-cols-[6px_minmax(0,1fr)] gap-3.5 text-[0.9375rem] leading-relaxed text-muted-foreground">
+                    <span aria-hidden="true" className="mt-[9px] h-1.5 w-1.5 rounded-full" style={{ backgroundColor: tone.hex }} />
+                    <span className="min-w-0 break-words">{reason}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-[0.9375rem] text-muted-foreground">Nothing stood out. No detection rule matched this message.</p>
+            )}
+            {scan?.senderVerifiedBrand && (
+              <p className="mt-3 text-sm text-muted-foreground-subtle">
+                Verified brand: <span className="text-foreground">{scan.verifiedBrandName || email.senderDomain}</span>.
+              </p>
+            )}
+            {scan?.senderListMatch?.value && (
+              <p className="mt-3 text-sm text-muted-foreground-subtle">
+                Your rule applies: <span className="text-foreground">{scan.senderListMatch.value}</span> is {scan.senderListMatch.listType === 'allow' ? 'trusted' : 'blocked'}.
+              </p>
+            )}
+          </section>
 
-      <div className="min-w-0 flex-1 px-4 pb-16 pt-5 md:px-6">
-        {tab === 'verdict' && (
-          <>
-            <Section title="Why we flagged it">
-              {reasons.length > 0 ? (
-                <ul className="grid gap-2">
-                  {reasons.map((reason, i) => (
-                    <li key={i} className="grid grid-cols-[0.5rem_minmax(0,1fr)] items-baseline gap-2.5 text-[0.8125rem] leading-relaxed text-foreground/90">
-                      <span aria-hidden="true" className="h-1.5 w-1.5 translate-y-[-1px] rounded-full" style={{ backgroundColor: tone.hex }} />
-                      <span className="min-w-0 break-words">{reason}</span>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                !summary && <Quiet>Nothing stood out. No detection rule matched this message.</Quiet>
-              )}
-              {scan?.senderVerifiedBrand && (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Verified brand: <span className="font-medium text-foreground">{scan.verifiedBrandName || email.senderDomain}</span>. The sender proved it owns this domain, so brand impersonation signals were not applied.
-                </p>
-              )}
-              {scan?.senderListMatch?.value && (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Matched your rule: <span className="data text-foreground">{scan.senderListMatch.value}</span> is {scan.senderListMatch.listType === 'allow' ? 'trusted' : 'blocked'}.
-                </p>
-              )}
-            </Section>
-
-            <Section title="What the AI read" note={aiOff ? (ai.state === 'disabled' ? 'AI off · template' : ai.state) : 'local model'}>
-              {summary ? (
-                <p className="max-w-[70ch] text-[0.8125rem] leading-relaxed text-foreground/90 break-words">{summary}</p>
-              ) : (
-                <Quiet>{ai.message || 'The model did not produce a summary for this scan.'}</Quiet>
-              )}
-            </Section>
-
-            <Section title="How the score was reached">
-              <div className="grid gap-5 sm:grid-cols-3">
-                <ScoreFigure label="Rule engine" value={ruleScore} max={RULE_SCORE_MAX} note={`${rules.length} ${rules.length === 1 ? 'rule' : 'rules'} fired`} />
-                {aiOff ? (
-                  <ScoreFigure label="AI model" value={null} max={AI_SCORE_MAX} valueLabel={ai.state === 'disabled' ? 'Off' : 'Unavailable'} note={ai.state === 'disabled' ? 'AI scoring is turned off' : 'Rule score shown alone'} />
-                ) : (
-                  <ScoreFigure label="AI model" value={aiScore} max={AI_SCORE_MAX} note={`capped at ${AI_SCORE_MAX}; AI alone can never reach phishing`} />
+          <section className="min-w-0">
+            <h3 className="mb-1.5 text-[0.9375rem] font-semibold">Sender check</h3>
+            <SenderAuthentication authResults={auth} />
+            {(email.isFirstTimeSender || replyToDiffers) && (
+              <div className="mt-3 text-[0.8125rem] leading-relaxed text-muted-foreground-subtle">
+                {email.isFirstTimeSender && <p>First message from this sender.</p>}
+                {replyToDiffers && (
+                  <p className="flex min-w-0 gap-1.5">
+                    <span className="shrink-0">Replies go to</span>
+                    <span className="truncate text-risk-review" title={email.replyTo || email.replyToDomain}>
+                      {email.replyTo || email.replyToDomain}
+                    </span>
+                  </p>
                 )}
-                <ScoreFigure label="Combined" value={scored ? score : null} max={SCORE_MAX} note={verdictLabel} color={scoreColor} />
               </div>
-            </Section>
+            )}
+          </section>
+        </div>
 
-            <Section title="Rules that fired" note={rules.length > 0 ? `${rules.length}` : 'none'}>
-              {rules.length > 0 ? (
-                <ul className="divide-y divide-border">
-                  {rules.map((rule, i) => (
-                    <li key={`${rule.rule}-${i}`} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4 py-2.5">
-                      <div className="min-w-0">
-                        <p className="text-[0.8125rem] font-medium break-words">{getRuleLabel(rule.rule)}</p>
-                        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground break-words">{rule.details || getRuleDescription(rule.rule)}</p>
-                      </div>
-                      <span className="data text-[0.8125rem] font-medium text-foreground">+{rule.points}</span>
-                    </li>
-                  ))}
-                </ul>
+        {/* 4 ─ the message */}
+        <section aria-label="Message" className="relative mt-9 rounded-[1.125rem] bg-well px-5 pb-6 pt-5 md:px-8 md:pb-7 md:pt-6">
+          <span className="float-right ml-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground-subtle">
+            <Lock className="h-3 w-3" />
+            Links disabled
+          </span>
+          <div className="max-w-[68ch]">
+            <EmailBody htmlBody={raw?.htmlBody} textBody={raw?.textBody} riskBucket={email.riskBucket} />
+          </div>
+          {attachments.length > 0 && (
+            <ul className="mt-5 flex flex-wrap gap-2 border-t border-border pt-4">
+              {attachments.map((attachment, i) => {
+                const analysis = analysisItems.find((item) => item?.attachmentIndex === i);
+                const findings = Array.isArray(analysis?.findings) ? analysis.findings : [];
+                const size = formatSize(attachment.size);
+                return (
+                  <li key={`${attachment.filename || 'attachment'}-${i}`} className="flex max-w-full items-center gap-2 rounded-[0.625rem] bg-white/[0.04] px-3 py-2 text-sm" title={findings.map(getRuleLabel).join(', ') || undefined}>
+                    <Paperclip className="h-3.5 w-3.5 shrink-0 text-muted-foreground-subtle" aria-hidden="true" />
+                    <span className="truncate">{attachment.filename || 'Attachment'}</span>
+                    {size && <span className="data shrink-0 text-muted-foreground-subtle">{size}</span>}
+                    {findings.length > 0 && <span className="shrink-0 text-risk-review">{getRuleLabel(findings[0])}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
+        {/* 5 ─ scoring details, folded */}
+        <button
+          type="button"
+          aria-expanded={details}
+          onClick={() => setDetails((v) => !v)}
+          className="focus-ring mt-4 flex w-full items-center gap-2.5 rounded-lg px-1 py-3 text-left text-[0.9375rem] text-muted-foreground hover:text-foreground"
+        >
+          <ChevronRight className={cn('h-4 w-4 text-muted-foreground-subtle transition-transform duration-[var(--duration-fast)]', details && 'rotate-90')} />
+          Scoring details
+          <span className="data ml-auto text-sm text-muted-foreground-subtle">
+            {rules.length} {rules.length === 1 ? 'rule' : 'rules'}
+            {isScored(score) ? ` · ${score} of ${SCORE_MAX}` : ''}
+          </span>
+        </button>
+
+        {details && (
+          <div className="grid gap-8 border-t border-border pt-6">
+            <div className="grid gap-6 sm:grid-cols-3">
+              <ScoreFigure label="Rules" value={ruleScore} max={RULE_SCORE_MAX} note={`${rules.length} ${rules.length === 1 ? 'rule' : 'rules'} fired`} />
+              {aiOff ? (
+                <ScoreFigure label="AI model" value={null} max={AI_SCORE_MAX} valueLabel={ai.state === 'disabled' ? 'Off' : 'Unavailable'} note="The rule score stands alone" />
               ) : (
-                <Quiet>No detection rule matched this message.</Quiet>
+                <ScoreFigure label="AI model" value={aiScore} max={AI_SCORE_MAX} note={`Capped at ${AI_SCORE_MAX}; never enough alone`} />
               )}
-            </Section>
-          </>
-        )}
+              <ScoreFigure label="Combined" value={isScored(score) ? score : null} max={SCORE_MAX} note={verdictLabel} />
+            </div>
 
-        {tab === 'message' && (
-          <>
-            <Section title="Message" note="links are disabled">
-              <EmailBody htmlBody={raw?.htmlBody} textBody={raw?.textBody} riskBucket={email.riskBucket} />
-            </Section>
-            <Section title="Links" note={links.length > 0 ? `${links.length}` : 'none'}>
-              <LinkList links={links} />
-            </Section>
-            <Section title="Attachments" note={attachments.length > 0 ? `${attachments.length}` : 'none'}>
-              {attachments.length > 0 ? (
-                <ul className="divide-y divide-border">
-                  {attachments.map((attachment, i) => {
-                    const analysis = analysisItems.find((item) => item?.attachmentIndex === i);
-                    const findings = Array.isArray(analysis?.findings) ? analysis.findings : [];
-                    const type = analysis?.detectedMimeType || attachment.declaredMimeType;
-                    const size = formatSize(attachment.size);
-                    return (
-                      <li key={`${attachment.filename || 'attachment'}-${i}`} className="flex items-start gap-3 py-2.5">
-                        <Paperclip className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground-subtle" aria-hidden="true" />
+            <div className="grid gap-8 lg:grid-cols-2 lg:gap-14">
+              <DetailBlock title="Rules that fired">
+                {rules.length > 0 ? (
+                  <ul className="divide-y divide-border">
+                    {rules.map((rule, i) => (
+                      <li key={`${rule.rule}-${i}`} className="grid grid-cols-[minmax(0,1fr)_auto] gap-4 py-2.5">
                         <div className="min-w-0">
-                          <p className="data truncate text-xs">{attachment.filename || 'Attachment'}</p>
-                          {(type || size) && <p className="data mt-0.5 text-[0.6875rem] text-muted-foreground">{[type, size].filter(Boolean).join(' · ')}</p>}
-                          {findings.length > 0 && <p className="mt-1 text-xs text-risk-review">{findings.map(getRuleLabel).join(' · ')}</p>}
+                          <p className="text-sm">{getRuleLabel(rule.rule)}</p>
+                          <p className="mt-0.5 text-[0.8125rem] leading-relaxed text-muted-foreground-subtle break-words">{rule.details || getRuleDescription(rule.rule)}</p>
                         </div>
+                        <span className="data text-sm text-muted-foreground">+{rule.points}</span>
                       </li>
-                    );
-                  })}
-                </ul>
-              ) : (
-                <Quiet>This message has no attachments.</Quiet>
-              )}
-            </Section>
-          </>
-        )}
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No detection rule matched.</p>
+                )}
+              </DetailBlock>
 
-        {tab === 'evidence' && (
-          <>
-            <Section title="Identity">
-              <dl>
-                <Fact label="From">{senderName}{senderAddress && senderAddress !== senderName ? ` <${senderAddress}>` : ''}</Fact>
-                <Fact label="Reply-To" tone={replyToDiffers ? 'text-risk-review' : undefined}>
-                  {email.replyTo ? `${email.replyTo}${replyToDiffers ? '  (differs from the sender)' : ''}` : 'same as sender'}
-                </Fact>
-                <Fact label="Sender domain">{email.senderDomain || 'unknown'}</Fact>
-                <Fact label="History" tone={email.isFirstTimeSender ? 'text-risk-review' : undefined}>
-                  {email.isFirstTimeSender ? 'first message from this sender' : 'you have received mail from this sender before'}
-                </Fact>
-                <Fact label="Received">{formatDateTime(email.receivedAt)}</Fact>
-              </dl>
-            </Section>
+              <DetailBlock title="What the AI read">
+                <p className="text-sm leading-relaxed text-muted-foreground break-words">{summary || ai.message || 'The model did not produce a reading for this scan.'}</p>
+                {aiOff && summary && <p className="mt-2 text-[0.8125rem] text-muted-foreground-subtle">{ai.message}</p>}
+              </DetailBlock>
 
-            <Section title="Sender verification">
-              <SenderAuthentication authResults={email.authResults} />
-            </Section>
+              <DetailBlock title={`Links${links.length ? ` (${links.length})` : ''}`}>
+                <LinkList links={links} />
+              </DetailBlock>
 
-            <Section title="Links at a glance">
-              <dl>
-                <Fact label="Links">{email.linkCount ?? links.length}</Fact>
-                <Fact label="Domains">{(email.linkDomains || []).length > 0 ? email.linkDomains.join('  ') : 'none'}</Fact>
-                <Fact label="Shortened links" tone={email.hasShortenedUrl ? 'text-risk-review' : undefined}>{email.hasShortenedUrl ? 'yes' : 'no'}</Fact>
-                <Fact label="Patterns" tone={(email.suspiciousLinkPatterns || []).length > 0 ? 'text-risk-review' : undefined}>
-                  {(email.suspiciousLinkPatterns || []).length > 0 ? email.suspiciousLinkPatterns.map((p) => getRuleLabel(`suspicious_link_pattern:${p}`)).join(' · ') : 'none'}
-                </Fact>
-                <Fact label="Attachments">{(email.attachmentExtensions || []).length > 0 ? email.attachmentExtensions.map((e) => `.${e}`).join(' ') : 'none'}</Fact>
-              </dl>
-            </Section>
-
-            <Section title="Your decision">
-              <dl>
-                <Fact label="Verdict" tone={userVerdict === 'phishing' ? 'text-risk-phishing' : userVerdict === 'safe' ? 'text-risk-safe' : undefined}>
-                  {userVerdict ? `marked ${userVerdict}` : 'none yet'}
-                </Fact>
-                {email.reviewedAt && <Fact label="Reviewed">{formatDateTime(email.reviewedAt)}</Fact>}
-                <Fact label="Gmail action" tone={email.lastProviderActionStatus === 'failed' ? 'text-risk-review' : undefined}>
-                  {email.lastProviderAction
-                    ? `${String(email.lastProviderAction).replace(/_/g, ' ')}: ${email.lastProviderActionStatus || 'unknown'}${email.lastProviderActionAt ? ` at ${formatDateTime(email.lastProviderActionAt)}` : ''}`
-                    : 'none'}
-                  {email.lastProviderActionError?.message && <span className="block text-muted-foreground">{email.lastProviderActionError.message}</span>}
-                </Fact>
-              </dl>
-            </Section>
-
-            <Section title="Scan">
-              <dl>
-                <Fact label="Scanned">{scan?.scannedAt ? formatDateTime(scan.scannedAt) : 'never'}</Fact>
-                {scan?.scanSource && <Fact label="Trigger">{String(scan.scanSource).replace(/_/g, ' ')}</Fact>}
-                {scan?.engineVersion && <Fact label="Engine">{scan.engineVersion}</Fact>}
-                <Fact label="AI">
-                  {aiOff
-                    ? ai.message
-                    : [scan?.aiExplanationMeta?.source, scan?.aiExplanationMeta?.mode, Number.isFinite(scan?.aiExplanationMeta?.latencyMs) ? `${scan.aiExplanationMeta.latencyMs} ms` : null].filter(Boolean).join(' · ') || 'generated'}
-                </Fact>
-                <Fact label="Verdict source">{email.verdictSource ? (email.verdictSource === 'user' ? 'your decision' : 'scan') : 'scan'}</Fact>
-              </dl>
-            </Section>
-          </>
+              <DetailBlock title="Facts">
+                <dl>
+                  <Fact label="Reply-To" tone={replyToDiffers ? 'text-risk-review' : undefined}>{email.replyTo || 'Same as sender'}</Fact>
+                  <Fact label="Domain policy">{auth?.dmarc?.policy ? `p=${auth.dmarc.policy}` : 'None published'}</Fact>
+                  <Fact label="Forwarding (ARC)">{auth?.arc?.result && auth.arc.result !== 'none' ? auth.arc.result : 'Not present'}</Fact>
+                  <Fact label="Your decision" tone={userVerdict === 'phishing' ? 'text-risk-phishing' : userVerdict === 'safe' ? 'text-risk-safe' : undefined}>
+                    {userVerdict ? `Marked as ${userVerdict}` : 'None yet'}
+                  </Fact>
+                  <Fact label="Gmail" tone={email.lastProviderActionStatus === 'failed' ? 'text-risk-review' : undefined}>
+                    {email.lastProviderAction
+                      ? `${String(email.lastProviderAction).replace(/_/g, ' ')}: ${email.lastProviderActionStatus || 'unknown'}`
+                      : 'No action taken'}
+                    {email.lastProviderActionError?.message && <span className="block text-muted-foreground-subtle">{email.lastProviderActionError.message}</span>}
+                  </Fact>
+                  <Fact label="Scanned">{scan?.scannedAt ? formatDateTime(scan.scannedAt) : 'Never'}</Fact>
+                </dl>
+              </DetailBlock>
+            </div>
+          </div>
         )}
       </div>
-    </div>
-  );
-}
-
-/* One figure in "How the score was reached": value, a bar against its own
-   maximum, a note. */
-function ScoreFigure({ label, value, max, valueLabel, note, color }) {
-  const scored = isScored(value);
-  return (
-    <div className="min-w-0">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className={cn('mt-1 text-2xl font-medium leading-none', valueLabel ? 'text-muted-foreground' : 'data')} style={color ? { color } : undefined}>
-        {valueLabel ?? (scored ? value : '–')}
-        {scored && <span className="text-xs font-normal text-muted-foreground"> /{max}</span>}
-      </p>
-      <ScoreMeter score={scored ? value : null} max={max} hex={color} className="mt-2 w-full" />
-      <p className="mt-1.5 text-[0.6875rem] text-muted-foreground-subtle">{note}</p>
     </div>
   );
 }

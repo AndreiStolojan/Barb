@@ -29,12 +29,12 @@ export function ShortcutsHelp({ open, onOpenChange }) {
         <div className="grid gap-5 sm:grid-cols-2">
           {groups.map((group) => (
             <div key={group}>
-              <p className="label-section mb-1.5">{group}</p>
+              <p className="mb-1.5 text-[0.8125rem] text-muted-foreground-subtle">{group}</p>
               <ul className="divide-y divide-border">
                 {commands
                   .filter((c) => c.group === group)
                   .map((c) => (
-                    <li key={c.id} className="flex items-center justify-between gap-3 py-1.5 text-[0.8125rem]">
+                    <li key={c.id} className="flex items-center justify-between gap-3 py-2 text-sm">
                       <span className="min-w-0 truncate text-foreground/85">{c.label}</span>
                       <span className="flex shrink-0 items-center gap-1">
                         {keyCaps(c.keys).map((cap, i) => (

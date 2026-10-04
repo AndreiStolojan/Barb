@@ -1,9 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // EmailRow.jsx — one row of the message list.
 //
-// Evidence before decoration, top to bottom: sender name and time, the sender
-// ADDRESS (in triage the address is the evidence, so it is never hidden),
-// the subject, then score meter + score + verdict.
+// Avatar, sender, time, subject. A risk pill appears ONLY when there is
+// something to say: a safe message carries no label at all, so the few that
+// are flagged stand out on their own. The selected row takes the panel colour,
+// so it reads as the message the panel beside it is showing.
 //
 // Modes: a link to /inbox/:id (deep links), a button that selects into the
 // pane (`onSelect`), and the same button beside a checkbox (`checkable`).
@@ -11,52 +12,64 @@
 
 import { Link } from 'react-router-dom';
 
-import { ScoreMeter } from '@/components/inbox/ScoreMeter';
+import { initials } from '@/components/layout/Rail';
 import { emailId, getSenderAddress, getSenderName } from '@/lib/email';
 import { getRiskMeta } from '@/lib/risk';
-import { getRiskTextColor, isScored } from '@/lib/scoreScale';
 import { formatRowTime } from '@/utils/formatDate';
 import { cn } from '@/lib/utils';
 
+// Buckets quiet enough to need no pill in the list.
+const QUIET = new Set(['safe', 'reviewed_safe']);
+
+/* The small coloured label used in lists. */
+export function RiskPill({ bucket, className }) {
+  const { label, tone } = getRiskMeta(bucket);
+  return (
+    <span className={cn('inline-flex items-center gap-1.5 rounded-full py-0.5 pl-[7px] pr-2.5 text-xs font-medium', tone.text, tone.softBg, className)}>
+      <span className={cn('h-1.5 w-1.5 rounded-full', tone.dot)} />
+      {label}
+    </span>
+  );
+}
+
+export function Avatar({ name, size = 'md', className }) {
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        'flex shrink-0 items-center justify-center rounded-full bg-white/[0.08] font-semibold text-muted-foreground',
+        size === 'sm' && 'h-7 w-7 text-[0.6875rem]',
+        size === 'md' && 'h-9 w-9 text-[0.8125rem]',
+        size === 'lg' && 'h-[42px] w-[42px] text-sm',
+        className
+      )}
+    >
+      {initials(name)}
+    </span>
+  );
+}
+
 export function EmailRow({ email, active = false, onSelect = null, checkable = false, checked = false, onCheck = null }) {
   const id = emailId(email);
-  const { label, tone } = getRiskMeta(email.riskBucket);
-  const score = email.latestScan?.score ?? null;
-  const scored = isScored(score);
   const name = getSenderName(email);
   const address = getSenderAddress(email);
-  const showAddress = Boolean(address) && address !== name;
+  const flagged = !QUIET.has(email.riskBucket);
 
   const className = cn(
-    'focus-ring group grid w-full min-w-0 grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-3 gap-y-[2px] border-l-2 py-2.5 pr-4 text-left transition-colors',
-    checkable ? 'pl-2' : 'pl-[14px]',
-    active ? 'border-l-primary bg-white/[0.07]' : 'border-l-transparent',
-    !active && !checkable && 'hover:bg-white/[0.04]'
+    'focus-ring grid w-full min-w-0 grid-cols-[2.25rem_minmax(0,1fr)] gap-3 rounded-[0.875rem] p-3 text-left transition-colors duration-[var(--duration-fast)]',
+    active ? 'bg-panel' : 'hover:bg-white/[0.035]'
   );
 
   const content = (
     <>
-      <span className={cn('truncate text-[0.8125rem] font-medium', active ? 'text-foreground' : 'text-foreground/90')}>{name}</span>
-      <time className="data shrink-0 text-[0.6875rem] text-muted-foreground">{formatRowTime(email.receivedAt)}</time>
-
-      {showAddress && <span className="data col-span-2 truncate text-[0.6875rem] text-muted-foreground">{address}</span>}
-
-      <span className={cn('col-span-2 truncate text-[0.8125rem]', active ? 'text-foreground/90' : 'text-foreground/70')}>
-        {email.subject || '(no subject)'}
-      </span>
-
-      <span className="col-span-2 mt-1 flex min-w-0 items-center gap-2">
-        <ScoreMeter score={score} className="w-12" />
-        <span
-          className={cn('data w-5 shrink-0 text-right text-[0.6875rem] font-medium', !scored && 'text-muted-foreground-subtle')}
-          style={scored ? { color: getRiskTextColor(score) } : undefined}
-        >
-          {scored ? score : '–'}
+      <Avatar name={name || address} />
+      <span className="min-w-0">
+        <span className="flex items-baseline justify-between gap-3">
+          <span className="truncate text-[0.90625rem] font-semibold">{name}</span>
+          <time className="data shrink-0 text-xs text-muted-foreground-subtle">{formatRowTime(email.receivedAt)}</time>
         </span>
-        <span className={cn('flex min-w-0 items-center gap-1.5 text-[0.6875rem]', tone.text)}>
-          <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', tone.dot)} />
-          <span className="truncate">{label}</span>
-        </span>
+        <span className="mt-px block truncate text-sm text-muted-foreground">{email.subject || '(no subject)'}</span>
+        {flagged && <RiskPill bucket={email.riskBucket} className="mt-2" />}
       </span>
     </>
   );
@@ -69,13 +82,13 @@ export function EmailRow({ email, active = false, onSelect = null, checkable = f
     );
     if (!checkable) return button;
     return (
-      <div className={cn('flex min-w-0 items-start gap-1 pl-3 transition-colors hover:bg-white/[0.04]', checked && 'bg-white/[0.05]')}>
+      <div className="flex min-w-0 items-start gap-1 pl-2">
         <input
           type="checkbox"
           checked={checked}
           onChange={() => onCheck?.(id)}
           aria-label={`Select ${email.subject || 'message'}`}
-          className="mt-3.5 h-3.5 w-3.5 shrink-0 accent-primary"
+          className="mt-5 h-4 w-4 shrink-0 accent-[var(--color-primary)]"
         />
         {button}
       </div>

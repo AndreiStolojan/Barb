@@ -1,65 +1,49 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // DashboardPage.jsx — the briefing.
 //
-// The inbox is where the work happens; this screen answers two questions
-// before you go there: "am I safe right now?" and "what needs me first?".
-// Four blocks, separated by hairlines, in that order:
-//   1. Posture        — safe rate, a sentence, the key counts
-//   2. Needs your review — the likely-phishing queue, most urgent first
-//   3. Risk over time — flagged messages per day in the selected range
-//   4. Where the risky mail came from — attacking domains
+// One question first, "is there anything I need to do?", answered by the hero
+// card in a single sentence with the button that does it. Beside it, how the
+// range breaks down. Below: flagged mail per day, the messages waiting for a
+// decision, and the domains the risky mail came from.
 //
-// Category colour comes from lib/risk.js; a numeric score is coloured from
-// the continuous ramp in lib/scoreScale.js. Never a raw hex here.
+// Category colours come from lib/risk.js; a numeric score is coloured from
+// the continuous ramp in lib/scoreScale.js.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Check, Loader2, RefreshCw, Send } from 'lucide-react';
+import { Check, Loader2, RefreshCw, Send, ShieldAlert, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 
 import { BriefingSkeleton, ConnectGmailState, ErrorState } from '@/components/common/states';
-import { PostureGauge } from '@/components/dashboard/PostureGauge';
 import { TimeRangeFilter } from '@/components/common/TimeRangeFilter';
+import { Avatar } from '@/components/inbox/EmailRow';
+import { PagePanel } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useApi } from '@/hooks/useApi';
+import { useAuth } from '@/hooks/useAuth';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { useMailAccount } from '@/context/MailAccountContext';
 import { useTimeRange } from '@/context/TimeRangeContext';
 import { getEmails, getEmailStats, getEmailTrend, getTopRiskySenders } from '@/api/emailsApi';
 import { sendReportSummary } from '@/api/reportsApi';
 import { normalizeEmailList } from '@/lib/email-list';
-import { emailId, getSenderAddress, getSenderName } from '@/lib/email';
+import { emailId, getSenderName } from '@/lib/email';
 import { CATEGORY_COLORS, CATEGORY_LABELS } from '@/lib/risk';
-import { getPostureLabel, getRiskColor, getRiskTextColor, isScored, UNSCORED_COLOR } from '@/lib/scoreScale';
-import { formatDateTime } from '@/utils/formatDate';
+import { getPostureLabel, getRiskTextColor, isScored } from '@/lib/scoreScale';
 import { cn } from '@/lib/utils';
 
 /* ─── helpers ─────────────────────────────────────────────────────────────── */
 
+const plural = (n, one, many) => (n === 1 ? one : many);
+
 const formatAxisDate = (dateStr) => {
-  if (!dateStr) return '';
   const d = new Date(`${dateStr}T00:00:00`);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 };
 
-const relativeTime = (value) => {
-  if (!value) return '';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
-  const diffMin = Math.round((Date.now() - date.getTime()) / 60000);
-  if (diffMin < 1) return 'now';
-  if (diffMin < 60) return `${diffMin}m`;
-  const diffHours = Math.round(diffMin / 60);
-  if (diffHours < 24) return `${diffHours}h`;
-  const diffDays = Math.round(diffHours / 24);
-  if (diffDays < 30) return `${diffDays}d`;
-  return formatAxisDate(date.toISOString().slice(0, 10));
-};
-
+// The email's score as an integer 0–100, or null when it was never scored.
 const scoreOf = (email) => {
   const raw = email?.latestScan?.score ?? email?.score;
   if (raw === null || raw === undefined) return null;
@@ -72,314 +56,363 @@ const receivedAtMs = (email) => {
   return Number.isNaN(t) ? 0 : t;
 };
 
-const plural = (n, one, many) => (n === 1 ? one : many);
+const greeting = (date = new Date()) => {
+  const h = date.getHours();
+  if (h < 5) return 'Good evening';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+};
 
-/* ─── block scaffolding ───────────────────────────────────────────────────── */
-
-function Block({ title, note, children }) {
+function Card({ title, aside, className, children }) {
   return (
-    <section className="border-t border-border py-8">
-      <div className="mb-5 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <h2 className="text-h3 font-semibold">{title}</h2>
-        {note && <span className="ml-auto text-xs text-muted-foreground">{note}</span>}
-      </div>
+    <section className={cn('card min-w-0 p-5 md:px-[26px] md:py-6', className)}>
+      {(title || aside) && (
+        <div className="mb-4 flex items-start justify-between gap-4">
+          {title && <h2 className="text-[0.9375rem] font-semibold">{title}</h2>}
+          {aside}
+        </div>
+      )}
       {children}
     </section>
   );
 }
 
-const Note = ({ children }) => (
-  <p className="max-w-[56ch] text-[0.8125rem] leading-relaxed text-muted-foreground">{children}</p>
-);
+const Quiet = ({ children }) => <p className="text-sm leading-relaxed text-muted-foreground">{children}</p>;
 
-/* ─── 1. posture ──────────────────────────────────────────────────────────── */
+/* ─── hero ────────────────────────────────────────────────────────────────── */
 
-function Figure({ value, label, color }) {
-  return (
-    <div className="min-w-0">
-      <span className="data block text-[1.5rem] font-medium leading-none" style={color ? { color } : undefined}>
-        {value}
-      </span>
-      <span className="mt-1.5 block text-xs text-muted-foreground">{label}</span>
-    </div>
-  );
-}
-
-function postureDetail({ scanned, total, needsReview, quarantine, confirmed }) {
+function calmDetail({ scanned, total, confirmed }) {
   if (scanned === 0) {
-    return total > 0
-      ? 'None of the synced messages have been scanned yet, so there is nothing to judge.'
-      : 'Nothing has been synced for this time range yet.';
+    return total > 0 ? 'None of the synced messages have been scanned yet, so there is nothing to judge.' : 'Nothing has been synced for this time range yet.';
   }
-  if (quarantine > 0) {
-    const head = `${quarantine} ${plural(quarantine, 'message looks', 'messages look')} like phishing`;
-    const tail = needsReview > 0 ? `, and ${needsReview} more ${plural(needsReview, 'is', 'are')} worth a second look.` : '.';
-    return `${head}${tail} Start with the queue below.`;
-  }
-  if (needsReview > 0) {
-    return `${needsReview} ${plural(needsReview, 'message has', 'messages have')} suspicious patterns, but nothing here looks like an outright phishing attempt.`;
-  }
-  if (confirmed > 0) {
-    return `Every message scanned in this range came back clean. The ${confirmed} you marked as phishing ${plural(confirmed, 'is', 'are')} already handled.`;
-  }
+  if (confirmed > 0) return `Everything scanned came back clean. The ${confirmed} you marked as phishing ${plural(confirmed, 'is', 'are')} handled.`;
   return `All ${scanned} scanned ${plural(scanned, 'message', 'messages')} came back clean.`;
 }
 
-function PostureBlock({ counts, total, scanned, safeRate, periodLabel }) {
-  const needsReview = counts.needs_review ?? 0;
+function Hero({ counts, total, scanned, safeRate }) {
   const quarantine = counts.quarantine ?? 0;
+  const needsReview = counts.needs_review ?? 0;
   const confirmed = counts.confirmed_phishing ?? 0;
-  const reviewedSafe = counts.reviewed_safe ?? 0;
+
+  let tone = CATEGORY_COLORS.safe;
+  let Icon = ShieldCheck;
+  let headline;
+  let detail;
+  let reviewTo = null;
+  let reviewCount = 0;
+
+  if (scanned > 0 && quarantine > 0) {
+    tone = CATEGORY_COLORS.likely_phishing;
+    Icon = ShieldAlert;
+    headline = (
+      <>
+        <span style={{ color: tone }}>
+          {quarantine} {plural(quarantine, 'message', 'messages')}
+        </span>{' '}
+        {plural(quarantine, 'looks', 'look')} like phishing
+      </>
+    );
+    detail = needsReview > 0 ? `${needsReview} more ${plural(needsReview, 'is', 'are')} worth a second look.` : 'Nothing else needs your attention.';
+    reviewTo = '/inbox?riskBucket=quarantine';
+    reviewCount = quarantine;
+  } else if (scanned > 0 && needsReview > 0) {
+    tone = CATEGORY_COLORS.suspicious;
+    Icon = ShieldAlert;
+    headline = (
+      <>
+        <span style={{ color: tone }}>
+          {needsReview} {plural(needsReview, 'message', 'messages')}
+        </span>{' '}
+        {plural(needsReview, 'is', 'are')} worth a second look
+      </>
+    );
+    detail = 'Nothing here looks like an outright phishing attempt.';
+    reviewTo = '/inbox?riskBucket=needs_review';
+    reviewCount = needsReview;
+  } else {
+    headline = scanned === 0 ? 'Nothing to report yet' : getPostureLabel(safeRate);
+    detail = calmDetail({ scanned, total, confirmed });
+  }
 
   return (
-    <Block title="Posture" note={periodLabel}>
-      <div className="grid items-center gap-8 md:grid-cols-[168px_minmax(0,1fr)] md:gap-12">
-        <PostureGauge value={safeRate} />
+    <section className="card flex min-w-0 flex-col justify-between gap-7 p-6 md:px-8 md:py-7">
+      <div>
+        <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl" style={{ color: tone, backgroundColor: `color-mix(in srgb, ${tone} 13%, transparent)` }}>
+          <Icon className="h-5 w-5" strokeWidth={1.7} />
+        </span>
+        <h2 className="text-display font-medium">{headline}</h2>
+        <p className="mt-2 text-[0.96875rem] text-muted-foreground">{detail}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {reviewTo && (
+          <Button asChild variant="primary" size="lg">
+            <Link to={reviewTo}>Review {plural(reviewCount, 'it', 'them')}</Link>
+          </Button>
+        )}
+        <Button asChild variant="ghost" size="lg">
+          <Link to="/inbox">Open inbox</Link>
+        </Button>
+      </div>
+    </section>
+  );
+}
 
-        <div className="min-w-0">
-          <p className="text-h1 font-semibold">{scanned === 0 ? 'Nothing to report yet' : getPostureLabel(safeRate)}</p>
-          <p className="mt-2 max-w-[56ch] text-[0.8125rem] leading-relaxed text-muted-foreground">
-            {postureDetail({ scanned, total, needsReview, quarantine, confirmed })}
-          </p>
+/* ─── breakdown donut ─────────────────────────────────────────────────────── */
 
-          <div className="mt-6 grid grid-cols-2 gap-x-6 gap-y-5 border-t border-border pt-5 sm:grid-cols-3 lg:grid-cols-5">
-            <Figure value={scanned} label={total > scanned ? `Scanned, of ${total} synced` : `Scanned ${plural(scanned, 'message', 'messages')}`} />
-            <Figure value={needsReview} label="Suspicious" color={needsReview > 0 ? CATEGORY_COLORS.suspicious : undefined} />
-            <Figure value={quarantine} label="Likely phishing" color={quarantine > 0 ? CATEGORY_COLORS.likely_phishing : undefined} />
-            <Figure value={confirmed} label="Confirmed by you" color={confirmed > 0 ? CATEGORY_COLORS.confirmed_phishing : undefined} />
-            <Figure value={reviewedSafe} label="Cleared by you" />
+function Breakdown({ counts, total, scanned, safeRate }) {
+  const slices = [
+    { key: 'safe', label: CATEGORY_LABELS.safe, value: (counts.safe ?? 0) + (counts.reviewed_safe ?? 0) },
+    { key: 'suspicious', label: CATEGORY_LABELS.suspicious, value: counts.needs_review ?? 0 },
+    { key: 'likely_phishing', label: CATEGORY_LABELS.likely_phishing, value: counts.quarantine ?? 0 },
+    { key: 'confirmed_phishing', label: 'Confirmed by you', value: counts.confirmed_phishing ?? 0 },
+  ];
+  const sum = slices.reduce((a, s) => a + s.value, 0);
+  const gap = sum > 0 && slices.filter((s) => s.value > 0).length > 1 ? 1.2 : 0;
+
+  let offset = 0;
+  const arcs = slices
+    .filter((s) => s.value > 0)
+    .map((s) => {
+      const len = (s.value / sum) * 100;
+      const arc = { ...s, dash: Math.max(len - gap, 0.6), offset };
+      offset += len;
+      return arc;
+    });
+
+  return (
+    <section className="card flex min-w-0 flex-col justify-center p-6 md:px-8">
+      <div className="grid items-center gap-7 sm:grid-cols-[148px_minmax(0,1fr)]">
+        <div className="relative mx-auto h-[148px] w-[148px]" role="img" aria-label={`Safe rate ${safeRate} percent. ${scanned === 0 ? 'Nothing scanned yet' : getPostureLabel(safeRate)}.`}>
+          <svg viewBox="0 0 148 148" className="h-full w-full -rotate-90">
+            <circle cx="74" cy="74" r="62" fill="none" stroke="rgb(255 255 255 / 0.06)" strokeWidth="12" />
+            {arcs.map((a) => (
+              <circle key={a.key} cx="74" cy="74" r="62" fill="none" strokeWidth="12" pathLength="100" strokeDasharray={`${a.dash} 100`} strokeDashoffset={-a.offset} style={{ stroke: CATEGORY_COLORS[a.key] }} />
+            ))}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="data text-[2.125rem] font-medium leading-none tracking-[-0.03em]">{scanned === 0 ? '–' : `${safeRate}%`}</span>
+            <span className="mt-1 text-[0.8125rem] text-muted-foreground-subtle">safe</span>
           </div>
         </div>
+        <div>
+          <ul className="grid gap-3">
+            {slices.map((s) => (
+              <li key={s.key} className="grid grid-cols-[8px_minmax(0,1fr)_auto] items-center gap-3 text-[0.90625rem] text-muted-foreground">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: CATEGORY_COLORS[s.key] }} />
+                {s.label}
+                <span className="data font-medium text-foreground">{s.value}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 text-[0.8125rem] text-muted-foreground-subtle">
+            {total > scanned ? `Scanned ${scanned} of ${total} synced` : `${scanned} ${plural(scanned, 'message', 'messages')} scanned`}
+          </p>
+        </div>
       </div>
-    </Block>
+    </section>
   );
 }
 
-/* ─── 2. review queue ─────────────────────────────────────────────────────── */
+/* ─── flagged per day ─────────────────────────────────────────────────────── */
 
-const QUEUE_GRID =
-  'grid grid-cols-[minmax(0,1.1fr)_minmax(0,1.6fr)_7rem_3rem] items-center gap-x-5 ' +
-  'max-md:grid-cols-[minmax(0,1fr)_7rem] max-md:gap-x-4 max-md:gap-y-1.5';
+const SERIES = [
+  { key: 'needs_review', category: 'suspicious' },
+  { key: 'quarantine', category: 'likely_phishing' },
+  { key: 'confirmed_phishing', category: 'confirmed_phishing' },
+];
 
-function QueueRow({ email }) {
-  const score = scoreOf(email);
-  const scored = isScored(score);
-  const barColor = scored ? getRiskColor(score) : UNSCORED_COLOR;
-  const scoreColor = scored ? getRiskTextColor(score) : UNSCORED_COLOR;
-  const address = getSenderAddress(email);
+function FlaggedPerDay({ data, loading, label }) {
+  const days = data.map((d) => ({ date: d.date, values: SERIES.map((s) => Number(d?.[s.key]) || 0) }));
+  const totals = days.map((d) => d.values.reduce((a, b) => a + b, 0));
+  const total = totals.reduce((a, b) => a + b, 0);
+  const peak = Math.max(1, ...totals);
+
+  const W = 1000;
+  const H = 120;
+  const slot = days.length > 0 ? W / days.length : W;
+  const bw = Math.min(slot * 0.5, 22);
+  const ticks = days.length > 1 ? [0, Math.round((days.length - 1) / 4), Math.round((days.length - 1) / 2), Math.round(((days.length - 1) * 3) / 4), days.length - 1] : [0];
 
   return (
-    <Link
-      // Opens THIS message with the queue's filter still applied, so the list
-      // beside it is the rest of the queue.
-      to={`/inbox?riskBucket=quarantine&selected=${encodeURIComponent(emailId(email))}`}
-      className={cn(QUEUE_GRID, 'focus-ring -mx-2 rounded-md border-b border-border px-2 py-2.5 transition-colors hover:bg-white/[0.04]')}
+    <Card
+      title="Flagged per day"
+      aside={
+        total > 0 && (
+          <div className="flex flex-wrap justify-end gap-x-4 gap-y-1 text-[0.8125rem] text-muted-foreground-subtle max-sm:hidden">
+            {SERIES.map((s) => (
+              <span key={s.key} className="inline-flex items-center gap-2">
+                <span className="h-2 w-2 rounded-[2px]" style={{ backgroundColor: CATEGORY_COLORS[s.category] }} />
+                {s.category === 'confirmed_phishing' ? 'Confirmed' : CATEGORY_LABELS[s.category]}
+              </span>
+            ))}
+          </div>
+        )
+      }
     >
-      <div className="min-w-0">
-        <span className="block truncate text-[0.8125rem] font-medium">{getSenderName(email)}</span>
-        <span className="data block truncate text-xs text-muted-foreground">{address || 'no sender address'}</span>
-      </div>
-
-      <span className="truncate text-[0.8125rem] text-foreground/85 max-md:order-3 max-md:col-span-full">
-        {email.subject || 'No subject'}
-      </span>
-
-      <div className="flex items-center gap-2.5">
-        <span className="relative h-[3px] min-w-0 flex-1 overflow-hidden rounded-full bg-white/[0.1]">
-          <i className="absolute inset-y-0 left-0 block rounded-full" style={{ width: `${score ?? 0}%`, backgroundColor: barColor }} />
-        </span>
-        <span className="data w-6 shrink-0 text-right text-[0.8125rem] font-medium" style={{ color: scoreColor }}>
-          {scored ? score : '–'}
-        </span>
-      </div>
-
-      <span className="data truncate text-right text-xs text-muted-foreground max-md:hidden">{relativeTime(email.receivedAt)}</span>
-    </Link>
+      {loading ? (
+        <Skeleton className="h-32 w-full" />
+      ) : total === 0 ? (
+        <Quiet>Nothing was flagged in this range.</Quiet>
+      ) : (
+        <>
+          <p className="-mt-2 mb-5 text-[0.8125rem] text-muted-foreground-subtle">
+            {total} flagged in the {label.toLowerCase()}
+          </p>
+          <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" className="h-[120px] w-full" role="img" aria-label={`${total} messages flagged in the ${label.toLowerCase()}`}>
+            <line x1="0" y1={H / 2} x2={W} y2={H / 2} stroke="rgb(255 255 255 / 0.05)" vectorEffect="non-scaling-stroke" />
+            {days.map((d, i) => {
+              const x = i * slot + (slot - bw) / 2;
+              if (totals[i] === 0) return <rect key={d.date} x={x} y={H - 2} width={bw} height="2" rx="1" fill="rgb(255 255 255 / 0.08)" />;
+              let y = H;
+              const top = H - (totals[i] / peak) * (H - 4);
+              return (
+                <g key={d.date}>
+                  <title>{`${formatAxisDate(d.date)}: ${SERIES.map((s, j) => `${d.values[j]} ${CATEGORY_LABELS[s.category].toLowerCase()}`).join(', ')}`}</title>
+                  <clipPath id={`bar-${i}`}>
+                    <rect x={x} y={top} width={bw} height={H - top} rx="3.5" />
+                  </clipPath>
+                  <g clipPath={`url(#bar-${i})`}>
+                    {SERIES.map((s, j) => {
+                      const h = (d.values[j] / peak) * (H - 4);
+                      if (h <= 0) return null;
+                      y -= h;
+                      return <rect key={s.key} x={x} y={y} width={bw} height={h} style={{ fill: CATEGORY_COLORS[s.category] }} />;
+                    })}
+                  </g>
+                </g>
+              );
+            })}
+          </svg>
+          <div className="relative mt-2.5 h-4 text-xs text-muted-foreground-subtle">
+            {ticks.map((t, k) => (
+              <span
+                key={t}
+                className="absolute top-0 whitespace-nowrap"
+                style={k === 0 ? { left: 0 } : k === ticks.length - 1 ? { right: 0 } : { left: `${((t + 0.5) / days.length) * 100}%`, transform: 'translateX(-50%)' }}
+              >
+                {k === ticks.length - 1 ? 'Today' : formatAxisDate(days[t].date)}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
+    </Card>
   );
 }
 
-function ReviewQueueBlock({ emails, loading }) {
+/* ─── needs your review ───────────────────────────────────────────────────── */
+
+function ReviewQueue({ emails, loading }) {
   const ordered = useMemo(
     () => [...emails].sort((a, b) => (scoreOf(b) ?? -1) - (scoreOf(a) ?? -1) || receivedAtMs(b) - receivedAtMs(a)),
     [emails]
   );
-  const total = ordered.length;
-  const shown = ordered.slice(0, 6);
+  const shown = ordered.slice(0, 5);
 
   return (
-    <Block
+    <Card
       title="Needs your review"
-      note={loading ? undefined : total > shown.length ? `${shown.length} most urgent of ${total}` : total > 0 ? 'Most urgent first' : undefined}
+      aside={
+        ordered.length > shown.length && (
+          <Link to="/inbox?riskBucket=quarantine" className="focus-ring rounded text-sm font-medium text-link hover:underline">
+            All {ordered.length}
+          </Link>
+        )
+      }
     >
       {loading ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Skeleton key={i} className="h-9 w-full" />
+            <Skeleton key={i} className="h-11 w-full" />
           ))}
         </div>
-      ) : total === 0 ? (
-        <Note>Nothing needs your attention right now. Anything that looks like phishing will show up here first.</Note>
+      ) : shown.length === 0 ? (
+        <Quiet>Nothing needs your attention right now. Anything that looks like phishing shows up here first.</Quiet>
       ) : (
-        <>
-          <div className={cn(QUEUE_GRID, '-mx-2 border-b border-border px-2 pb-2 max-md:hidden')}>
-            {['Sender', 'Subject', 'Risk', ''].map((h, i) => (
-              <span key={i} className={cn('text-xs text-muted-foreground', i === 3 && 'text-right')}>{h}</span>
-            ))}
-          </div>
-          {shown.map((email) => (
-            <QueueRow key={emailId(email)} email={email} />
-          ))}
-          {total > shown.length && (
-            <Link to="/inbox?riskBucket=quarantine" className="focus-ring mt-4 inline-block rounded text-xs text-link underline-offset-4 hover:underline">
-              Open all {total} in the inbox
-            </Link>
-          )}
-        </>
+        <ul className="-mx-2">
+          {shown.map((email) => {
+            const score = scoreOf(email);
+            const color = isScored(score) ? getRiskTextColor(score) : 'var(--color-risk-unscanned)';
+            return (
+              <li key={emailId(email)}>
+                <Link
+                  // Opens THIS message with the queue's filter still applied.
+                  to={`/inbox?riskBucket=quarantine&selected=${encodeURIComponent(emailId(email))}`}
+                  className="focus-ring grid grid-cols-[2.25rem_minmax(0,1fr)_auto] items-center gap-3.5 rounded-xl px-2 py-2.5 transition-colors hover:bg-white/[0.035]"
+                >
+                  <Avatar name={getSenderName(email)} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[0.90625rem] font-semibold">{getSenderName(email)}</span>
+                    <span className="block truncate text-sm text-muted-foreground">{email.subject || 'No subject'}</span>
+                  </span>
+                  <span className="data rounded-full px-2.5 py-0.5 text-[0.8125rem] font-semibold" style={{ color, backgroundColor: `color-mix(in srgb, ${color} 13%, transparent)` }}>
+                    {isScored(score) ? score : '–'}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </Block>
+    </Card>
   );
 }
 
-/* ─── 3. trend ────────────────────────────────────────────────────────────── */
-
-const TREND_SERIES = [
-  { key: 'needs_review', name: CATEGORY_LABELS.suspicious, color: CATEGORY_COLORS.suspicious },
-  { key: 'quarantine', name: CATEGORY_LABELS.likely_phishing, color: CATEGORY_COLORS.likely_phishing },
-  { key: 'confirmed_phishing', name: CATEGORY_LABELS.confirmed_phishing, color: CATEGORY_COLORS.confirmed_phishing },
-];
-
-function TrendTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="rounded-md border border-border-strong bg-popover px-3 py-2 text-xs shadow-md">
-      <p className="data mb-1.5 text-muted-foreground">{formatAxisDate(label)}</p>
-      {TREND_SERIES.map(({ key, name, color }) => {
-        const val = payload.find((e) => e.dataKey === key)?.value ?? 0;
-        return (
-          <div key={key} className="flex items-center justify-between gap-5 py-0.5">
-            <span className="flex items-center gap-2 text-muted-foreground">
-              <span className="inline-block h-0.5 w-3 rounded-full" style={{ background: color }} />
-              {name}
-            </span>
-            <span className={cn('data font-medium', val === 0 ? 'text-muted-foreground-subtle' : 'text-foreground')}>{val}</span>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function TrendBlock({ data, loading }) {
-  const hasDetections = data.some((d) => TREND_SERIES.some(({ key }) => Number(d?.[key]) > 0));
-  const tickFormatter = (value, index) => (index % 5 === 0 ? formatAxisDate(value) : '');
-
-  return (
-    <Block title="Risk over time" note="Flagged messages per day">
-      {loading ? (
-        <Skeleton className="h-48 w-full" />
-      ) : data.length === 0 || !hasDetections ? (
-        <Note>No message was flagged on any day in this range, so there is no trend to plot yet.</Note>
-      ) : (
-        <>
-          <div className="mb-4 flex flex-wrap gap-x-5 gap-y-1.5">
-            {TREND_SERIES.map(({ key, name, color }) => (
-              <span key={key} className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="inline-block h-0.5 w-3 rounded-full" style={{ background: color }} />
-                {name}
-              </span>
-            ))}
-          </div>
-          <div className="w-full select-none">
-            <ResponsiveContainer width="100%" height={200}>
-              <LineChart accessibilityLayer={false} data={data} margin={{ top: 6, right: 4, left: -28, bottom: 0 }}>
-                <CartesianGrid vertical={false} stroke="rgb(255 255 255 / 0.08)" />
-                <XAxis dataKey="date" tickFormatter={tickFormatter} tick={{ fontSize: 11, fill: 'var(--color-muted-foreground-subtle)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--color-muted-foreground-subtle)', fontFamily: 'var(--font-mono)' }} axisLine={false} tickLine={false} allowDecimals={false} />
-                <Tooltip content={<TrendTooltip />} cursor={{ stroke: 'rgb(255 255 255 / 0.2)' }} />
-                {TREND_SERIES.map(({ key, name, color }) => (
-                  <Line key={key} type="monotone" dataKey={key} name={name} stroke={color} strokeWidth={1.5} dot={false} activeDot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false} />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </>
-      )}
-    </Block>
-  );
-}
-
-/* ─── 4. attacking domains ────────────────────────────────────────────────── */
+/* ─── where it came from ──────────────────────────────────────────────────── */
 
 const DOMAIN_SEGMENTS = [
-  { key: 'needsReview', label: 'suspicious', color: CATEGORY_COLORS.suspicious },
-  { key: 'quarantine', label: 'likely phishing', color: CATEGORY_COLORS.likely_phishing },
-  { key: 'confirmedPhishing', label: 'confirmed', color: CATEGORY_COLORS.confirmed_phishing },
+  { key: 'needsReview', category: 'suspicious' },
+  { key: 'quarantine', category: 'likely_phishing' },
+  { key: 'confirmedPhishing', category: 'confirmed_phishing' },
 ];
 
-function DomainRow({ sender, max }) {
-  const total = sender.total || 0;
-  const barWidth = max > 0 ? (total / max) * 100 : 0;
-
-  return (
-    <Link
-      to={`/inbox?q=${encodeURIComponent(sender.domain)}`}
-      className={cn(
-        'focus-ring -mx-2 grid grid-cols-[minmax(0,1fr)_minmax(0,1.6fr)_4rem] items-center gap-x-6 rounded-md border-b border-border px-2 py-2.5 transition-colors hover:bg-white/[0.04]',
-        'max-md:grid-cols-[minmax(0,1fr)_4rem] max-md:gap-y-1.5'
-      )}
-    >
-      <span className="data truncate text-[0.8125rem]">{sender.domain}</span>
-
-      <div className="min-w-0 max-md:order-3 max-md:col-span-full">
-        <div className="flex h-[5px] overflow-hidden rounded-full bg-white/[0.08]" style={{ width: `${barWidth}%` }}>
-          {DOMAIN_SEGMENTS.map(({ key, color }) => {
-            const count = sender[key] ?? 0;
-            if (!count || !total) return null;
-            return <span key={key} className="h-full" style={{ width: `${(count / total) * 100}%`, backgroundColor: color }} />;
-          })}
-        </div>
-        <div className="mt-1.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
-          {DOMAIN_SEGMENTS.filter(({ key }) => (sender[key] ?? 0) > 0).map(({ key, label }) => (
-            <span key={key}>
-              <b className="data font-medium text-foreground">{sender[key]}</b> {label}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      <span className="data text-right text-[0.8125rem]">
-        <b className="font-medium">{total}</b>
-        <span className="text-muted-foreground"> {plural(total, 'msg', 'msgs')}</span>
-      </span>
-    </Link>
-  );
-}
-
-function DomainsBlock({ senders, loading }) {
-  const list = Array.isArray(senders) ? senders : [];
+function Sources({ senders, loading }) {
+  const list = (Array.isArray(senders) ? senders : []).slice(0, 5);
   const max = list.reduce((acc, s) => Math.max(acc, s.total || 0), 0);
 
   return (
-    <Block title="Where the risky mail came from" note={list.length > 0 ? 'Bars are relative to the busiest domain' : undefined}>
+    <Card title="Where it came from">
       {loading ? (
-        <div className="space-y-2">
+        <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, i) => (
             <Skeleton key={i} className="h-9 w-full" />
           ))}
         </div>
       ) : list.length === 0 ? (
-        <Note>No domain sent you anything suspicious in this range.</Note>
+        <Quiet>No domain sent you anything suspicious in this range.</Quiet>
       ) : (
-        list.map((sender) => <DomainRow key={sender.domain} sender={sender} max={max} />)
+        <ul className="-mx-2">
+          {list.map((sender) => {
+            const total = sender.total || 0;
+            return (
+              <li key={sender.domain}>
+                <Link to={`/inbox?q=${encodeURIComponent(sender.domain)}`} className="focus-ring block rounded-xl px-2 py-2.5 transition-colors hover:bg-white/[0.035]">
+                  <span className="flex items-baseline justify-between gap-4 text-[0.90625rem]">
+                    <span className="truncate font-medium">{sender.domain}</span>
+                    <span className="data text-muted-foreground">{total}</span>
+                  </span>
+                  <span className="mt-2 flex h-1.5 overflow-hidden rounded-full bg-white/[0.06]" style={{ width: `${max > 0 ? Math.max((total / max) * 100, 4) : 0}%` }}>
+                    {DOMAIN_SEGMENTS.map(({ key, category }) => {
+                      const count = sender[key] ?? 0;
+                      return count > 0 && total > 0 ? <span key={key} className="h-full" style={{ width: `${(count / total) * 100}%`, backgroundColor: CATEGORY_COLORS[category] }} /> : null;
+                    })}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </Block>
+    </Card>
   );
 }
 
 /* ─── page ────────────────────────────────────────────────────────────────── */
 
 export function DashboardPage() {
-  const { account, isConnected, syncVersion, sync, syncing } = useMailAccount();
+  const { user } = useAuth();
+  const { isConnected, syncVersion, sync, syncing } = useMailAccount();
   const { label, from, to } = useTimeRange();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -389,15 +422,15 @@ export function DashboardPage() {
   const sendersQuery = useApi(() => getTopRiskySenders({ from, to }), [syncVersion, from, to], `dash-senders-${from}-${to}-${syncVersion}`);
 
   const sendReport = useAsyncAction(sendReportSummary);
-  const [reportSentTo, setReportSentTo] = useState(null);
+  const [reportSent, setReportSent] = useState(false);
 
-  useEffect(() => setReportSentTo(null), [from, to]);
+  useEffect(() => setReportSent(false), [from, to]);
 
   const handleSendReport = async () => {
     try {
       const result = await sendReport.run({ from, to, label });
       if (result?.sent) {
-        setReportSentTo(result.recipient);
+        setReportSent(true);
         toast.success(`Report sent to ${result.recipient}`);
       }
     } catch (err) {
@@ -414,65 +447,59 @@ export function DashboardPage() {
     }
   }, [searchParams, setSearchParams]);
 
-  const toolbar = (
-    <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border px-4 md:px-6">
-      <h1 className="text-sm font-semibold max-md:hidden">Briefing</h1>
-      {isConnected && (
-        <div className="ml-auto flex items-center gap-1.5">
-          <Button size="sm" onClick={handleSendReport} disabled={sendReport.loading || !statsQuery.data}>
-            {sendReport.loading ? <Loader2 className="animate-spin" /> : reportSentTo ? <Check /> : <Send />}
-            <span className="max-sm:hidden">{reportSentTo ? 'Sent' : 'Email me this'}</span>
-          </Button>
-          <TimeRangeFilter size="sm" />
-          <Button size="sm" onClick={() => sync?.()} disabled={syncing}>
-            <RefreshCw className={cn(syncing && 'animate-spin')} />
-            <span className="max-sm:hidden">{syncing ? 'Refreshing…' : 'Refresh'}</span>
-          </Button>
-        </div>
-      )}
-    </header>
-  );
-
-  if (!isConnected) {
-    return (
-      <>
-        {toolbar}
-        <ConnectGmailState />
-      </>
-    );
-  }
+  const firstName = (user?.name || '').trim().split(/\s+/)[0] || 'there';
 
   const counts = statsQuery.data?.counts || {};
   const total = statsQuery.data?.total ?? 0;
   const safeCount = (counts.safe || 0) + (counts.reviewed_safe || 0);
   const scanned = Math.max(0, total - (counts.unscanned || 0));
   const safeRate = scanned > 0 ? Math.round((safeCount / scanned) * 100) : 0;
-  const lastSynced = account?.lastSyncedAt;
 
   return (
-    <>
-      {toolbar}
-      <div className="mx-auto w-full max-w-[64rem] px-4 pb-16 md:px-6">
-        {statsQuery.loading ? (
-          <div className="pt-8">
+    <PagePanel>
+      <div className="mx-auto w-full max-w-[90rem] px-5 pb-12 pt-6 md:px-11 md:pt-9">
+        <header className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-h1 font-medium">
+              {greeting()}, {firstName}
+            </h1>
+            <p className="mt-1 text-[0.9375rem] text-muted-foreground">Your inbox over the {label.toLowerCase()}.</p>
+          </div>
+          {isConnected && (
+            <div className="flex items-center gap-1">
+              <TimeRangeFilter />
+              <Button variant="ghost" size="icon" aria-label={reportSent ? 'Report sent' : 'Email me this report'} title="Email me this report" onClick={handleSendReport} disabled={sendReport.loading || !statsQuery.data}>
+                {sendReport.loading ? <Loader2 className="animate-spin" /> : reportSent ? <Check /> : <Send />}
+              </Button>
+              <Button variant="ghost" size="icon" aria-label="Refresh" title="Refresh" onClick={() => sync?.()} disabled={syncing}>
+                <RefreshCw className={cn(syncing && 'animate-spin')} />
+              </Button>
+            </div>
+          )}
+        </header>
+
+        {!isConnected ? (
+          <ConnectGmailState compact />
+        ) : statsQuery.loading ? (
+          <div className="mt-7">
             <BriefingSkeleton />
           </div>
         ) : statsQuery.error ? (
           <ErrorState message={statsQuery.error} onRetry={statsQuery.reload} />
         ) : (
-          <>
-            <p className="data py-4 text-xs text-muted-foreground">
-              {total === 0 ? `No messages in ${label.toLowerCase()}` : `${scanned} of ${total} ${plural(total, 'message', 'messages')} scanned · ${label.toLowerCase()}`}
-              {lastSynced ? ` · synced ${formatDateTime(lastSynced)}` : ''}
-            </p>
-
-            <PostureBlock counts={counts} total={total} scanned={scanned} safeRate={safeRate} periodLabel={label} />
-            <ReviewQueueBlock emails={normalizeEmailList(riskyQuery.data)} loading={riskyQuery.loading} />
-            <TrendBlock data={Array.isArray(trendQuery.data) ? trendQuery.data : []} loading={trendQuery.loading} />
-            <DomainsBlock senders={sendersQuery.data} loading={sendersQuery.loading} />
-          </>
+          <div className="mt-7 grid gap-4">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+              <Hero counts={counts} total={total} scanned={scanned} safeRate={safeRate} />
+              <Breakdown counts={counts} total={total} scanned={scanned} safeRate={safeRate} />
+            </div>
+            <FlaggedPerDay data={Array.isArray(trendQuery.data) ? trendQuery.data : []} loading={trendQuery.loading} label={label} />
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+              <ReviewQueue emails={normalizeEmailList(riskyQuery.data)} loading={riskyQuery.loading} />
+              <Sources senders={sendersQuery.data} loading={sendersQuery.loading} />
+            </div>
+          </div>
         )}
       </div>
-    </>
+    </PagePanel>
   );
 }

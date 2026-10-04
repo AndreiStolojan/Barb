@@ -17,7 +17,7 @@ function Switch({ className, ...props }) {
       <SwitchPrimitive.Thumb
         className={cn(
           'pointer-events-none block h-4 w-4 rounded-full shadow-sm transition-[transform,background-color] duration-[var(--duration-fast)]',
-          'data-[state=checked]:translate-x-4 data-[state=checked]:bg-primary-foreground data-[state=unchecked]:translate-x-0 data-[state=unchecked]:bg-foreground'
+          'data-[state=checked]:translate-x-4 data-[state=checked]:bg-white data-[state=unchecked]:translate-x-0 data-[state=unchecked]:bg-foreground'
         )}
       />
     </SwitchPrimitive.Root>

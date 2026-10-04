@@ -2,20 +2,13 @@
 @import 'tw-animate-css';
 
 /*
-  SecureInbox design system — "triage desk".
+  SecureInbox design system: graphite.
 
-  One canvas (pure black), one typeface family (IBM Plex Sans for prose,
-  IBM Plex Mono for anything that is literal data: addresses, URLs, scores,
-  timestamps, key hints), and one rule for colour: colour means severity.
-  The only chromatic things on a screen are risk marks. Interactive chrome is
-  bone/white, never blue, so an action can never be mistaken for a warning.
-
-  Severity ramp (warm, one direction):
-    safe        quiet bone-grey  — the absence of alarm, not a colour
-    review      amber            — worth a look
-    quarantine  orange-red       — likely phishing
-    phishing    red              — confirmed by the user
-    unscanned   neutral grey     — no verdict yet
+  The app sits on a graphite chrome. What you read sits on a raised panel;
+  anything grouped inside a panel sits on a card. One family, IBM Plex Sans,
+  with tabular figures. One interactive colour, a soft periwinkle. Severity
+  is a soft ramp (mint, amber, coral, rose) used on small marks, never on
+  large areas. Words are kept to what the reader needs to decide.
 */
 
 @font-face {
@@ -111,100 +104,101 @@
   --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
 
-  /* Weights. Plex is a variable face; these are the four steps the UI uses. */
   --font-weight-normal: 400;
   --font-weight-medium: 500;
-  --font-weight-semibold: 600;
-  --font-weight-bold: 650;
+  --font-weight-semibold: 560;
+  --font-weight-bold: 620;
 
-  /* Type ramp */
-  --text-display: 2rem;
-  --text-display--line-height: 1.1;
+  --text-display: 1.75rem;
+  --text-display--line-height: 1.15;
   --text-display--letter-spacing: -0.02em;
-  --text-h1: 1.5rem;
-  --text-h1--line-height: 1.2;
-  --text-h1--letter-spacing: -0.016em;
-  --text-h2: 1.125rem;
-  --text-h2--line-height: 1.3;
-  --text-h2--letter-spacing: -0.01em;
+  --text-h1: 1.6875rem;
+  --text-h1--line-height: 1.22;
+  --text-h1--letter-spacing: -0.018em;
+  --text-h2: 1.375rem;
+  --text-h2--line-height: 1.25;
+  --text-h2--letter-spacing: -0.015em;
   --text-h3: 0.9375rem;
-  --text-h3--line-height: 1.35;
-  --text-h3--letter-spacing: -0.004em;
-  --text-body: 0.8125rem;
-  --text-body--line-height: 1.5;
-  --text-caption: 0.75rem;
-  --text-caption--line-height: 1.4;
-  --text-micro: 0.6875rem;
-  --text-micro--line-height: 1.3;
+  --text-h3--line-height: 1.4;
+  --text-h3--letter-spacing: -0.005em;
+  --text-caption: 0.8125rem;
+  --text-caption--line-height: 1.45;
 
-  --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 0.875rem;
+  --radius-2xl: 1.125rem;
+  --radius-3xl: 1.25rem;
 
-  /* Canvas + the two steps above it. Black is the page; everything else is a
-     translucent lift so it reads as the same material, not a different one. */
-  --color-background: #000000;
-  --color-foreground: #f4f3ee;
-  --color-card: #0b0b0c;
-  --color-card-foreground: #f4f3ee;
-  --color-popover: #121214;
-  --color-popover-foreground: #f4f3ee;
-  --color-elevated: #17171a;
+  /*
+    Graphite. Three surfaces, each one step lighter: the chrome the app sits
+    on, the raised panel you read in, and the card inside a panel. A fourth,
+    the well, sits slightly BELOW the panel and holds the email itself, so the
+    sender's words read as something set apart from our analysis.
+  */
+  --color-background: #141417;
+  --color-panel: #1c1c21;
+  --color-card: #232329;
+  --color-well: #18181c;
+  --color-elevated: #26262c;
+  --color-foreground: #edece9;
+  --color-card-foreground: #edece9;
+  --color-popover: #26262c;
+  --color-popover-foreground: #edece9;
 
-  /* Text steps */
-  --color-muted-foreground: #a4a29b;
-  --color-muted-foreground-subtle: #74736e;
-  --color-muted: #0f0f10;
-  --color-accent: #151517;
-  --color-accent-foreground: #f4f3ee;
-  --color-secondary: #161618;
-  --color-secondary-foreground: #d6d4cd;
+  /* Text. All three clear WCAG AA on chrome, panel and card. */
+  --color-muted-foreground: #a6a5a2;
+  --color-muted-foreground-subtle: #8b8a8f;
+  --color-muted: #18181c;
+  --color-accent: #2a2a31;
+  --color-accent-foreground: #edece9;
+  --color-secondary: #232329;
+  --color-secondary-foreground: #d6d5d2;
 
-  /* Interactive: bone. The single primary action on a screen is a bone fill
-     with black text. Focus is a white ring. Links are bone, underlined. */
-  --color-primary: #e9e6dc;
-  --color-primary-foreground: #0a0a0a;
-  --color-primary-hover: #ffffff;
-  --color-primary-active: #d6d3c8;
-  --color-primary-soft: rgb(233 230 220 / 0.09);
-  --color-link: #e9e6dc;
-  --color-ring: #ffffff;
+  /* The one interactive colour: soft periwinkle. Never used for severity. */
+  --color-primary: #a3adff;
+  --color-primary-foreground: #14162b;
+  --color-primary-hover: #b6beff;
+  --color-primary-active: #8f9bff;
+  --color-primary-soft: rgb(163 173 255 / 0.12);
+  --color-link: #a3adff;
+  --color-ring: #a3adff;
 
-  /* Hairlines */
-  --color-border: rgb(255 255 255 / 0.1);
-  --color-border-strong: rgb(255 255 255 / 0.18);
-  --color-input: rgb(255 255 255 / 0.16);
+  --color-border: rgb(255 255 255 / 0.07);
+  --color-border-strong: rgb(255 255 255 / 0.12);
+  --color-input: rgb(255 255 255 / 0.12);
 
-  /* Destructive = the phishing red; it is the only red on the page. */
-  --color-destructive: #e5484d;
-  --color-destructive-strong: #b4262b;
-  --color-destructive-foreground: #fff5f5;
+  --color-destructive: #f1677d;
+  --color-destructive-strong: #c9435a;
+  --color-destructive-foreground: #fff5f6;
 
-  /* Severity ramp. Names are stable: lib/risk.js and every chart reference
-     them. All five pass 4.5:1 as text on black. */
-  --color-risk-safe: #a3a199;
-  --color-risk-safe-soft: rgb(163 161 153 / 0.12);
-  --color-risk-review: #e2a63a;
-  --color-risk-review-soft: rgb(226 166 58 / 0.14);
-  --color-risk-quarantine: #f0703f;
-  --color-risk-quarantine-soft: rgb(240 112 63 / 0.14);
-  --color-risk-phishing: #ea4d52;
-  --color-risk-phishing-soft: rgb(234 77 82 / 0.14);
-  --color-risk-unscanned: #5e5e63;
-  --color-risk-unscanned-soft: rgb(94 94 99 / 0.16);
+  /*
+    Severity, softened for a grey canvas: mint, amber, coral, rose.
+    Names are stable; lib/risk.js and every chart read them.
+  */
+  --color-risk-safe: #8ccbb0;
+  --color-risk-safe-soft: rgb(140 203 176 / 0.12);
+  --color-risk-review: #f1bb63;
+  --color-risk-review-soft: rgb(241 187 99 / 0.12);
+  --color-risk-quarantine: #ff8e7c;
+  --color-risk-quarantine-soft: rgb(255 142 124 / 0.12);
+  --color-risk-phishing: #f1677d;
+  --color-risk-phishing-soft: rgb(241 103 125 / 0.13);
+  --color-risk-unscanned: #8a8990;
+  --color-risk-unscanned-soft: rgb(138 137 144 / 0.14);
 
-  /* Charts draw from the same ramp */
-  --color-chart-1: #e9e6dc;
-  --color-chart-2: #a3a199;
-  --color-chart-3: #e2a63a;
-  --color-chart-4: #f0703f;
-  --color-chart-5: #ea4d52;
+  --color-chart-1: #a3adff;
+  --color-chart-2: #8ccbb0;
+  --color-chart-3: #f1bb63;
+  --color-chart-4: #ff8e7c;
+  --color-chart-5: #f1677d;
 
-  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.6);
-  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.7);
-  --shadow-md: 0 8px 24px -8px rgb(0 0 0 / 0.8);
-  --shadow-lg: 0 16px 48px -12px rgb(0 0 0 / 0.85);
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.3);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.35);
+  --shadow-md: 0 10px 30px -12px rgb(0 0 0 / 0.55);
+  --shadow-lg: 0 24px 60px -20px rgb(0 0 0 / 0.65);
+  --shadow-panel: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 20px 50px -30px rgb(0 0 0 / 0.6);
 
   --ease-out: cubic-bezier(0.32, 0.72, 0, 1);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -212,7 +206,7 @@
   --duration-base: 220ms;
   --duration-slow: 360ms;
 
-  --gutter: clamp(1rem, 3vw, 1.75rem);
+  --gutter: clamp(1rem, 3vw, 2.75rem);
 }
 
 @layer base {
@@ -232,29 +226,17 @@
     background-color: var(--color-background);
     color: var(--color-foreground);
     font-family: var(--font-sans);
-    font-size: 0.8125rem;
+    font-size: 0.875rem;
     line-height: 1.5;
-    letter-spacing: -0.004em;
+    letter-spacing: -0.003em;
+    font-variant-numeric: tabular-nums;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
   }
 
   ::selection {
-    background-color: rgb(233 230 220 / 0.28);
-  }
-
-  /* Numbers line up in columns everywhere. */
-  .tabular,
-  .font-mono {
-    font-variant-numeric: tabular-nums;
-  }
-
-  .recharts-wrapper:focus,
-  .recharts-wrapper:focus-visible,
-  .recharts-surface:focus,
-  .recharts-surface:focus-visible {
-    outline: none;
+    background-color: rgb(163 173 255 / 0.3);
   }
 
   * {
@@ -286,17 +268,15 @@
 
 /* The quiet section title: small, medium weight, muted. Not uppercase. */
 @utility label-section {
-  font-size: 0.75rem;
-  font-weight: 500;
+  font-size: 0.9375rem;
+  font-weight: 560;
   line-height: 1.4;
-  color: var(--color-muted-foreground);
+  color: var(--color-foreground);
 }
 
-/* Literal data: addresses, domains, URLs, ids, timestamps. */
+/* Numbers that should line up in columns. */
 @utility data {
-  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: 0;
 }
 
 /* A keyboard key hint. */
@@ -308,10 +288,9 @@
   height: 1.125rem;
   padding-inline: 0.3rem;
   border-radius: 0.25rem;
-  border: 1px solid var(--color-border-strong);
-  background: rgb(255 255 255 / 0.04);
-  font-family: var(--font-mono);
-  font-size: 0.625rem;
+  background: rgb(255 255 255 / 0.08);
+  font-family: var(--font-sans);
+  font-size: 0.6875rem;
   font-weight: 500;
   line-height: 1;
   color: var(--color-muted-foreground);
@@ -321,8 +300,24 @@
 @utility focus-ring {
   outline: none;
   &:focus-visible {
-    box-shadow: 0 0 0 2px var(--color-background), 0 0 0 4px var(--color-ring);
+    box-shadow: 0 0 0 2px var(--color-panel), 0 0 0 4px var(--color-ring);
   }
+}
+
+/* The raised reading surface. Only a panel on desktop; phones go edge to edge. */
+@utility panel {
+  background-color: var(--color-background);
+  @media (width >= 48rem) {
+    background-color: var(--color-panel);
+    border-radius: 1.125rem;
+    box-shadow: var(--shadow-panel);
+  }
+}
+
+/* A card inside a panel. */
+@utility card {
+  background-color: var(--color-card);
+  border-radius: 1.25rem;
 }
 
 @utility scrollbar-none {
@@ -333,11 +328,6 @@
 }
 
 /* A hairline that fades at both ends, used under sticky headers. */
-@utility hairline-fade {
-  background: linear-gradient(to right, transparent, var(--color-border-strong) 12%, var(--color-border-strong) 88%, transparent);
-  height: 1px;
-}
-
 @keyframes shimmer {
   100% {
     transform: translateX(100%);
@@ -350,9 +340,9 @@
 */
 @layer components {
   .email-body {
-    color: rgb(244 243 238 / 0.9);
-    font-size: 0.875rem;
-    line-height: 1.65;
+    color: rgb(237 236 233 / 0.86);
+    font-size: 0.96875rem;
+    line-height: 1.72;
     word-break: break-word;
     overflow-wrap: break-word;
   }
@@ -371,8 +361,8 @@
   .email-body :where(a) {
     color: inherit;
     text-decoration: underline dotted;
-    text-decoration-color: var(--color-muted-foreground-subtle);
-    text-underline-offset: 3px;
+    text-decoration-color: rgb(255 255 255 / 0.35);
+    text-underline-offset: 4px;
     cursor: default;
   }
   .email-body :where(ul, ol) { margin: 0.75em 0; padding-left: 1.5em; }

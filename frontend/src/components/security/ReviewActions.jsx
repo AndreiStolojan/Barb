@@ -6,17 +6,18 @@
 //   ref.current.review('safe' | 'phishing')
 
 import { forwardRef, useEffect, useImperativeHandle, useState } from 'react';
-import { Check, Loader2, ShieldCheck, ShieldX } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { Kbd } from '@/components/ui/kbd';
 import { markEmailPhishing, markEmailSafe } from '@/api/actionsApi';
 import { useAsyncAction } from '@/hooks/useAsyncAction';
 import { emailId } from '@/lib/email';
 import { cn } from '@/lib/utils';
 
-export const ReviewActions = forwardRef(function ReviewActions({ email, onReviewed, disabled = false, hints = false, className }, ref) {
+export const ReviewActions = forwardRef(function ReviewActions({ email, onReviewed, disabled = false, className }, ref) {
+  // The coral fill is a recommendation; only make it where the scan backs it.
+  const urgent = email?.riskBucket === 'quarantine';
   const safe = useAsyncAction(markEmailSafe);
   const phishing = useAsyncAction(markEmailPhishing);
   const busy = safe.loading || phishing.loading;
@@ -35,7 +36,7 @@ export const ReviewActions = forwardRef(function ReviewActions({ email, onReview
     setVerdict(kind);
     try {
       const result = await (kind === 'safe' ? safe : phishing).run(emailId(email));
-      toast.success(kind === 'safe' ? 'Marked safe' : 'Marked phishing');
+      toast.success(kind === 'safe' ? 'Marked as safe' : 'Marked as phishing');
       onReviewed?.(result);
     } catch (err) {
       setVerdict(previous);
@@ -46,26 +47,26 @@ export const ReviewActions = forwardRef(function ReviewActions({ email, onReview
   useImperativeHandle(ref, () => ({ review }), [review]);
 
   return (
-    <div className={cn('flex flex-wrap items-center gap-1.5', className)}>
+    <div className={cn('flex flex-wrap items-center gap-2', className)}>
       <Button
-        variant={reviewedPhishing ? 'outline' : 'danger'}
+        variant={reviewedPhishing || !urgent ? 'outline' : 'phish'}
+        size="lg"
         disabled={disabled || busy || reviewedPhishing}
         onClick={() => review('phishing')}
-        className={cn(reviewedPhishing && 'border-risk-phishing/40 text-risk-phishing')}
+        className={cn(reviewedPhishing && 'text-risk-phishing disabled:opacity-100')}
       >
-        {phishing.loading ? <Loader2 className="animate-spin" /> : reviewedPhishing ? <Check /> : <ShieldX />}
-        {reviewedPhishing ? 'Marked phishing' : 'Mark phishing'}
-        {hints && !reviewedPhishing && <Kbd className="max-md:hidden">P</Kbd>}
+        {phishing.loading ? <Loader2 className="animate-spin" /> : reviewedPhishing && <Check />}
+        {reviewedPhishing ? 'Marked as phishing' : 'Mark as phishing'}
       </Button>
       <Button
         variant="outline"
+        size="lg"
         disabled={disabled || busy || reviewedSafe}
         onClick={() => review('safe')}
-        className={cn(reviewedSafe && 'border-risk-safe/50 text-risk-safe')}
+        className={cn(reviewedSafe && 'text-risk-safe disabled:opacity-100')}
       >
-        {safe.loading ? <Loader2 className="animate-spin" /> : reviewedSafe ? <Check /> : <ShieldCheck />}
-        {reviewedSafe ? 'Marked safe' : 'Mark safe'}
-        {hints && !reviewedSafe && <Kbd className="max-md:hidden">S</Kbd>}
+        {safe.loading ? <Loader2 className="animate-spin" /> : reviewedSafe && <Check />}
+        {reviewedSafe ? 'Marked as safe' : 'Mark as safe'}
       </Button>
     </div>
   );

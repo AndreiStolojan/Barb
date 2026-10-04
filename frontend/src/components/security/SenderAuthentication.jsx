@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // SenderAuthentication.jsx — did this message really come from who it claims?
 //
-// Three mechanisms (sending server, signature, domain policy), each in one of
-// THREE states: passed, failed, or not verified. A check we could not run is
-// never drawn like a check that failed: that would invent an accusation.
-// ARC and the published DMARC policy are listed as facts underneath.
+// Three short lines: sending server (SPF), signature (DKIM), domain policy
+// (DMARC). Each is passed, failed, or not verified, and the three never look
+// alike: a check we could not run is not drawn like one that failed, because
+// that would invent an accusation. The full sentence for each is the tooltip.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Check, Minus, X } from 'lucide-react';
@@ -13,60 +13,49 @@ import { getSenderAuthentication } from '@/lib/senderAuth';
 import { cn } from '@/lib/utils';
 
 const STATE = {
-  pass: { icon: Check, color: 'var(--color-risk-safe)', srLabel: 'Passed', word: 'pass' },
-  fail: { icon: X, color: 'var(--color-risk-quarantine)', srLabel: 'Failed', word: 'fail' },
-  unknown: { icon: Minus, color: 'var(--color-risk-unscanned)', srLabel: 'Not verified', word: 'not verified' },
+  pass: { icon: Check, className: 'bg-risk-safe-soft text-risk-safe', srLabel: 'Passed' },
+  fail: { icon: X, className: 'bg-risk-quarantine-soft text-risk-quarantine', srLabel: 'Failed' },
+  unknown: { icon: Minus, className: 'bg-white/[0.07] text-muted-foreground-subtle', srLabel: 'Not verified' },
 };
 
-const MECHANISM_CODE = { spf: 'SPF', dkim: 'DKIM', dmarc: 'DMARC' };
+// The short status word, per mechanism. 'none' means the sender published
+// nothing to check against, which is different from "we could not check".
+const STATUS = {
+  spf: { pass: 'Authorised', fail: 'Not authorised', none: 'No policy', unknown: 'Not checked' },
+  dkim: { pass: 'Valid', fail: 'Invalid', none: 'Not signed', unknown: 'Not checked' },
+  dmarc: { pass: 'Passed', fail: 'Failed', none: 'No policy', unknown: 'Not checked' },
+};
 
-function Mechanism({ id, label, state, description }) {
-  const tone = STATE[state] ?? STATE.unknown;
-  const Icon = tone.icon;
-  return (
-    <div className="grid grid-cols-[1.25rem_minmax(0,1fr)_auto] items-start gap-x-3 border-b border-border py-2.5 last:border-b-0">
-      <span className="flex h-5 w-5 items-center justify-center rounded-full border" style={{ borderColor: tone.color, color: tone.color }}>
-        <Icon className="h-3 w-3" aria-hidden="true" strokeWidth={2.5} />
-      </span>
-      <div className="min-w-0">
-        <p className="text-[0.8125rem] font-medium">
-          {label}
-          <span className="sr-only">: {tone.srLabel}</span>
-        </p>
-        <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{description}</p>
-      </div>
-      <span className="data text-[0.6875rem]" style={{ color: tone.color }}>
-        {MECHANISM_CODE[id]} {tone.word}
-      </span>
-    </div>
-  );
-}
+const statusWord = (id, state, raw) => {
+  if (state !== 'unknown') return STATUS[id][state];
+  return String(raw || '').toLowerCase() === 'none' ? STATUS[id].none : STATUS[id].unknown;
+};
 
 export function SenderAuthentication({ authResults, className }) {
-  const { available, tone, summary, mechanisms } = getSenderAuthentication(authResults);
-  const arc = authResults?.arc?.result;
-  const policy = authResults?.dmarc?.policy;
+  const { available, summary, mechanisms } = getSenderAuthentication(authResults);
 
   if (!available) {
-    return <p className={cn('text-[0.8125rem] text-muted-foreground', className)}>{summary}</p>;
+    return <p className={cn('text-sm text-muted-foreground', className)}>{summary}</p>;
   }
 
   return (
     <div className={cn('min-w-0', className)}>
-      <p className="text-[0.8125rem] font-medium" style={{ color: STATE[tone]?.color }}>
-        {summary}
-      </p>
-      <div className="mt-1">
-        {mechanisms.map((m) => (
-          <Mechanism key={m.id} {...m} />
-        ))}
-      </div>
-      <dl className="mt-3 grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-1 text-xs">
-        <dt className="text-muted-foreground">Domain policy</dt>
-        <dd className="data">{policy ? `p=${policy}` : 'none published'}</dd>
-        <dt className="text-muted-foreground">Forwarding chain (ARC)</dt>
-        <dd className="data">{arc && arc !== 'none' ? arc : 'not present'}</dd>
-      </dl>
+      {mechanisms.map(({ id, label, state, description }) => {
+        const tone = STATE[state] ?? STATE.unknown;
+        const Icon = tone.icon;
+        return (
+          <div key={id} title={description} className="grid grid-cols-[22px_minmax(0,1fr)_auto] items-center gap-3 py-[7px] text-[0.9375rem]">
+            <span className={cn('flex h-[22px] w-[22px] items-center justify-center rounded-full', tone.className)}>
+              <Icon className="h-3 w-3" strokeWidth={2.5} aria-hidden="true" />
+            </span>
+            <span>
+              {label}
+              <span className="sr-only">: {tone.srLabel}. {description}</span>
+            </span>
+            <span className="text-[0.8125rem] text-muted-foreground-subtle">{statusWord(id, state, authResults?.[id]?.result)}</span>
+          </div>
+        );
+      })}
     </div>
   );
 }

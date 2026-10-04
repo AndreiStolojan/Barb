@@ -24,7 +24,7 @@ import { addSenderListEntry, removeSenderListEntry } from '@/api/senderListsApi'
 import { normalizeAddress, normalizeDomain } from '@/lib/senderLists';
 import { cn } from '@/lib/utils';
 
-export function SenderListActions({ senderAddress, senderDomain, senderEntry, domainEntry, onChanged, size = 'sm' }) {
+export function SenderListActions({ senderAddress, senderDomain, senderEntry, domainEntry, onChanged }) {
   const [busy, setBusy] = useState(false);
   const address = normalizeAddress(senderAddress);
   const domain = normalizeDomain(senderDomain);
@@ -49,7 +49,7 @@ export function SenderListActions({ senderAddress, senderDomain, senderEntry, do
 
   if (!address && !domain) return null;
 
-  const label = match ? (match.listType === 'allow' ? 'Trusted' : 'Blocked') : 'Trust / block';
+  const label = match ? (match.listType === 'allow' ? 'Trusted' : 'Blocked') : 'Trust or block';
   const Icon = match ? (match.listType === 'allow' ? ShieldCheck : ShieldOff) : UserRoundCheck;
   const scope = match ? (match.kind === 'domain' ? 'domain' : 'sender') : null;
 
@@ -57,30 +57,28 @@ export function SenderListActions({ senderAddress, senderDomain, senderEntry, do
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button
-          size={size}
+          variant="ghost"
+          size="sm"
           disabled={busy}
-          className={cn(
-            match?.listType === 'allow' && 'border-risk-safe/50 text-risk-safe hover:text-risk-safe',
-            match?.listType === 'block' && 'border-risk-quarantine/50 text-risk-quarantine hover:text-risk-quarantine'
-          )}
+          className={cn(match?.listType === 'allow' && 'text-risk-safe hover:text-risk-safe', match?.listType === 'block' && 'text-risk-quarantine hover:text-risk-quarantine')}
         >
           {busy ? <Loader2 className="animate-spin" /> : <Icon />}
           {label}
-          {scope && <span className="text-[0.6875rem] opacity-70">({scope})</span>}
+          {scope && <span className="opacity-70">{scope}</span>}
           <ChevronDown className="opacity-60" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         {address && (
           <>
-            <DropdownMenuLabel className="data truncate">{address}</DropdownMenuLabel>
+            <DropdownMenuLabel className="truncate">{address}</DropdownMenuLabel>
             {senderEntry ? (
               <DropdownMenuItem onClick={() => removeEntry(senderEntry)}>
                 <X />
                 Remove from {senderEntry.listType === 'allow' ? 'trusted' : 'blocked'}
               </DropdownMenuItem>
             ) : domainEntry ? (
-              <p className="px-2 py-1.5 text-xs text-muted-foreground">
+              <p className="px-2.5 py-1.5 text-[0.8125rem] text-muted-foreground">
                 Already {domainEntry.listType === 'allow' ? 'trusted' : 'blocked'} through the domain rule below.
               </p>
             ) : (
@@ -100,7 +98,7 @@ export function SenderListActions({ senderAddress, senderDomain, senderEntry, do
         {address && domain && <DropdownMenuSeparator />}
         {domain && (
           <>
-            <DropdownMenuLabel className="data truncate">{domain}</DropdownMenuLabel>
+            <DropdownMenuLabel className="truncate">{domain}</DropdownMenuLabel>
             {domainEntry ? (
               <DropdownMenuItem onClick={() => removeEntry(domainEntry)}>
                 <X />

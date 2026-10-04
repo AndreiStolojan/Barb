@@ -1,13 +1,17 @@
-import { RISK_FILTERS, getRiskMeta } from '@/lib/risk';
+import { RISK_FILTERS } from '@/lib/risk';
 import { cn } from '@/lib/utils';
 
-const underlineColor = (key) => (key ? getRiskMeta(key).tone.hex : 'var(--color-foreground)');
+// Short labels for a narrow list column. The full names live in risk.js.
+const SHORT = { '': 'All', quarantine: 'Phishing', needs_review: 'Suspicious', confirmed_phishing: 'Confirmed', safe: 'Safe' };
 
-/* The risk filters, as tabs. The active underline carries the category colour. */
+// Only the filters that hold flagged mail show a count: "Safe 289" is noise.
+const COUNTED = new Set(['quarantine', 'needs_review', 'confirmed_phishing']);
+
+/* The risk filters, as quiet pills. The active one takes the panel colour. */
 export function FilterTabs({ active, counts, showCounts = true, onSelect }) {
   return (
-    <div role="tablist" aria-label="Filter messages by risk" className="scrollbar-none flex shrink-0 items-stretch gap-x-0.5 overflow-x-auto border-b border-border px-2">
-      {RISK_FILTERS.map(({ key, label }, index) => {
+    <div role="tablist" aria-label="Filter messages by risk" className="scrollbar-none flex shrink-0 items-center gap-0.5 overflow-x-auto px-2">
+      {RISK_FILTERS.map(({ key, label }) => {
         const isActive = active === key;
         const count = counts?.[key];
         return (
@@ -16,19 +20,16 @@ export function FilterTabs({ active, counts, showCounts = true, onSelect }) {
             type="button"
             role="tab"
             aria-selected={isActive}
-            aria-keyshortcuts={String(index + 1)}
+            aria-label={label}
             onClick={() => onSelect(key)}
             className={cn(
-              'focus-ring relative flex items-baseline gap-1.5 whitespace-nowrap px-2.5 py-2 text-xs transition-colors',
-              isActive ? 'font-medium text-foreground' : 'text-muted-foreground hover:text-foreground'
+              'focus-ring flex items-baseline gap-1.5 whitespace-nowrap rounded-[0.5625rem] px-2.5 py-1.5 text-[0.8125rem] transition-colors',
+              isActive ? 'bg-panel text-foreground' : 'text-muted-foreground hover:text-foreground'
             )}
           >
-            <span>{label}</span>
-            {showCounts && Number.isFinite(count) && (
-              <span className={cn('data text-[0.6875rem]', isActive ? 'text-muted-foreground' : 'text-muted-foreground-subtle')}>{count}</span>
-            )}
-            {isActive && (
-              <span aria-hidden="true" className="absolute inset-x-2 -bottom-px h-[2px] rounded-full" style={{ backgroundColor: underlineColor(key) }} />
+            {SHORT[key] ?? label}
+            {showCounts && COUNTED.has(key) && Number.isFinite(count) && count > 0 && (
+              <span className="data text-muted-foreground-subtle">{count}</span>
             )}
           </button>
         );

@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Loader2, Minus, Plus } from 'lucide-react';
 
 import { ConnectGmailButton } from '@/components/common/states';
+import { PagePanel } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -49,10 +50,10 @@ const offsetLabel = OFFSET_HOURS === 0 ? 'UTC' : `UTC${OFFSET_HOURS > 0 ? '+' : 
 
 function Section({ title, purpose, danger = false, children }) {
   return (
-    <section className={cn('grid gap-4 border-t py-8 first:border-t-0 md:grid-cols-[14rem_minmax(0,1fr)] md:gap-10', danger ? 'border-destructive/30' : 'border-border')}>
+    <section className={cn('card grid gap-4 p-5 md:grid-cols-[15rem_minmax(0,1fr)] md:gap-10 md:px-7 md:py-6', danger && 'shadow-[inset_0_0_0_1px_rgb(241_103_125_/_0.25)]')}>
       <div>
-        <h2 className={cn('text-h3 font-semibold', danger && 'text-destructive')}>{title}</h2>
-        {purpose && <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{purpose}</p>}
+        <h2 className={cn('text-[0.9375rem] font-semibold', danger && 'text-destructive')}>{title}</h2>
+        {purpose && <p className="mt-1 text-[0.8125rem] leading-relaxed text-muted-foreground">{purpose}</p>}
       </div>
       <div className="min-w-0">{children}</div>
     </section>
@@ -63,8 +64,8 @@ function Row({ label, hint, children, first = false }) {
   return (
     <div className={cn('flex items-start justify-between gap-6 py-3', !first && 'border-t border-border')}>
       <div className="min-w-0">
-        <p className="text-[0.8125rem] font-medium">{label}</p>
-        {hint && <p className="mt-0.5 max-w-[48ch] text-xs leading-relaxed text-muted-foreground">{hint}</p>}
+        <p className="text-[0.9375rem]">{label}</p>
+        {hint && <p className="mt-0.5 max-w-[48ch] text-[0.8125rem] leading-relaxed text-muted-foreground-subtle">{hint}</p>}
       </div>
       <div className="shrink-0">{children}</div>
     </div>
@@ -75,8 +76,8 @@ function ToggleRow({ id, label, hint, checked, disabled, onCheckedChange, first 
   return (
     <label htmlFor={id} className={cn('flex cursor-pointer items-start justify-between gap-6 py-3', !first && 'border-t border-border')}>
       <span className="min-w-0">
-        <span className="block text-[0.8125rem] font-medium">{label}</span>
-        {hint && <span className="mt-0.5 block max-w-[48ch] text-xs leading-relaxed text-muted-foreground">{hint}</span>}
+        <span className="block text-[0.9375rem]">{label}</span>
+        {hint && <span className="mt-0.5 block max-w-[48ch] text-[0.8125rem] leading-relaxed text-muted-foreground-subtle">{hint}</span>}
       </span>
       <Switch id={id} checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} className="mt-0.5 shrink-0" />
     </label>
@@ -95,7 +96,7 @@ function SaveButton({ dirty, loading, onSave, children = 'Save' }) {
 
 function NumberStepper({ id, value, onChange, min = 1, max = 50 }) {
   const num = Number(value);
-  const step = 'focus-ring flex h-8 w-8 items-center justify-center rounded-md border border-input text-muted-foreground hover:border-border-strong hover:text-foreground disabled:opacity-35';
+  const step = 'focus-ring flex h-9 w-9 items-center justify-center rounded-[0.625rem] text-muted-foreground shadow-[inset_0_0_0_1px_var(--color-input)] hover:text-foreground disabled:opacity-35';
   return (
     <div className="flex items-center gap-1">
       <button type="button" aria-label="Fewer" className={step} disabled={num <= min} onClick={() => onChange(Math.max(num - 1, min))}>
@@ -179,139 +180,142 @@ export function SettingsPage() {
   const address = account?.accountEmail || account?.email;
 
   return (
-    <>
-      <header className="hidden h-12 shrink-0 items-center border-b border-border px-4 md:flex md:px-6">
-        <h1 className="text-sm font-semibold">Settings</h1>
-      </header>
+    <PagePanel>
+      <div className="mx-auto w-full max-w-[64rem] px-5 pb-12 pt-6 md:px-11 md:pt-9">
+        <header>
+          <h1 className="text-h1 font-medium">Settings</h1>
+          <p className="mt-1 text-[0.9375rem] text-muted-foreground">Your account, your mailbox, and when SecureInbox writes to you.</p>
+        </header>
 
-      <div className="mx-auto w-full max-w-[56rem] px-4 pb-16 pt-2 md:px-6">
-        <Section title="Profile" purpose="How SecureInbox addresses you in the emails it sends.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5">
-              <Label htmlFor="name">Name</Label>
-              <div className="flex items-center gap-2">
-                <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-                <SaveButton dirty={nameDirty} loading={saveName.loading} onSave={() => saveName.run().catch(fail('Could not save the name.'))} />
-              </div>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="email">Sign-in email</Label>
-              <Input id="email" value={user?.email || ''} disabled className="data" />
-              <p className="text-[0.6875rem] text-muted-foreground-subtle">Set when the account was created.</p>
-            </div>
-          </div>
-        </Section>
-
-        <Section title="Gmail" purpose="The mailbox SecureInbox scans. Read-only access; nothing is sent on your behalf.">
-          {isConnected ? (
-            <>
-              <Row first label={<span className="data">{address}</span>} hint={`Connected. Last synced ${formatDateTime(account.lastSyncedAt)}.`}>
-                <AlertDialog>
-                  <AlertDialogTrigger asChild>
-                    <Button variant="danger" size="sm" disabled={disconnect.loading}>
-                      {disconnect.loading && <Loader2 className="animate-spin" />}
-                      Disconnect
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent>
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Disconnect Gmail?</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Removes <span className="data text-foreground">{address}</span> together with its synced messages and scans. You can reconnect at any time and sync again.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel>Keep connected</AlertDialogCancel>
-                      <AlertDialogAction className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90" onClick={() => disconnect.run().catch(fail('Could not disconnect.'))}>
-                        Disconnect
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
-              </Row>
-              <Row label="Backfill page size" hint="Messages fetched per page while catching up on history. Ongoing sync does not use it. 1 to 50.">
+        <div className="mt-7 grid gap-4">
+          <Section title="Profile" purpose="How SecureInbox addresses you in the emails it sends.">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="name">Name</Label>
                 <div className="flex items-center gap-2">
-                  <NumberStepper id="maxResults" value={maxResults} onChange={setMaxResults} />
-                  <SaveButton dirty={syncDirty} loading={saveSync.loading} onSave={() => saveSync.run().catch(fail('Could not save.'))} />
+                  <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
+                  <SaveButton dirty={nameDirty} loading={saveName.loading} onSave={() => saveName.run().catch(fail('Could not save the name.'))} />
                 </div>
-              </Row>
-            </>
-          ) : (
-            <Row first label="No mailbox connected" hint="The briefing and the inbox stay empty until there is a mailbox to scan.">
-              <ConnectGmailButton size="sm" />
-            </Row>
-          )}
-        </Section>
-
-        <Section title="Detection" purpose="Every message is scored by the built-in checks regardless. This only changes whether the reasoning is written out by the local model.">
-          <ToggleRow first id="ai-toggle" label="AI explanations" hint="Adds a plain-language reading of each message on top of the deterministic rules. The model alone can never declare a message phishing." checked={aiEnabled} disabled={toggleAi.loading} onCheckedChange={(next) => toggleAi.run(next).catch(fail('Could not update.'))} />
-        </Section>
-
-        <Section title="Notifications" purpose="When SecureInbox emails you.">
-          <ToggleRow first id="alerts-toggle" label="Instant phishing alerts" hint="Sent the moment a sync turns up a likely phishing message." checked={alertsEnabled} disabled={toggleAlerts.loading} onCheckedChange={(next) => toggleAlerts.run(next).catch(fail('Could not update.'))} />
-          <ToggleRow id="digest-toggle" label="Daily digest" hint="One summary a day. Nothing urgent waits for it." checked={digestEnabled} disabled={toggleDigest.loading} onCheckedChange={(next) => toggleDigest.run(next).catch(fail('Could not update.'))} />
-          {digestEnabled && (
-            <div className="border-t border-border py-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <p id="digest-hour-label" className="text-[0.8125rem]">
-                  Digest arrives at <span className="data font-medium">{hourLabel(utcToLocalHour(digestHour))}</span>
-                  <span className="text-xs text-muted-foreground"> · {TZ_NAME} ({offsetLabel})</span>
-                </p>
-                <SaveButton dirty={digestHourDirty} loading={saveDigestHour.loading} onSave={() => saveDigestHour.run().catch(fail('Could not save.'))}>
-                  Save time
-                </SaveButton>
               </div>
-              <div role="radiogroup" aria-labelledby="digest-hour-label" className="mt-3 grid grid-cols-8 gap-1 sm:grid-cols-12">
-                {Array.from({ length: 24 }, (_, h) => {
-                  const isActive = utcToLocalHour(digestHour) === h;
-                  return (
-                    <button
-                      key={h}
-                      type="button"
-                      role="radio"
-                      aria-checked={isActive}
-                      aria-label={hourLabel(h)}
-                      onClick={() => setDigestHour(localToUtcHour(h))}
-                      className={cn(
-                        'data focus-ring flex h-7 items-center justify-center rounded-md text-xs transition-colors',
-                        isActive ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:bg-white/[0.07] hover:text-foreground'
-                      )}
-                    >
-                      {String(h).padStart(2, '0')}
-                    </button>
-                  );
-                })}
+              <div className="grid content-start gap-1.5">
+                <Label htmlFor="email">Sign-in email</Label>
+                <Input id="email" value={user?.email || ''} disabled />
+                <p className="text-[0.6875rem] text-muted-foreground-subtle">Set when the account was created.</p>
               </div>
             </div>
-          )}
-        </Section>
+          </Section>
 
-        <Section danger title="Delete account" purpose="Removes your profile, every synced message and every scan. The Gmail connection is revoked as part of it. No undo, no export.">
-          <Row first label="You will be signed out immediately." hint="Nothing of yours stays on this server.">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="danger" size="sm" disabled={deleteAccount.loading}>
-                  {deleteAccount.loading && <Loader2 className="animate-spin" />}
-                  Delete account
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete your account?</AlertDialogTitle>
-                  <AlertDialogDescription>This is permanent. Your profile, messages and scan results are deleted and cannot be recovered.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Keep my account</AlertDialogCancel>
-                  <AlertDialogAction className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90" onClick={() => deleteAccount.run().catch(fail('Could not delete the account.'))}>
+          <Section title="Gmail" purpose="The mailbox SecureInbox scans. Read-only access; nothing is sent on your behalf.">
+            {isConnected ? (
+              <>
+                <Row first label={address} hint={`Connected. Last synced ${formatDateTime(account.lastSyncedAt)}.`}>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button variant="danger" size="sm" disabled={disconnect.loading}>
+                        {disconnect.loading && <Loader2 className="animate-spin" />}
+                        Disconnect
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Disconnect Gmail?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Removes <span className="text-foreground">{address}</span> together with its synced messages and scans. You can reconnect at any time and sync again.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Keep connected</AlertDialogCancel>
+                        <AlertDialogAction className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90" onClick={() => disconnect.run().catch(fail('Could not disconnect.'))}>
+                          Disconnect
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </Row>
+                <Row label="Backfill page size" hint="Messages fetched per page while catching up on history. Ongoing sync does not use it. 1 to 50.">
+                  <div className="flex items-center gap-2">
+                    <NumberStepper id="maxResults" value={maxResults} onChange={setMaxResults} />
+                    <SaveButton dirty={syncDirty} loading={saveSync.loading} onSave={() => saveSync.run().catch(fail('Could not save.'))} />
+                  </div>
+                </Row>
+              </>
+            ) : (
+              <Row first label="No mailbox connected" hint="The briefing and the inbox stay empty until there is a mailbox to scan.">
+                <ConnectGmailButton size="sm" />
+              </Row>
+            )}
+          </Section>
+
+          <Section title="Detection" purpose="Every message is scored by the built-in checks regardless. This only changes whether the reasoning is written out by the local model.">
+            <ToggleRow first id="ai-toggle" label="AI explanations" hint="Adds a plain-language reading of each message on top of the deterministic rules. The model alone can never declare a message phishing." checked={aiEnabled} disabled={toggleAi.loading} onCheckedChange={(next) => toggleAi.run(next).catch(fail('Could not update.'))} />
+          </Section>
+
+          <Section title="Notifications" purpose="When SecureInbox emails you.">
+            <ToggleRow first id="alerts-toggle" label="Instant phishing alerts" hint="Sent the moment a sync turns up a likely phishing message." checked={alertsEnabled} disabled={toggleAlerts.loading} onCheckedChange={(next) => toggleAlerts.run(next).catch(fail('Could not update.'))} />
+            <ToggleRow id="digest-toggle" label="Daily digest" hint="One summary a day. Nothing urgent waits for it." checked={digestEnabled} disabled={toggleDigest.loading} onCheckedChange={(next) => toggleDigest.run(next).catch(fail('Could not update.'))} />
+            {digestEnabled && (
+              <div className="border-t border-border py-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <p id="digest-hour-label" className="text-[0.8125rem]">
+                    Digest arrives at <span className="data font-medium">{hourLabel(utcToLocalHour(digestHour))}</span>
+                    <span className="text-[0.8125rem] text-muted-foreground-subtle"> · {TZ_NAME} ({offsetLabel})</span>
+                  </p>
+                  <SaveButton dirty={digestHourDirty} loading={saveDigestHour.loading} onSave={() => saveDigestHour.run().catch(fail('Could not save.'))}>
+                    Save time
+                  </SaveButton>
+                </div>
+                <div role="radiogroup" aria-labelledby="digest-hour-label" className="mt-3 grid grid-cols-8 gap-1 sm:grid-cols-12">
+                  {Array.from({ length: 24 }, (_, h) => {
+                    const isActive = utcToLocalHour(digestHour) === h;
+                    return (
+                      <button
+                        key={h}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        aria-label={hourLabel(h)}
+                        onClick={() => setDigestHour(localToUtcHour(h))}
+                        className={cn(
+                          'data focus-ring flex h-8 items-center justify-center rounded-lg text-[0.8125rem] transition-colors',
+                          isActive ? 'bg-primary font-medium text-primary-foreground' : 'text-muted-foreground hover:bg-white/[0.07] hover:text-foreground'
+                        )}
+                      >
+                        {String(h).padStart(2, '0')}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </Section>
+
+          <Section danger title="Delete account" purpose="Removes your profile, every synced message and every scan. The Gmail connection is revoked as part of it. No undo, no export.">
+            <Row first label="You will be signed out immediately." hint="Nothing of yours stays on this server.">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="danger" size="sm" disabled={deleteAccount.loading}>
+                    {deleteAccount.loading && <Loader2 className="animate-spin" />}
                     Delete account
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </Row>
-        </Section>
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Delete your account?</AlertDialogTitle>
+                    <AlertDialogDescription>This is permanent. Your profile, messages and scan results are deleted and cannot be recovered.</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Keep my account</AlertDialogCancel>
+                    <AlertDialogAction className="bg-destructive-strong text-destructive-foreground hover:bg-destructive-strong/90" onClick={() => deleteAccount.run().catch(fail('Could not delete the account.'))}>
+                      Delete account
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </Row>
+          </Section>
+        </div>
       </div>
-    </>
+    </PagePanel>
   );
 }
 

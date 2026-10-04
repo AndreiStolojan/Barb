@@ -15,7 +15,7 @@ and shows the reasoning behind each verdict instead of a black-box score.
 > operating or extending it.
 
 <p align="center">
-  <img src="assets/screenshots/inbox-verdict.png" alt="SecureInbox inbox: message list beside the verdict and evidence pane" width="900" />
+  <img src="assets/screenshots/inbox.png" alt="SecureInbox inbox: message list beside the verdict and evidence pane" width="900" />
 </p>
 
 ## What it does
