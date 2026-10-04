@@ -26,9 +26,11 @@ services:
     command: tunnel --no-autoupdate run
     environment:
       TUNNEL_TOKEN: ${TUNNEL_TOKEN:?Set TUNNEL_TOKEN in .env}
-    depends_on:
-      frontend:
-        condition: service_healthy
+    # No depends_on on frontend, deliberately. nginx.prod.conf resolves the
+    # name `cloudflared` (set_real_ip_from) when it starts, so the tunnel must
+    # exist first; waiting for a healthy frontend made each wait on the other
+    # and the first consolidated deployment came up with no frontend. The
+    # tunnel retries its origin on its own until nginx answers.
     networks: [edge]
 
 networks:
