@@ -42,10 +42,11 @@ the Pi must never pull `main` as part of a routine update.
 
 ## Configure secrets
 
-Use one root configuration:
+Use one root configuration. `-n` never overwrites an existing `.env`; on an
+installation that already has one, follow the migration section below instead.
 
 ```bash
-cp .env.example .env
+cp -n .env.example .env
 chmod 600 .env
 ```
 
@@ -112,10 +113,90 @@ curl -i https://YOUR_HOSTNAME/api/v1/ready
 
 ## Promote and update safely
 
-Test changes on a branch and merge them to `main`. After the CI production
-Compose validation gate passes, open a separate PR from the selected `main` revision
-into `prod`; require the Quality check and human review before merging that PR.
-Then update the Pi only from `prod`:
+Test changes on a branch and merge them to `main`. Then open, or refresh, the
+promotion PR from `main` into `prod`. Merge it when the required checks pass on
+its exact head and its description records the release contents, the rollback
+revision, and any configuration migration (see
+[repository-controls.md](repository-controls.md)).
+
+### Back up before every deployment
+
+Take a database dump and a copy of the configuration, and tag the running
+images, before changing anything. The copies stay on the Pi with mode `600`;
+they are the fast rollback path, not a replacement for the owner's encrypted
+off-device backups in the [recovery runbook](hibernation-recovery-runbook.md).
+
+```bash
+cd /opt/secureinbox
+backup="$HOME/secureinbox-backups/$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
+install -d -m 700 "$backup"
+cp -p .env "$backup/root.env"
+test ! -f backend/.env.production.local || cp -p backend/.env.production.local "$backup/backend.env.production.local"
+DB_URI="$(bash -c 'source scripts/dotenv.sh; dotenv_get DB_URI backend/.env.production.local 2>/dev/null || dotenv_get DB_URI .env')" \
+  docker run --rm -e DB_URI mongo:8.0.28 sh -c 'mongodump --uri "$DB_URI" --archive --gzip --quiet' > "$backup/db.archive.gz"
+chmod 600 "$backup"/*
+for image in secureinbox-backend secureinbox-frontend; do
+  docker tag "$image:latest" "$image:rollback-$(git rev-parse --short HEAD)"
+done
+```
+
+`mongodump` only reads. The database URI is passed through the environment, so
+it never appears in a command line or a log.
+
+### Migrate an installation from before the consolidated configuration
+
+Revisions up to `dd7b89f` kept application secrets in
+`backend/.env.production.local` and only the tunnel and Grafana values in the
+root `.env`. Current revisions read everything from the root `.env`. The
+backend does not read the old file at all, and `./provision` refuses a root
+`.env` without `NODE_ENV` rather than generate new secrets into it.
+
+Build the new root `.env` from both old files, keeping every value verbatim:
+
+- Every key of `backend/.env.production.local`, including the feature flags.
+  Compose defaults `THREAT_INTEL_ENABLED`, `ATTACHMENT_ANALYSIS_ENABLED` and
+  `GMAIL_PUSH_ENABLED` to `false` and `ARCJET_ENV` to `development`, so a
+  forgotten flag silently weakens detection or rate limiting.
+- `DB_URI` exactly as it is. An installation whose URI has no database path
+  uses the driver's default database; copying the example path instead would
+  point at an empty database.
+- `TUNNEL_TOKEN`, `GRAFANA_ADMIN_USER` and `GRAFANA_ADMIN_PASSWORD` from the old
+  root `.env`.
+- Then the layout keys: `NODE_ENV=production`, `COMPOSE_PROJECT_NAME=secureinbox`,
+  `COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml`,
+  `COMPOSE_PROFILES=monitoring`, `SEED_DEMO=false`, `APP_PORT=8080`,
+  `PROMETHEUS_PORT=9090` and `GRAFANA_PORT=3000`.
+
+```bash
+cd /opt/secureinbox
+umask 077
+{
+  cat backend/.env.production.local
+  grep -E '^(TUNNEL_TOKEN|GRAFANA_ADMIN_USER|GRAFANA_ADMIN_PASSWORD)=' "$backup/root.env"
+  printf '%s\n' NODE_ENV=production COMPOSE_PROJECT_NAME=secureinbox \
+    COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml COMPOSE_PROFILES=monitoring \
+    SEED_DEMO=false APP_PORT=8080 PROMETHEUS_PORT=9090 GRAFANA_PORT=3000
+} | awk -F= '!/^[[:space:]]*(#|$)/ { last[$1] = $0; if (!($1 in seen)) { seen[$1] = 1; order[++n] = $1 } }
+             END { for (i = 1; i <= n; i++) print last[order[i]] }' > .env.new
+mv .env.new .env
+```
+
+Before starting, compare the variable NAMES the running backend has with the
+ones the new configuration gives it. Only names are printed:
+
+```bash
+docker exec secureinbox-backend-1 printenv | cut -d= -f1 | sort > /tmp/before.names
+docker compose --env-file .env config --format json \
+  | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(Object.keys(JSON.parse(s).services.backend.environment).sort().join("\n")))' > /tmp/after.names
+comm -23 /tmp/before.names /tmp/after.names
+```
+
+Anything listed besides shell and image variables (`PATH`, `HOSTNAME`, `HOME`,
+`NODE_VERSION`, `YARN_VERSION`) is a value the new release would lose. Keep
+`backend/.env.production.local` until the release is verified: rollback to
+`dd7b89f` needs it.
+
+### Update the Pi from `prod`
 
 ```bash
 cd /opt/secureinbox
@@ -127,8 +208,10 @@ docker compose up -d
 docker compose ps
 ```
 
-Record `git rev-parse HEAD` after each deployment. Stop if the working tree is
-not clean; do not resolve local changes by pulling `main`.
+On a consolidated installation `./provision` validates the configuration and
+runs the same build and `up`. Record `git rev-parse HEAD` after each
+deployment. Stop if the working tree is not clean; do not resolve local changes
+by pulling `main`.
 
 CI verifies the promotion inputs only. Rollout remains a manual Pi operation
 until dedicated deployment infrastructure is introduced.

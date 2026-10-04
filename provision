@@ -68,6 +68,13 @@ create_env() {
     chmod 0600 "$ENV_FILE"
     return
   fi
+  # A .env without NODE_ENV predates the consolidated layout (on the Pi it held
+  # only the tunnel and Grafana values). Filling it would generate a new
+  # JWT_SECRET and MAIL_TOKEN_ENCRYPTION_KEY, and the stored Gmail tokens could
+  # no longer be decrypted. Stop and let a person migrate it.
+  if [[ -f "$ENV_FILE" && -z "$(dotenv_get NODE_ENV "$ENV_FILE" || true)" ]]; then
+    fail "${ENV_FILE} has no NODE_ENV, so it predates the consolidated configuration. Migrate it first (docs/raspberry-pi-deployment.md); provisioning will not generate secrets into it."
+  fi
   command -v openssl >/dev/null 2>&1 || fail "OpenSSL is required to generate local secrets."
   umask 077
 

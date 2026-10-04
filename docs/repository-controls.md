@@ -18,11 +18,24 @@ Required check contexts:
 - `integration`
 - `CodeQL`
 
-`main` does not require an approval because the repository currently has one
-human maintainer. The maintainer must still use a pull request and pass every
-check. `prod` additionally requires one approving human review. This makes a
-routine production promotion impossible for the pull request author to merge
-alone.
+Neither branch requires an approving review while the repository has one human
+maintainer. GitHub never lets the author approve their own pull request, so a
+required approval could only be met by relaxing the rule for every release,
+which is what the former emergency procedure did each time. A rule that is
+always bypassed protects nothing and teaches that bypassing is normal.
+
+The human gate for production is the promotion pull request from `main` into
+`prod`. Its description must record, before it is merged:
+
+- the release contents (the pull requests it carries) and anything deliberately
+  left out;
+- that the pre-deployment backup in
+  [raspberry-pi-deployment.md](raspberry-pi-deployment.md#back-up-before-every-deployment)
+  will be taken, and the exact rollback revision;
+- any configuration migration the release needs.
+
+When a second maintainer joins, set `required_approving_review_count` on `prod`
+back to `1` (command below) and update this section.
 
 Inspect the live rules before a release:
 
@@ -48,35 +61,12 @@ secret-scanning alert triage. Secret scanning and push protection must remain
 enabled. Security alerts are reviewed in the repository Security tab; secrets
 or exploit details must not be copied into public issues.
 
-## Production emergency procedure
+## Changing the review requirement
 
-The only expected reason to relax `prod` is an urgent production recovery when
-no second reviewer is available. Do not disable branch protection or push
-directly to `prod`.
-
-1. Open an incident issue that records the reason, pull request, current
-   `prod` commit, and operator.
-2. Confirm all five required checks passed and all conversations are resolved.
-3. Temporarily change only `required_approving_review_count` from `1` to `0`.
-   Keep administrator enforcement, required pull requests, checks, force-push
-   protection, and deletion protection enabled.
-4. Merge the pull request, immediately restore the approval count to `1`, and
-   verify the live protection response.
-5. Record the merge commit and restored-rule evidence in the incident issue.
-   Request retrospective review when another reviewer is available.
-
-Example for steps 3 and 4:
+Review requirements change only through a pull request that updates this file.
+To require one approving review on `prod` again:
 
 ```bash
-gh api --method PATCH \
-  repos/AndreiStolojan/SecureInbox/branches/prod/protection/required_pull_request_reviews \
-  -F dismiss_stale_reviews=true \
-  -F require_code_owner_reviews=false \
-  -F required_approving_review_count=0 \
-  -F require_last_push_approval=false
-
-# Merge the already checked pull request here.
-
 gh api --method PATCH \
   repos/AndreiStolojan/SecureInbox/branches/prod/protection/required_pull_request_reviews \
   -F dismiss_stale_reviews=true \
@@ -84,6 +74,9 @@ gh api --method PATCH \
   -F required_approving_review_count=1 \
   -F require_last_push_approval=false
 ```
+
+Required pull requests, required checks, administrator enforcement, and the
+force-push and deletion protections stay on regardless of the review count.
 
 ## Resuming development
 

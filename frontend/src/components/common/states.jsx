@@ -77,7 +77,7 @@ export function ConnectGmailButton({ size = 'md', className, children = 'Connect
 }
 
 const STEPS = [
-  ['Connect your Gmail', 'Read-only access through Google. Nothing is ever sent from your account.'],
+  ['Connect your Gmail', 'SecureInbox reads your mail and never sends from your account. Marking a message as phishing moves it to Spam.'],
   ['Every message is checked', 'Who sent it, where its links go, what it attaches, and how it is worded.'],
   ['You decide on the few that matter', 'Each flagged message shows why, so the call takes seconds.'],
 ];

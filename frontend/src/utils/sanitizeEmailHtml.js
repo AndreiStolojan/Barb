@@ -56,15 +56,17 @@ const blockRemoteImages = (documentNode) => {
     }
   }
 
-  // Pasul 2: caută în atributele "style" inline orice background-image cu URL extern
-  // și îl șterge din acel style (fără a afecta restul stilurilor elementului).
+  // Pasul 2: orice declarație din atributul "style" care încarcă un URL extern
+  // (background, list-style-image, border-image, cursor...) e scoasă, fără a
+  // atinge restul stilurilor elementului.
   for (const el of Array.from(documentNode.querySelectorAll('[style]'))) {
     const style = el.getAttribute('style') || '';
-    if (/background(-image)?\s*:\s*[^;]*url\(\s*['"]?https?:/i.test(style)) {
-      el.setAttribute(
-        'style',
-        style.replace(/background(-image)?\s*:\s*[^;]*url\([^)]*\)[^;]*;?/gi, '')
-      );
+    if (/url\(\s*['"]?\s*(https?:)?\/\//i.test(style)) {
+      const kept = style
+        .split(';')
+        .filter((declaration) => !/url\(\s*['"]?\s*(https?:)?\/\//i.test(declaration))
+        .join(';');
+      el.setAttribute('style', kept);
       blocked += 1;
     }
   }
@@ -88,8 +90,22 @@ const blockRemoteImages = (documentNode) => {
  *
  * @returns {{ html: string, blockedImages: number }}
  */
-// Interzicem explicit și object/embed. srcset este blocat pentru a nu permite
-// încărcarea imaginilor prin surse alternative.
+// Taguri scoase complet. Pe lângă cele care rulează cod (script, iframe,
+// object, embed, form), scoatem tot ce poate încărca resurse de pe internet
+// pe căi pe care blocarea imaginilor nu le vede (video/audio/source, input de
+// tip imagine, svg <image>, link, meta refresh, base) și <style>: o foaie de
+// stil dintr-un email se aplică ÎNTREGII aplicații, deci ar putea ascunde sau
+// rescrie verdictul afișat lângă mesaj și poate face @import de pe internet.
+const FORBIDDEN_TAGS = [
+  'script', 'iframe', 'frame', 'frameset', 'form', 'object', 'embed', 'applet',
+  'style', 'link', 'meta', 'base',
+  'video', 'audio', 'source', 'track', 'picture',
+  'input', 'button', 'select', 'textarea',
+  'svg', 'math',
+];
+
+// srcset/poster încarcă imagini prin surse alternative, formaction/ping pot
+// trimite cereri la click.
 export const sanitizeEmailHtml = (html, { blockImages = false } = {}) => {
   // Dacă nu avem text valid, returnăm un rezultat "gol" sigur.
   if (typeof html !== 'string' || html.trim().length === 0) {
@@ -99,8 +115,8 @@ export const sanitizeEmailHtml = (html, { blockImages = false } = {}) => {
   // DOMPurify face curățarea principală: scoate tagurile/atributele periculoase
   // și normalizează HTML-ul.
   const sanitized = DOMPurify.sanitize(html, {
-    FORBID_TAGS: ['script', 'iframe', 'form', 'object', 'embed'],
-    FORBID_ATTR: ['srcset'],
+    FORBID_TAGS: FORBIDDEN_TAGS,
+    FORBID_ATTR: ['srcset', 'poster', 'formaction', 'ping'],
   });
   // Parsăm HTML-ul curățat într-un DOM "în memorie" (nu e adăugat în pagină),
   // ca să putem manipula linkurile și imaginile înainte de afișare.

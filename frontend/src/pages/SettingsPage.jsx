@@ -205,7 +205,7 @@ export function SettingsPage() {
             </div>
           </Section>
 
-          <Section title="Gmail" purpose="The mailbox SecureInbox scans. Read-only access; nothing is sent on your behalf.">
+          <Section title="Gmail" purpose="The mailbox SecureInbox scans. It never sends mail from your account; marking a message as phishing moves it to Spam.">
             {isConnected ? (
               <>
                 <Row first label={address} hint={`Connected. Last synced ${formatDateTime(account.lastSyncedAt)}.`}>
@@ -220,7 +220,7 @@ export function SettingsPage() {
                       <AlertDialogHeader>
                         <AlertDialogTitle>Disconnect Gmail?</AlertDialogTitle>
                         <AlertDialogDescription>
-                          Removes <span className="text-foreground">{address}</span> together with its synced messages and scans. You can reconnect at any time and sync again.
+                          Stops syncing <span className="text-foreground">{address}</span> and deletes its stored Google tokens. Messages already synced stay here until you delete your account. You can reconnect at any time.
                         </AlertDialogDescription>
                       </AlertDialogHeader>
                       <AlertDialogFooter>
@@ -289,8 +289,8 @@ export function SettingsPage() {
             )}
           </Section>
 
-          <Section danger title="Delete account" purpose="Removes your profile, every synced message and every scan. The Gmail connection is revoked as part of it. No undo, no export.">
-            <Row first label="You will be signed out immediately." hint="Nothing of yours stays on this server.">
+          <Section danger title="Delete account" purpose="Removes your profile, every synced message, every scan and your sender rules. No undo, no export. To withdraw Google access as well, remove SecureInbox from your Google Account permissions.">
+            <Row first label="You will be signed out immediately.">
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button variant="danger" size="sm" disabled={deleteAccount.loading}>

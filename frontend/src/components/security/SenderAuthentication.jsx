@@ -2,9 +2,9 @@
 // SenderAuthentication.jsx — did this message really come from who it claims?
 //
 // Three short lines: sending server (SPF), signature (DKIM), domain policy
-// (DMARC). Each is passed, failed, or not verified, and the three never look
-// alike: a check we could not run is not drawn like one that failed, because
-// that would invent an accusation. The full sentence for each is the tooltip.
+// (DMARC), under a one-line conclusion. Each is passed, failed, or not
+// verified, and the three never look alike: a check we could not run is not
+// drawn like one that failed, because that would invent an accusation.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import { Check, Minus, X } from 'lucide-react';
@@ -31,15 +31,32 @@ const statusWord = (id, state, raw) => {
   return String(raw || '').toLowerCase() === 'none' ? STATUS[id].none : STATUS[id].unknown;
 };
 
-export function SenderAuthentication({ authResults, className }) {
-  const { available, summary, mechanisms } = getSenderAuthentication(authResults);
+// `detailed` writes each check's explanation out in full (used under Scoring
+// details); the compact form keeps it in the tooltip and for screen readers.
+export function SenderAuthentication({ authResults, detailed = false, className }) {
+  const { available, summary, tone: overall, mechanisms } = getSenderAuthentication(authResults);
 
   if (!available) {
     return <p className={cn('text-sm text-muted-foreground', className)}>{summary}</p>;
   }
 
+  if (detailed) {
+    return (
+      <ul className={cn('grid gap-2.5', className)}>
+        {mechanisms.map(({ id, label, state, description }) => (
+          <li key={id} className="text-sm">
+            <span className="text-foreground">{label}</span>
+            <span className="text-muted-foreground-subtle"> · {statusWord(id, state, authResults?.[id]?.result)}</span>
+            <span className="mt-0.5 block text-[0.8125rem] leading-relaxed text-muted-foreground">{description}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
   return (
     <div className={cn('min-w-0', className)}>
+      <p className={cn('mb-1.5 text-sm', overall === 'fail' ? 'text-risk-quarantine' : overall === 'pass' ? 'text-risk-safe' : 'text-muted-foreground')}>{summary}</p>
       {mechanisms.map(({ id, label, state, description }) => {
         const tone = STATE[state] ?? STATE.unknown;
         const Icon = tone.icon;

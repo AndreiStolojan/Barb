@@ -100,7 +100,12 @@ export function InboxPage() {
   // An id in the URL wins even when it is not on this page (links from the
   // briefing). On desktop the first row is open by default; on a phone the
   // pane would cover the list, so nothing is auto-selected.
-  const selectedId = selectedParam || (isDesktop ? emailIds[0] || '' : '');
+  // While a refresh reloads the list, keep showing the message that was open
+  // instead of blanking the pane until the new page arrives.
+  const lastAutoSelected = useRef('');
+  const autoSelected = isDesktop ? emailIds[0] || (loading ? lastAutoSelected.current : '') : '';
+  if (autoSelected) lastAutoSelected.current = autoSelected;
+  const selectedId = selectedParam || autoSelected;
 
   useEffect(() => {
     setSelectMode(false);
@@ -281,7 +286,7 @@ export function InboxPage() {
       </aside>
 
       <section aria-label="Message" className={cn('panel min-h-0 min-w-0 md:overflow-y-auto', !showPaneOnMobile && 'max-md:hidden')}>
-        {selectedId ? <MessagePane id={selectedId} onReviewed={afterReview} onBack={closeMessage} onMove={move} /> : <MessagePaneEmpty />}
+        {selectedId ? <MessagePane key={selectedId} id={selectedId} onReviewed={afterReview} onBack={closeMessage} onMove={move} /> : <MessagePaneEmpty />}
       </section>
 
       {selectMode && checkedIds.size > 0 && (
