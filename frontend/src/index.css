@@ -388,4 +388,23 @@
     font-family: var(--font-mono);
     font-size: 0.85em;
   }
+
+  /*
+    HTML mail on its paper sheet: the colours a sender designs for (dark text
+    on white), and tables at their own width. EmailBody scales the whole sheet
+    to fit, so a 600px newsletter is shown whole instead of clipped.
+  */
+  .email-paper {
+    color: #1f1f22;
+    font-size: 0.9375rem;
+    line-height: 1.55;
+    word-break: normal;
+    overflow-wrap: anywhere;
+  }
+  .email-paper :where(h1, h2, h3, h4) { color: inherit; }
+  .email-paper :where(table) { max-width: none; }
+  .email-paper :where(a) { text-decoration-color: rgb(0 0 0 / 0.35); }
+  .email-paper :where(blockquote) { border-left-color: rgb(0 0 0 / 0.15); color: #55555c; }
+  .email-paper :where(hr) { border-top-color: rgb(0 0 0 / 0.12); }
+  .email-paper :where(pre) { background: rgb(0 0 0 / 0.05); }
 }
