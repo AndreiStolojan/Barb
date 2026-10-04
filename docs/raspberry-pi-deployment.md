@@ -63,7 +63,7 @@ network has cloudflared as nginx's only peer; nginx resolves and trusts that
 service name for `CF-Connecting-IP`, then replaces rather than appends the
 forwarded client-IP chain. It forwards that client IP and `https` to the
 backend, so Express's single trusted nginx hop keeps distinct public visitors
-in distinct rate-limit buckets. Only optional monitoring publishes loopback ports, so the
+in distinct rate-limit buckets. Nothing publishes a host port, so the
 backend and nginx are reachable only through the private Compose network and
 cloudflared.
 
@@ -76,7 +76,7 @@ docker compose ps
 ```
 
 Ollama is optional. Enable the `ai` profile before running provisioning if the
-Pi should host the model. Monitoring uses the separate `monitoring` profile.
+Pi should host the model.
 
 ### Choosing the model
 
@@ -201,7 +201,7 @@ The new root `.env` keeps every value verbatim:
 - every key of `backend/.env.production.local`, feature flags included;
 - `DB_URI` exactly as it is. A URI without a database path uses the driver's
   default database; copying the example path would point at an empty one;
-- `TUNNEL_TOKEN` and the Grafana credentials from the old root `.env`;
+- `TUNNEL_TOKEN` from the old root `.env`;
 - the layout keys below. Add `ai` to `COMPOSE_PROFILES` only when
   `AI_SEMANTIC_ENABLED=true`; otherwise Ollama is not started.
 
@@ -214,10 +214,10 @@ The new root `.env` keeps every value verbatim:
   {
     cat backend/.env.production.local
     echo
-    grep -E '^(TUNNEL_TOKEN|GRAFANA_ADMIN_USER|GRAFANA_ADMIN_PASSWORD)=' "$backup/root.env"
+    grep -E '^TUNNEL_TOKEN=' "$backup/root.env"
     printf '%s\n' NODE_ENV=production COMPOSE_PROJECT_NAME=secureinbox \
-      COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml COMPOSE_PROFILES=monitoring \
-      SEED_DEMO=false APP_PORT=8080 PROMETHEUS_PORT=9090 GRAFANA_PORT=3000
+      COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml COMPOSE_PROFILES= \
+      SEED_DEMO=false APP_PORT=8080
   } | awk -F= '!/^[[:space:]]*(#|$)/ { last[$1] = $0; if (!($1 in seen)) { seen[$1] = 1; order[++n] = $1 } }
                END { for (i = 1; i <= n; i++) print last[order[i]] }' > .env.new
   mv .env.new .env

@@ -32,6 +32,12 @@ const provider = ({
 
 const noMetrics = () => {};
 
+// One 18-point rule: enough evidence that AI can still change the verdict.
+const replyToMismatch = provider({
+    id: 'reply-to-test',
+    analyze: async () => ({ signals: [{ key: 'reply_to_mismatch', reason: 'Reply-To differs.' }] }),
+});
+
 test('registry awaits sync and async providers in declared order', async () => {
     const events = [];
     const providers = [
@@ -274,15 +280,16 @@ test('AI analyzer failed status is reported as a provider error and remains avai
             semanticAnalyzer: async () => aiSignals,
         },
         {
-            providers: [aiSemanticProvider],
+            providers: [replyToMismatch, aiSemanticProvider],
             recordOutcome: (outcome) => outcomes.push(outcome),
         }
     );
 
     assert.deepEqual(outcomes, [
+        { provider: 'reply-to-test', result: 'success' },
         { provider: 'ai-semantic', result: 'error' },
     ]);
-    assert.equal(result.providerMeta[0].status, 'error');
+    assert.equal(result.providerMeta[1].status, 'error');
     assert.equal(
         result.providerResults.get('ai-semantic').meta.aiSignals,
         aiSignals
@@ -361,4 +368,44 @@ test('registry rejects duplicate ids and malformed provider contracts up front',
         () => validateProviderRegistry([{ meta: { id: 'broken' } }]),
         /Invalid detection provider contract/
     );
+});
+
+// Rule signals that fix the verdict on their own make a model call pointless:
+// AI is capped below `suspicious` without rule evidence, and cannot raise a
+// `likely_phishing` verdict any further.
+test('AI runs only when its points could change the verdict', async () => {
+    const blocklisted = provider({
+        id: 'blocklist-test',
+        analyze: async () => ({ signals: [{ key: 'user_blocklist_match', reason: 'Blocked.' }] }),
+    });
+    const runWith = async (ruleProviders) => {
+        let calls = 0;
+        const result = await runDetection(
+            {
+                userSettings: { aiEnabled: true },
+                aiInput: {},
+                scanContext: {},
+                semanticAnalyzer: async () => {
+                    calls += 1;
+                    return { status: 'evaluated', urgencyLevel: 'high' };
+                },
+            },
+            { providers: [...ruleProviders, aiSemanticProvider], recordOutcome: noMetrics }
+        );
+        return { calls, result };
+    };
+
+    const noEvidence = await runWith([]);
+    assert.equal(noEvidence.calls, 0);
+    assert.equal(noEvidence.result.aiSignals.status, 'skipped');
+    assert.equal(noEvidence.result.verdict, 'safe');
+
+    const decided = await runWith([blocklisted]);
+    assert.equal(decided.calls, 0);
+    assert.equal(decided.result.verdict, 'likely_phishing');
+
+    const borderline = await runWith([replyToMismatch]);
+    assert.equal(borderline.calls, 1);
+    assert.equal(borderline.result.aiSignals.status, 'evaluated');
+    assert.ok(borderline.result.aiScore > 0);
 });

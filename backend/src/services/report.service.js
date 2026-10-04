@@ -24,6 +24,7 @@ import { parseDateRangeQuery } from '../common/utils/date-range.js';
 import { sendMonthlyDigestEmail } from '../../extras/notifications/send-email.js';
 import Email from '../models/email.model.js';
 import Scan from '../models/scan.model.js';
+import { buildLatestScanLookupStages } from './email.service.js';
 
 const MONTH_QUERY_PATTERN = /^\d{4}-(0[1-9]|1[0-2])$/;
 const TOP_ITEMS_LIMIT = 10;
@@ -158,43 +159,14 @@ const buildDateRange = ({ from, to }) => ({
  *   - safe/suspicious/likelyPhishing: împărțirea emailurilor scanate după ultimul verdict
  *   - quarantined:    ultimul verdict = likely_phishing ȚI încă nu a fost revizuit de user
  */
-// Pașii de $lookup care atașează la fiecare email cea mai recentă scanare
-// a lui (sortată după scannedAt, apoi updatedAt, apoi createdAt — cea mai
-// proaspătă primă), redenumită `latestScan`.
-const buildLatestScanLookupStages = () => [
-    {
-        $lookup: {
-            from: 'scans',
-            let: { emailId: '$_id', ownerId: '$userId' },
-            pipeline: [
-                {
-                    $match: {
-                        $expr: {
-                            $and: [
-                                { $eq: ['$emailId', '$$emailId'] },
-                                { $eq: ['$userId', '$$ownerId'] },
-                            ],
-                        },
-                    },
-                },
-                { $sort: { scannedAt: -1, updatedAt: -1, createdAt: -1 } },
-                { $limit: 1 },
-                {
-                    $project: {
-                        _id: 1,
-                        verdict: 1,
-                        triggeredRules: 1,
-                        aiStatus: '$aiSignals.status',
-                    },
-                },
-            ],
-            as: 'latestScan',
-        },
-    },
-    // $lookup întoarce mereu un array; îl transformăm într-un singur obiect
-    // (sau undefined dacă emailul nu are nicio scanare).
-    { $addFields: { latestScan: { $arrayElemAt: ['$latestScan', 0] } } },
-];
+// Cea mai recentă scanare a fiecărui email, cu doar câmpurile de care are
+// nevoie raportul (vezi buildLatestScanLookupStages din email.service.js).
+const LATEST_SCAN_REPORT_FIELDS = {
+    _id: '$latestScan._id',
+    verdict: '$latestScan.verdict',
+    triggeredRules: '$latestScan.triggeredRules',
+    aiStatus: '$latestScan.aiSignals.status',
+};
 
 // `$userVerdict` nu e nici 'safe', nici 'phishing': userul nu a revizuit încă
 // emailul, deci verdictul scanului decide în continuare găleata efectivă.
@@ -304,7 +276,7 @@ const getWindowScanAggregates = async ({ userObjectId, from, to, dateField = 'cr
         // `receivedAt`, ca raportul să corespundă cu ce arată inbox-ul pentru
         // același interval.
         { $match: { userId: userObjectId, [dateField]: buildDateRange({ from, to }) } },
-        ...buildLatestScanLookupStages(),
+        ...buildLatestScanLookupStages(LATEST_SCAN_REPORT_FIELDS),
         {
             $facet: {
                 counts: windowCountsFacet,

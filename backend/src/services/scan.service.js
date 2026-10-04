@@ -11,7 +11,6 @@ import Email from '../models/email.model.js';
 import Scan from '../models/scan.model.js';
 import User from '../models/user.model.js';
 import { analyzeEmailSemanticsWithOllama } from './ollama-semantic.service.js';
-import { generateNaturalExplanationWithOllama } from './ollama-explanation.service.js';
 import {
     buildControlledExplanationObject,
 } from './scan-explanation.service.js';
@@ -68,10 +67,11 @@ import {
 import { createUrlhausService } from './threat-intel/urlhaus.service.js';
 import { createWebRiskService } from './threat-intel/web-risk.service.js';
 
-// Versiunea motorului. Urcată v10 -> v11 pentru verificarea atașamentelor.
-// Scanările vechi își păstrează scorul anterior până la o
-// rescanare (nu rescorăm retroactiv toată baza de date).
-export const CURRENT_SCAN_ENGINE_VERSION = 'rules-ai-v12';
+// Versiunea motorului. Urcată v12 -> v13: cu AI pornit, modelul nu mai rulează
+// când regulile decid singure verdictul (scorul AI devine 0, verdictul nu se
+// schimbă), iar explicația vine mereu din șablon. Scanările vechi își păstrează
+// scorul anterior până la o rescanare (nu rescorăm retroactiv baza de date).
+export const CURRENT_SCAN_ENGINE_VERSION = 'rules-ai-v13';
 
 export const buildAttachmentConfigFingerprint = ({
     enabled,
@@ -280,14 +280,31 @@ const getUserAiEnabled = async (userId) => {
     return Boolean(user?.settings?.aiEnabled);
 };
 
-const buildFallbackExplanationResult = ({
+// Ce a făcut AI-ul la această scanare, în vocabularul pe care îl înțelege UI-ul
+// (null = a rulat normal). `aiSignals.error` poate conține text liber de la
+// Ollama, deci nu-l copiem direct.
+const toAiExplanationReason = ({ aiEnabled, aiSignals }) => {
+    if (!aiEnabled) return 'ai_disabled';
+    if (aiSignals?.status === 'evaluated') return null;
+    if (aiSignals?.status === 'skipped') return 'ai_not_needed';
+
+    return ['ollama_timeout', 'ollama_unreachable'].includes(aiSignals?.error)
+        ? aiSignals.error
+        : 'ollama_failed';
+};
+
+// Explicația salvată: mereu șablonul determinist din scan-explanation.service.js,
+// care include și semnalele AI când analiza semantică a reușit. Un al doilea apel
+// la model doar ca să reformuleze verdictul costa ~20-25% din timpul AI pe Pi.
+// `fallbackReason` păstrează numele vechi: UI-ul și scanările vechi îl citesc.
+const buildExplanationResult = ({
     verdict,
     triggeredRules,
     aiSignals,
     senderVerifiedBrand,
     verifiedBrandName,
     senderListMatch,
-    fallbackReason,
+    aiReason,
 }) => ({
     explanation: buildControlledExplanationObject({
         verdict,
@@ -298,13 +315,13 @@ const buildFallbackExplanationResult = ({
         senderListMatch,
     }),
     meta: {
-        status: 'fallback',
+        status: 'template',
         source: 'backend',
         mode: 'controlled_template',
-        promptVersion: 'explanation-fallback-v1',
+        promptVersion: 'explanation-template-v2',
         latencyMs: 0,
-        fallbackUsed: true,
-        fallbackReason,
+        fallbackUsed: false,
+        fallbackReason: aiReason,
         evaluatedAt: new Date(),
     },
 });
@@ -394,10 +411,9 @@ export const isCurrentScanValidForCurrentAiSetting = ({
         return true;
     }
 
-    return (
-        currentScan.aiSignals?.status === 'evaluated' &&
-        currentScan.aiExplanationMeta?.fallbackReason !== 'ai_disabled'
-    );
+    // `skipped` = AI pornit, dar regulile au decis singure; rescanarea ar
+    // ajunge la același rezultat. Un scan făcut cu AI oprit are `disabled`.
+    return ['evaluated', 'skipped'].includes(currentScan.aiSignals?.status);
 };
 
 const isDuplicateKeyError = (error) => error?.code === 11000;
@@ -546,48 +562,11 @@ const upsertCurrentScanForEmail = async ({
     return currentScan;
 };
 
-// Decide ce explicație se salvează: textul AI când s-a generat corect, un fallback
-// controlat când AI a fost cerut dar a eșuat, sau fallback-ul deja construit când AI
-// era oprit. Așa aplicația nu rămâne niciodată fără explicație.
-const resolveExplanationResult = ({
-    shouldGenerateNaturalExplanation,
-    explanationResult,
-    finalResult,
-    aiSignals,
-}) => {
-    const aiFailedAfterRequest =
-        shouldGenerateNaturalExplanation &&
-        explanationResult.meta.status !== 'generated';
-    if (aiFailedAfterRequest) {
-        return buildFallbackExplanationResult({
-            verdict: finalResult.verdict,
-            triggeredRules: finalResult.triggeredRules,
-            aiSignals,
-            senderVerifiedBrand: finalResult.senderVerifiedBrand,
-            verifiedBrandName: finalResult.verifiedBrandName,
-            senderListMatch: finalResult.senderListMatch,
-            fallbackReason: explanationResult.meta.fallbackReason || 'ollama_failed',
-        });
-    }
-
-    if (explanationResult.meta.status === 'generated') {
-        return {
-            explanation: explanationResult.explanation,
-            meta: {
-                ...explanationResult.meta,
-                fallbackUsed: false,
-                fallbackReason: null,
-            },
-        };
-    }
-
-    return explanationResult;
-};
-
 // Funcția principală: scanează UN email și salvează rezultatul. Pașii (vezi
 // docs/detection-engine.md): 1) ia emailul; 2) context liste user;
-// 3) context brand; 4) input pentru AI; 5) reguli; 6) semnale AI; 7) scor final
-// + verdict; 8) explicație; 9) salvare (un singur scan curent per email).
+// 3) context brand; 4) input pentru AI (doar cu AI pornit); 5) reguli;
+// 6) semnale AI (doar dacă pot schimba verdictul); 7) scor final + verdict;
+// 8) explicație din șablon; 9) salvare (un singur scan curent per email).
 export const scanEmailWithRules = async ({
     userId,
     emailId,
@@ -611,7 +590,6 @@ export const scanEmailWithRules = async ({
     const scanContext = listContext.senderBlocklisted
         ? { ...listContext, senderVerifiedBrand: false, brandName: null }
         : { ...brandContext, ...listContext };
-    const aiInput = buildAiAnalysisInput(email, scanContext);
     const aiEnabled = await getUserAiEnabled(userId);
     const currentScan = await getCurrentScanForEmail({ userId, emailId: email._id });
     const authResultsFingerprint = buildAuthResultsFingerprint(email.authResults);
@@ -640,7 +618,6 @@ export const scanEmailWithRules = async ({
         return {
             status: 'skipped_current_engine',
             scan: toPublicScan(currentScan),
-            aiInput,
         };
     }
 
@@ -651,7 +628,9 @@ export const scanEmailWithRules = async ({
         authResults: email.authResults || {},
         scanContext,
         userSettings: { aiEnabled },
-        aiInput,
+        // Doar AI-ul citește acest pachet; fără AI nu-l construim deloc (curățarea
+        // HTML-ului ar fi muncă aruncată la fiecare scanare).
+        aiInput: aiEnabled ? buildAiAnalysisInput(email, scanContext) : undefined,
         semanticAnalyzer: analyzeEmailSemanticsWithOllama,
         threatIntelAnalyzer,
     });
@@ -670,30 +649,14 @@ export const scanEmailWithRules = async ({
             : null,
         senderListMatch: listContext.listMatch || null,
     };
-    const shouldGenerateNaturalExplanation = aiEnabled;
-    const explanationResult = shouldGenerateNaturalExplanation
-        ? await generateNaturalExplanationWithOllama({
-              verdict: finalResult.verdict,
-              score: finalResult.score,
-              ruleScore: finalResult.ruleScore,
-              aiScore: finalResult.aiScore,
-              triggeredRules: finalResult.triggeredRules,
-              aiSignals,
-          })
-        : buildFallbackExplanationResult({
-              verdict: finalResult.verdict,
-              triggeredRules: finalResult.triggeredRules,
-              aiSignals,
-              senderVerifiedBrand: finalResult.senderVerifiedBrand,
-              verifiedBrandName: finalResult.verifiedBrandName,
-              senderListMatch: finalResult.senderListMatch,
-              fallbackReason: 'ai_disabled',
-          });
-    const finalExplanationResult = resolveExplanationResult({
-        shouldGenerateNaturalExplanation,
-        explanationResult,
-        finalResult,
+    const explanationResult = buildExplanationResult({
+        verdict: finalResult.verdict,
+        triggeredRules: finalResult.triggeredRules,
         aiSignals,
+        senderVerifiedBrand: finalResult.senderVerifiedBrand,
+        verifiedBrandName: finalResult.verifiedBrandName,
+        senderListMatch: finalResult.senderListMatch,
+        aiReason: toAiExplanationReason({ aiEnabled, aiSignals }),
     });
 
     const scan = await upsertCurrentScanForEmail({
@@ -702,14 +665,13 @@ export const scanEmailWithRules = async ({
         result: finalResult,
         aiSignals,
         providerMeta: detectionResult.providerMeta,
-        aiExplanation: finalExplanationResult.explanation,
-        aiExplanationMeta: finalExplanationResult.meta,
+        aiExplanation: explanationResult.explanation,
+        aiExplanationMeta: explanationResult.meta,
     });
 
     return {
         status: 'scanned',
         scan: toPublicScan(scan),
-        aiInput,
     };
 };
 

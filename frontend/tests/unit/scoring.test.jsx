@@ -62,3 +62,23 @@ describe('getAiStatus', () => {
     expect(getAiStatus({}).state).toBe('ok');
   });
 });
+
+describe('getAiStatus after AI gating', () => {
+  it('reports skipped when rules decided the verdict alone', () => {
+    const scan = {
+      aiExplanationMeta: { status: 'template', fallbackReason: 'ai_not_needed' },
+      aiSignals: { status: 'skipped', skippedReason: 'verdict_decided_by_rules' },
+    };
+    expect(getAiStatus(scan).state).toBe('skipped');
+    // The inbox list carries only the explanation metadata.
+    expect(getAiStatus({ aiExplanationMeta: scan.aiExplanationMeta }).state).toBe('skipped');
+  });
+
+  it('reports ok for a template explanation over evaluated signals', () => {
+    const scan = {
+      aiExplanationMeta: { status: 'template', fallbackReason: null },
+      aiSignals: { status: 'evaluated' },
+    };
+    expect(getAiStatus(scan)).toEqual({ state: 'ok', message: null });
+  });
+});
