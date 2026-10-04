@@ -1,22 +1,25 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// EmailBody.jsx — renders the message itself, safely.
+// EmailBody.jsx — renders the message itself, safely and as it was designed.
 //
 // Two safety layers, in order:
-//   1. sanitizeEmailHtml() strips scripts/iframes/forms and (for risky buckets)
-//      remote tracking images.
-//   2. neutralizeLinks() below removes `href` from every anchor that survives.
-//      This is a phishing tool: clicking a hostile link by accident must be
-//      impossible, so nothing in the rendered body is ever navigable. The link
-//      TEXT stays visible — and the real destination is preserved in the
-//      tooltip and in `data-blocked-href` — because reading where a link
-//      *claimed* to go is the whole point of the exercise.
+//   1. sanitizeEmailHtml() strips scripts, styles, media and (for risky
+//      buckets) every remote image.
+//   2. neutralizeLinks() removes `href` from every anchor that survives, so
+//      nothing in the body is navigable. The link TEXT stays visible and the
+//      real destination stays in the tooltip and `data-blocked-href`.
 //
-// The rendered body never scrolls sideways: long words break, images and tables
-// are capped at 100% by the `.email-body` rules, and anything still too wide is
-// clipped rather than given a horizontal scrollbar.
+// How it is shown:
+//   - HTML mail is laid out on a light "paper" sheet, because senders design
+//     for a white background: on the dark app, dark text on a transparent
+//     email became unreadable.
+//   - The sheet keeps the email's own width (newsletters are usually 600px
+//     tables) and is scaled down with CSS `zoom` until it fits, the way mail
+//     apps do on a phone. Squeezing the tables to the screen instead clipped
+//     the right side of every fixed-width message.
+//   - Plain-text mail stays in the app's own type and colours.
 // ─────────────────────────────────────────────────────────────────────────────
 
-import { useMemo, useState } from 'react';
+import { useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { ImageOff } from 'lucide-react';
 
 import { sanitizeEmailHtml } from '@/utils/sanitizeEmailHtml';
@@ -48,19 +51,60 @@ export function neutralizeLinks(html) {
   return documentNode.body.innerHTML;
 }
 
+/*
+  Scale the sheet so its natural width fits the space it has. Measured after
+  layout and again whenever the space or the content's size changes (images
+  arriving, the window resizing, the phone rotating).
+*/
+function useFitToWidth(outerRef, innerRef, deps) {
+  useLayoutEffect(() => {
+    const outer = outerRef.current;
+    const inner = innerRef.current;
+    if (!outer || !inner) return undefined;
+
+    let frame = 0;
+    const fit = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        // At zoom 1 the sheet's own box is the space available; anything wider
+        // is the email's fixed layout spilling out of it.
+        inner.style.zoom = '1';
+        const natural = inner.scrollWidth;
+        const available = inner.clientWidth;
+        inner.style.zoom = natural > available + 1 && available > 0 ? String(available / natural) : '1';
+      });
+    };
+
+    fit();
+    if (typeof ResizeObserver === 'undefined') return () => cancelAnimationFrame(frame);
+    const observer = new ResizeObserver(fit);
+    observer.observe(outer);
+    for (const img of Array.from(inner.querySelectorAll('img'))) img.addEventListener('load', fit, { once: true });
+    return () => {
+      cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, deps);
+}
+
 /**
  * Render the email body safely. Prefers sanitized HTML, falls back to plain text.
  * For risky messages, remote images are blocked by default (tracking-pixel
- * protection) with a one-click "Load images" affordance; safe messages load them.
+ * protection) with a one-click "Show images" control; safe messages load them.
  */
 export function EmailBody({ htmlBody, textBody, riskBucket }) {
   const [imagesLoaded, setImagesLoaded] = useState(false);
   const blockImages = RISKY.has(riskBucket) && !imagesLoaded;
+  const outerRef = useRef(null);
+  const innerRef = useRef(null);
 
   const { html, blockedImages } = useMemo(() => {
     const result = sanitizeEmailHtml(htmlBody, { blockImages });
     return { ...result, html: neutralizeLinks(result.html) };
   }, [htmlBody, blockImages]);
+
+  useFitToWidth(outerRef, innerRef, [html]);
 
   if (html) {
     return (
@@ -69,7 +113,7 @@ export function EmailBody({ htmlBody, textBody, riskBucket }) {
           <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[0.8125rem] text-muted-foreground-subtle">
             <ImageOff className="h-3.5 w-3.5 shrink-0" />
             <span>
-              {blockedImages} remote image{blockedImages > 1 ? 's' : ''} blocked — they can tell
+              {blockedImages} remote image{blockedImages > 1 ? 's' : ''} blocked. They can tell
               the sender you opened this.
             </span>
             <button
@@ -81,25 +125,26 @@ export function EmailBody({ htmlBody, textBody, riskBucket }) {
             </button>
           </p>
         )}
-        {/*
-          Links are already href-less; the click guard is belt-and-braces. The
-          dotted underline + default cursor say "this was a link, and it is
-          switched off" without hiding the text.
-        */}
-        <div
-          onClickCapture={(event) => {
-            if (event.target?.closest?.('a, area')) event.preventDefault();
-          }}
-          className="email-body min-w-0 overflow-hidden [&_a]:cursor-default [&_a]:decoration-dotted [&_pre]:overflow-x-hidden [&_pre]:whitespace-pre-wrap [&_pre]:break-words"
-          dangerouslySetInnerHTML={{ __html: html }}
-        />
+        {/* The paper sheet. Links are already href-less; the click guard is
+            belt-and-braces. */}
+        <div ref={outerRef} className="min-w-0 overflow-hidden rounded-xl bg-[#fbfbfa] p-4 sm:p-6">
+          <div
+            ref={innerRef}
+            data-testid="email-html"
+            onClickCapture={(event) => {
+              if (event.target?.closest?.('a, area')) event.preventDefault();
+            }}
+            className="email-body email-paper min-w-0 [&_a]:cursor-default [&_pre]:whitespace-pre-wrap [&_pre]:break-words"
+            dangerouslySetInnerHTML={{ __html: html }}
+          />
+        </div>
       </div>
     );
   }
 
   if (textBody) {
     return (
-      <pre className="min-w-0 whitespace-pre-wrap break-words font-sans text-[0.96875rem] leading-[1.72] text-foreground/85">
+      <pre className="min-w-0 max-w-[68ch] whitespace-pre-wrap break-words font-sans text-[0.96875rem] leading-[1.72] text-foreground/85">
         {textBody}
       </pre>
     );

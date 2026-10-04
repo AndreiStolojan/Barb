@@ -172,7 +172,7 @@ export function TimeRangeFilter({ className, size = 'md' }) {
         <div
           role="dialog"
           aria-label="Select time range"
-          className="absolute right-0 z-50 mt-2 rounded-2xl bg-popover p-1.5 shadow-lg ring-1 ring-white/[0.06]"
+          className="absolute left-0 z-50 mt-2 max-w-[calc(100vw-2rem)] overflow-auto rounded-2xl bg-popover p-1.5 shadow-lg ring-1 ring-white/[0.06] md:left-auto md:right-0"
         >
           {view === 'presets' ? (
             <div className="flex w-48 flex-col gap-0.5">
