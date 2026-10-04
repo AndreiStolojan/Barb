@@ -43,8 +43,10 @@ export const ReviewActions = forwardRef(function ReviewActions({ email, onReview
         toast.warning('Marked as phishing, but Gmail did not move it to Spam', {
           description: result.providerAction.message || 'The message is still in your Gmail inbox.',
         });
+      } else if (kind === 'phishing' && result?.providerAction?.status === 'success') {
+        toast.success('Marked as phishing · moved to Spam');
       } else {
-        toast.success(kind === 'safe' ? 'Marked as safe' : 'Marked as phishing · moved to Spam');
+        toast.success(kind === 'safe' ? 'Marked as safe' : 'Marked as phishing');
       }
       onReviewed?.(result);
     } catch (err) {
