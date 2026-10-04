@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>R8 — Reader, softened</title>
+<style>
+/*
+  R8 — "Reader" (B) refined after review.
+  - Not black: a graphite (or ink) chrome, a raised reading panel, a third
+    step for cards. Three surfaces, nothing else.
+  - Fewer words: safe rows carry no label, scoring details fold into one row,
+    verification is three short lines.
+  - One accent (soft periwinkle) for what you can press; severity colours are
+    softened so a red message is clear without shouting.
+  - One family, IBM Plex Sans. No monospace labels, no uppercase eyebrows.
+*/
+@font-face { font-family: 'Plex'; font-weight: 100 700; src: url('../../frontend/public/fonts/plex/IBMPlexSans-Roman-100to700-latin.woff2') format('woff2'); unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+2190-2193; }
+@font-face { font-family: 'Plex'; font-weight: 100 700; src: url('../../frontend/public/fonts/plex/IBMPlexSans-Roman-100to700-latin-ext.woff2') format('woff2'); unicode-range: U+0100-02FF, U+1E00-1EFF; }
+
+:root, .theme-graphite {
+  --chrome: #141417;
+  --panel: #1c1c21;
+  --card: #232329;
+  --well: #18181c;
+  --hover: rgb(255 255 255 / 0.045);
+  --line: rgb(255 255 255 / 0.07);
+  --line-2: rgb(255 255 255 / 0.12);
+  --text: #edece9;
+  --text-2: rgb(237 236 233 / 0.66);
+  --text-3: rgb(237 236 233 / 0.42);
+  --accent: #a3adff;
+  --accent-ink: #14162b;
+  --glow: rgb(163 173 255 / 0.06);
+}
+.theme-ink {
+  --chrome: #0f1218;
+  --panel: #161a22;
+  --card: #1d222b;
+  --well: #12151c;
+  --hover: rgb(255 255 255 / 0.045);
+  --line: rgb(255 255 255 / 0.07);
+  --line-2: rgb(255 255 255 / 0.12);
+  --text: #e9ecf3;
+  --text-2: rgb(233 236 243 / 0.66);
+  --text-3: rgb(233 236 243 / 0.42);
+  --accent: #93a6ff;
+  --accent-ink: #0e1430;
+  --glow: rgb(110 140 255 / 0.08);
+}
+:root {
+  --phish: #ff8e7c;
+  --phish-2: #f1677d;
+  --susp: #f1bb63;
+  --safe: #8ccbb0;
+  --sans: 'Plex', system-ui, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { font-family: var(--sans); font-size: 14px; line-height: 1.5; color: var(--text); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+body { background: var(--chrome); }
+svg { display: block; }
+.screen { height: 100vh; overflow: hidden; background: radial-gradient(1200px 600px at 0% 0%, var(--glow), transparent 70%), var(--chrome); }
+
+.app { display: grid; grid-template-columns: 68px 372px minmax(0, 1fr); height: 100vh; padding: 10px 10px 10px 0; }
+.app.wide { grid-template-columns: 68px minmax(0, 1fr); }
+
+/* rail */
+.rail { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 8px 0; }
+.rail a { width: 42px; height: 42px; border-radius: 12px; display: grid; place-items: center; color: var(--text-3); }
+.rail a.on { background: var(--panel); color: var(--text); }
+.rail a svg { width: 20px; height: 20px; }
+.rail .mark { color: var(--text); margin-bottom: 18px; }
+.rail .end { margin-top: auto; }
+.av { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; font-size: 12.5px; font-weight: 600; color: var(--text-2); background: rgb(255 255 255 / 0.08); }
+.av.sm { width: 28px; height: 28px; font-size: 11px; }
+.av.lg { width: 42px; height: 42px; font-size: 14px; }
+
+/* list */
+.list { display: flex; flex-direction: column; min-height: 0; padding-right: 10px; }
+.list-head { display: flex; align-items: center; justify-content: space-between; padding: 14px 12px 14px 14px; }
+.list-head h1 { font-size: 22px; font-weight: 560; letter-spacing: -0.015em; }
+.icon-btn { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--text-2); }
+.icon-btn svg { width: 18px; height: 18px; }
+.filters { display: flex; gap: 4px; padding: 0 8px 12px; }
+.filter { padding: 6px 11px; border-radius: 9px; font-size: 13px; color: var(--text-2); }
+.filter.on { background: var(--panel); color: var(--text); }
+.filter span { color: var(--text-3); margin-left: 4px; }
+.group { padding: 14px 14px 6px; font-size: 12.5px; color: var(--text-3); }
+.row { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 12px; padding: 12px; margin: 0 2px; border-radius: 14px; }
+.row.on { background: var(--panel); }
+.row .top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.row .who { font-weight: 560; font-size: 14.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row .t { font-size: 12.5px; color: var(--text-3); flex: none; }
+.row .sub { font-size: 14px; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
+.pill { display: inline-flex; align-items: center; gap: 6px; margin-top: 7px; padding: 2px 9px 2px 7px; border-radius: 999px; font-size: 12px; font-weight: 500; }
+.pill i { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.phish { color: var(--phish); background: rgb(255 142 124 / 0.12); }
+.pill.red { color: var(--phish-2); background: rgb(241 103 125 / 0.13); }
+.pill.susp { color: var(--susp); background: rgb(241 187 99 / 0.12); }
+.pill.ok { color: var(--safe); background: rgb(140 203 176 / 0.12); }
+
+/* reading panel */
+.panel { background: var(--panel); border-radius: 18px; min-width: 0; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 1px 0 rgb(255 255 255 / 0.04) inset, 0 20px 50px -30px rgb(0 0 0 / 0.6); }
+.bar { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px 0 20px; }
+.bar .l, .bar .r { display: flex; gap: 2px; }
+.pane { padding: 18px 48px 48px; overflow: hidden; }
+.sender { display: flex; align-items: center; gap: 14px; }
+.sender .name { font-weight: 560; font-size: 15px; }
+.sender .addr { color: var(--text-3); font-size: 14px; }
+.sender .when { margin-left: auto; color: var(--text-3); font-size: 13.5px; }
+.subject { margin-top: 22px; font-size: 27px; font-weight: 540; letter-spacing: -0.018em; line-height: 1.22; max-width: 34ch; }
+
+.verdict { margin-top: 26px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 22px; padding: 22px 24px; border-radius: 18px;
+  background: linear-gradient(120deg, rgb(255 142 124 / 0.09), rgb(255 142 124 / 0.025) 60%, transparent); box-shadow: inset 0 0 0 1px rgb(255 142 124 / 0.14); }
+.ring { position: relative; width: 68px; height: 68px; }
+.ring b { position: absolute; inset: 0; display: grid; place-items: center; font-size: 21px; font-weight: 600; color: var(--phish); letter-spacing: -0.02em; }
+.verdict .w { font-size: 19px; font-weight: 560; color: var(--phish); letter-spacing: -0.01em; }
+.verdict .s { color: var(--text-2); margin-top: 3px; font-size: 14.5px; }
+.btns { display: flex; gap: 8px; }
+.btn { height: 40px; padding: 0 18px; border-radius: 12px; display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.btn svg { width: 16px; height: 16px; }
+.btn.fill-phish { background: var(--phish); color: #2b100b; }
+.btn.ghost { box-shadow: inset 0 0 0 1px var(--line-2); color: var(--text); }
+.btn.accent { background: var(--accent); color: var(--accent-ink); }
+.btn.quiet { color: var(--text-2); padding: 0 12px; }
+
+.cols { margin-top: 34px; display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 56px; }
+h3 { font-size: 15px; font-weight: 560; margin-bottom: 12px; letter-spacing: -0.005em; }
+.why li { list-style: none; display: grid; grid-template-columns: 6px 1fr; gap: 14px; padding: 5px 0; font-size: 15px; color: var(--text-2); line-height: 1.5; }
+.why li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--phish); margin-top: 9px; }
+.why b { color: var(--text); font-weight: 500; }
+.check { display: grid; grid-template-columns: 22px 1fr auto; gap: 12px; align-items: center; padding: 8px 0; font-size: 15px; }
+.check .ic { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+.check .ic svg { width: 12px; height: 12px; }
+.check .ic.bad { background: rgb(255 142 124 / 0.14); color: var(--phish); }
+.check .ic.none { background: rgb(255 255 255 / 0.07); color: var(--text-3); }
+.check .ic.good { background: rgb(140 203 176 / 0.14); color: var(--safe); }
+.check .st { font-size: 13.5px; color: var(--text-3); }
+.note { margin-top: 14px; font-size: 13.5px; color: var(--text-3); }
+.note b { color: var(--susp); font-weight: 500; }
+
+.letter { margin-top: 34px; background: var(--well); border-radius: 18px; padding: 26px 32px 30px; position: relative; }
+.letter .tag { position: absolute; top: 18px; right: 20px; display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--text-3); }
+.letter .tag svg { width: 13px; height: 13px; }
+.letter .body { max-width: 68ch; font-size: 15.5px; line-height: 1.72; color: rgb(237 236 233 / 0.86); }
+.theme-ink .letter .body { color: rgb(233 236 243 / 0.86); }
+.letter p { margin-bottom: 0.9em; }
+.letter a { color: inherit; text-decoration: underline dotted rgb(255 255 255 / 0.35); text-underline-offset: 4px; }
+.fold { margin-top: 14px; display: flex; align-items: center; gap: 12px; padding: 14px 4px; border-top: 1px solid var(--line); font-size: 14.5px; color: var(--text-2); }
+.fold .r { margin-left: auto; color: var(--text-3); font-size: 13.5px; }
+.fold svg { width: 16px; height: 16px; color: var(--text-3); }
+
+/* briefing */
+.brief { padding: 34px 44px 40px; overflow: hidden; }
+.bhead { display: flex; align-items: flex-end; justify-content: space-between; }
+.bhead h1 { font-size: 28px; font-weight: 540; letter-spacing: -0.02em; }
+.bhead p { color: var(--text-2); margin-top: 4px; font-size: 15px; }
+.range { height: 38px; padding: 0 14px; border-radius: 12px; display: inline-flex; align-items: center; gap: 10px; box-shadow: inset 0 0 0 1px var(--line-2); font-size: 14px; }
+.range svg { width: 15px; height: 15px; color: var(--text-3); }
+.card { background: var(--card); border-radius: 20px; padding: 24px 26px; }
+.hero { margin-top: 24px; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; }
+.alert { position: relative; overflow: hidden; padding: 28px 32px; display: flex; flex-direction: column; justify-content: space-between; min-height: 0;
+  background: var(--card); }
+.alert .big { font-size: 32px; font-weight: 540; letter-spacing: -0.025em; line-height: 1.15; }
+.alert .big em { font-style: normal; color: var(--phish); }
+.halo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; background: rgb(255 142 124 / 0.12); color: var(--phish); margin-bottom: 18px; }
+.halo svg { width: 20px; height: 20px; }
+.alert .s { color: var(--text-2); font-size: 16px; margin-top: 8px; }
+.alert .go { display: flex; align-items: center; gap: 18px; margin-top: 26px; }
+.stack { display: flex; align-items: center; }
+.stack .av { box-shadow: 0 0 0 3px var(--card); margin-left: -8px; }
+.stack .av:first-child { margin-left: 0; }
+.stack span.more { margin-left: 10px; color: var(--text-3); font-size: 13.5px; }
+.rate { display: grid; grid-template-columns: 148px 1fr; align-items: center; gap: 28px; }
+.donut { position: relative; width: 148px; height: 148px; }
+.donut .c { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.donut .c b { font-size: 34px; font-weight: 500; letter-spacing: -0.03em; line-height: 1; }
+.donut .c span { font-size: 13px; color: var(--text-3); margin-top: 4px; }
+.legend { display: grid; gap: 12px; }
+.legend div { display: grid; grid-template-columns: 8px 1fr auto; gap: 12px; align-items: center; font-size: 14.5px; color: var(--text-2); }
+.legend i { width: 8px; height: 8px; border-radius: 50%; }
+.legend b { color: var(--text); font-weight: 500; }
+.card .ct { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
+.card .ct h3 { margin: 0; }
+.cs { color: var(--text-3); font-size: 13.5px; margin-top: 2px; }
+.card .ct .k { display: flex; gap: 16px; font-size: 13px; color: var(--text-3); }
+.card .ct .k span { display: inline-flex; align-items: center; gap: 7px; }
+.card .ct .k i { width: 8px; height: 8px; border-radius: 2px; }
+.trend { margin-top: 16px; }
+.trend svg { width: 100%; height: 120px; }
+.trend rect { opacity: 0.92; }
+.axis { display: flex; justify-content: space-between; margin-top: 10px; font-size: 12.5px; color: var(--text-3); }
+.low { margin-top: 16px; display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr); gap: 16px; }
+.q { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto; gap: 14px; align-items: center; padding: 11px 0; }
+.q + .q { border-top: 1px solid var(--line); }
+.q .n { font-weight: 560; font-size: 14.5px; }
+.q .sb { color: var(--text-2); font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.q .sc { font-size: 13px; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+.src { padding: 11px 0; }
+.src + .src { border-top: 1px solid var(--line); }
+.src .top { display: flex; justify-content: space-between; font-size: 14.5px; }
+.src .top b { font-weight: 500; }
+.src .bar2 { margin-top: 9px; height: 6px; border-radius: 4px; background: rgb(255 255 255 / 0.06); display: flex; overflow: hidden; }
+.src .bar2 i { height: 100%; }
+.link { color: var(--accent); font-size: 14px; font-weight: 500; }
+</style>
+</head>
+<body class="theme-graphite">
+
+<!-- ═══════════════════════════════ INBOX ═══════════════════════════════ -->
+<section class="screen" data-screen="inbox">
+<div class="app">
+  <nav class="rail">
+    <a class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.75 4.75 5.6v5.5c0 4.36 2.94 8.43 7.25 9.65 4.31-1.22 7.25-5.29 7.25-9.65V5.6L12 2.75Z"/><path d="m8.9 11.9 2.2 2.2 4-4.4" stroke-linecap="round"/></svg></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="9" rx="2"/><rect x="13.5" y="3.5" width="7" height="5" rx="2"/><rect x="13.5" y="11.5" width="7" height="9" rx="2"/><rect x="3.5" y="15.5" width="7" height="5" rx="2"/></svg></a>
+    <a class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 13h4.8l1.7 2.6h4l1.7-2.6h4.8"/><path d="M5.6 5h12.8l2.1 8v5a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18v-5l2.1-8Z"/></svg></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 20c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 6.6M17.5 15.3c1.8.7 3 2.3 3.5 4.7"/></svg></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></a>
+    <span class="end av sm">AS</span>
+  </nav>
+
+  <div class="list">
+    <div class="list-head"><h1>Inbox</h1><span class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="m20 20-4.2-4.2"/></svg></span></div>
+    <div class="filters"><span class="filter on">All</span><span class="filter">Phishing<span>7</span></span><span class="filter">Suspicious<span>2</span></span><span class="filter">Safe</span></div>
+
+    <div class="group">Today</div>
+    <div class="row on"><span class="av">M</span><div><div class="top"><span class="who">Microsoft Account Team</span><span class="t">02:34</span></div><div class="sub">Unusual sign-in attempt blocked — confirm it was you</div><span class="pill phish"><i></i>Likely phishing</span></div></div>
+    <div class="row"><span class="av">G</span><div><div class="top"><span class="who">GitHub</span><span class="t">03:16</span></div><div class="sub">A third-party OAuth application has been added</div></div></div>
+    <div class="row"><span class="av">MP</span><div><div class="top"><span class="who">Mihai Popescu</span><span class="t">00:46</span></div><div class="sub">Re: Notițe curs joi</div></div></div>
+    <div class="group">Yesterday</div>
+    <div class="row"><span class="av">R</span><div><div class="top"><span class="who">Revolut</span><span class="t">22:46</span></div><div class="sub">Your card has been temporarily blocked</div><span class="pill red"><i></i>Likely phishing</span></div></div>
+    <div class="row"><span class="av">D</span><div><div class="top"><span class="who">Dropbox</span><span class="t">18:46</span></div><div class="sub">Your Dropbox is almost full</div></div></div>
+    <div class="row"><span class="av">G</span><div><div class="top"><span class="who">Google</span><span class="t">15:46</span></div><div class="sub">Security alert: new sign-in on Linux</div></div></div>
+    <div class="row"><span class="av">HR</span><div><div class="top"><span class="who">HR Benefits</span><span class="t">09:12</span></div><div class="sub">Action required: updated payroll details</div><span class="pill phish"><i></i>Likely phishing</span></div></div>
+  </div>
+
+  <main class="panel">
+    <div class="bar">
+      <div class="l">
+        <span class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg></span>
+        <span class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg></span>
+      </div>
+      <div class="r">
+        <span class="btn quiet"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="10" cy="8" r="3.5"/><path d="M4 19.5c.6-3 2.9-4.7 6-4.7 1.2 0 2.3.3 3.2.8"/><path d="m16 16.5 5 5M21 16.5l-5 5"/></svg>Block sender</span>
+        <span class="icon-btn"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 1 0-2.3 5.7"/><path d="M20 5v6h-6"/></svg></span>
+        <span class="icon-btn"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5.5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="18.5" cy="12" r="1.6"/></svg></span>
+      </div>
+    </div>
+
+    <div class="pane">
+      <div class="sender"><span class="av lg">M</span><div><div class="name">Microsoft Account Team</div><div class="addr">no-reply@microsoft-verify-login.net</div></div><span class="when">Today at 02:34</span></div>
+      <div class="subject">Unusual sign-in attempt blocked — confirm it was you</div>
+
+      <div class="verdict">
+        <div class="ring"><svg viewBox="0 0 68 68"><circle cx="34" cy="34" r="29" fill="none" stroke="rgb(255 142 124 / 0.18)" stroke-width="5"/><circle cx="34" cy="34" r="29" fill="none" stroke="#ff8e7c" stroke-width="5" stroke-linecap="round" pathLength="100" stroke-dasharray="83 100" transform="rotate(-90 34 34)"/></svg><b>83</b></div>
+        <div><div class="w">Likely phishing</div><div class="s">This is not from Microsoft. Don’t open the link or reply.</div></div>
+        <div class="btns"><span class="btn fill-phish">Mark as phishing</span><span class="btn ghost">It’s safe</span></div>
+      </div>
+
+      <div class="cols">
+        <div>
+          <h3>Why it was flagged</h3>
+          <ul class="why">
+            <li><span>The domain is <b>microsoft-verify-login.net</b>, not microsoft.com.</span></li>
+            <li><span>It failed the domain’s own authentication checks.</span></li>
+            <li><span>Replies go to a different address in Russia.</span></li>
+            <li><span>The only link is shortened, so its destination is hidden.</span></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Sender check</h3>
+          <div class="check"><span class="ic bad"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m3 3 6 6M9 3 3 9"/></svg></span><span>Sending server</span><span class="st">Not authorised</span></div>
+          <div class="check"><span class="ic none"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 6h6"/></svg></span><span>Signature</span><span class="st">Not signed</span></div>
+          <div class="check"><span class="ic bad"><svg viewBox="0 0 12 12" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m3 3 6 6M9 3 3 9"/></svg></span><span>Domain policy</span><span class="st">Failed</span></div>
+          <p class="note">First message from this sender. Replies go to <b>recover@secure-mail-relay.ru</b>.</p>
+        </div>
+      </div>
+
+      <div class="letter">
+        <span class="tag"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>Links disabled</span>
+        <div class="body">
+          <p>Hello,</p>
+          <p>We detected an unusual sign-in attempt to your Microsoft account from <b>Lagos, Nigeria</b> at 03:12 UTC.</p>
+          <p>If this was not you, confirm your identity within 12 hours or your mailbox will be locked.</p>
+          <p><a>Review sign-in activity</a></p>
+          <p style="margin:0">Thank you,<br>The Microsoft Account Team</p>
+        </div>
+      </div>
+
+      <div class="fold"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m9 6 6 6-6 6"/></svg>Scoring details<span class="r">4 rules · 83 of 100</span></div>
+    </div>
+  </main>
+</div>
+</section>
+
+<!-- ═══════════════════════════════ BRIEFING ═══════════════════════════════ -->
+<section class="screen" data-screen="briefing">
+<div class="app wide">
+  <nav class="rail">
+    <a class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M12 2.75 4.75 5.6v5.5c0 4.36 2.94 8.43 7.25 9.65 4.31-1.22 7.25-5.29 7.25-9.65V5.6L12 2.75Z"/><path d="m8.9 11.9 2.2 2.2 4-4.4" stroke-linecap="round"/></svg></a>
+    <a class="on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><rect x="3.5" y="3.5" width="7" height="9" rx="2"/><rect x="13.5" y="3.5" width="7" height="5" rx="2"/><rect x="13.5" y="11.5" width="7" height="9" rx="2"/><rect x="3.5" y="15.5" width="7" height="5" rx="2"/></svg></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3.5 13h4.8l1.7 2.6h4l1.7-2.6h4.8"/><path d="M5.6 5h12.8l2.1 8v5a1.5 1.5 0 0 1-1.5 1.5h-14A1.5 1.5 0 0 1 3.5 18v-5l2.1-8Z"/></svg></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="9" cy="8.5" r="3.5"/><path d="M3 20c.6-3.2 3-5 6-5s5.4 1.8 6 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 6.6M17.5 15.3c1.8.7 3 2.3 3.5 4.7"/></svg></a>
+    <a><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h9M17 7h3M4 17h3M11 17h9"/><circle cx="15" cy="7" r="2"/><circle cx="9" cy="17" r="2"/></svg></a>
+    <span class="end av sm">AS</span>
+  </nav>
+
+  <main class="panel">
+    <div class="brief">
+      <div class="bhead">
+        <div><h1>Good evening, Andrei</h1><p>Your inbox over the last 30 days.</p></div>
+        <span class="range"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>Last 30 days</span>
+      </div>
+
+      <div class="hero">
+        <div class="card alert">
+          <div>
+            <span class="halo"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2.75 4.75 5.6v5.5c0 4.36 2.94 8.43 7.25 9.65 4.31-1.22 7.25-5.29 7.25-9.65V5.6L12 2.75Z"/><path d="M12 8v4.5" stroke-linecap="round"/><circle cx="12" cy="15.6" r="0.6" fill="currentColor"/></svg></span>
+            <div class="big"><em>7 messages</em> look like phishing</div>
+            <div class="s">Two more are worth a second look. Nothing has been opened.</div>
+          </div>
+          <div class="go">
+            <span class="btn accent">Review them</span>
+            <span class="btn quiet">Open inbox</span>
+          </div>
+        </div>
+
+        <div class="card rate">
+          <div class="donut">
+            <svg viewBox="0 0 148 148">
+              <circle cx="74" cy="74" r="62" fill="none" stroke="rgb(255 255 255 / 0.06)" stroke-width="12"/>
+              <circle cx="74" cy="74" r="62" fill="none" stroke="#8ccbb0" stroke-width="12" pathLength="100" stroke-dasharray="64 100" stroke-dashoffset="0" transform="rotate(-90 74 74)"/>
+              <circle cx="74" cy="74" r="62" fill="none" stroke="#f1bb63" stroke-width="12" pathLength="100" stroke-dasharray="6 100" stroke-dashoffset="-65" transform="rotate(-90 74 74)"/>
+              <circle cx="74" cy="74" r="62" fill="none" stroke="#ff8e7c" stroke-width="12" pathLength="100" stroke-dasharray="22 100" stroke-dashoffset="-72" transform="rotate(-90 74 74)"/>
+              <circle cx="74" cy="74" r="62" fill="none" stroke="#f1677d" stroke-width="12" pathLength="100" stroke-dasharray="5 100" stroke-dashoffset="-95" transform="rotate(-90 74 74)"/>
+            </svg>
+            <div class="c"><b>65%</b><span>safe</span></div>
+          </div>
+          <div class="legend">
+            <div><i style="background:var(--safe)"></i>Safe<b>20</b></div>
+            <div><i style="background:var(--susp)"></i>Suspicious<b>2</b></div>
+            <div><i style="background:var(--phish)"></i>Likely phishing<b>7</b></div>
+            <div><i style="background:var(--phish-2)"></i>Confirmed by you<b>2</b></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card trend">
+        <div class="ct"><div><h3>Flagged per day</h3><p class="cs">60 in the last 30 days, most of them on weekdays.</p></div><div class="k"><span><i style="background:var(--susp)"></i>Suspicious</span><span><i style="background:var(--phish)"></i>Likely phishing</span><span><i style="background:var(--phish-2)"></i>Confirmed</span></div></div>
+        <svg viewBox="0 0 1000 160" preserveAspectRatio="none"><line x1="0" y1="84" x2="1000" y2="84" stroke="rgb(255 255 255 / 0.05)"/><rect x="9.0" y="157" width="15.3" height="3" rx="1.5" fill="rgb(255 255 255 / 0.08)"/><clipPath id="c1"><rect x="42.3" y="141.0" width="15.3" height="19.0" rx="4"/></clipPath><g clip-path="url(#c1)"><rect x="42.3" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/></g><clipPath id="c2"><rect x="75.7" y="141.0" width="15.3" height="19.0" rx="4"/></clipPath><g clip-path="url(#c2)"><rect x="75.7" y="141.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c3"><rect x="109.0" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c3)"><rect x="109.0" y="122.0" width="15.3" height="38.0" fill="#f1bb63"/></g><clipPath id="c4"><rect x="142.3" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c4)"><rect x="142.3" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/><rect x="142.3" y="122.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c5"><rect x="175.7" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c5)"><rect x="175.7" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/><rect x="175.7" y="122.0" width="15.3" height="19.0" fill="#f1677d"/></g><clipPath id="c6"><rect x="209.0" y="84.0" width="15.3" height="76.0" rx="4"/></clipPath><g clip-path="url(#c6)"><rect x="209.0" y="103.0" width="15.3" height="57.0" fill="#f1bb63"/><rect x="209.0" y="84.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c7"><rect x="242.3" y="84.0" width="15.3" height="76.0" rx="4"/></clipPath><g clip-path="url(#c7)"><rect x="242.3" y="122.0" width="15.3" height="38.0" fill="#f1bb63"/><rect x="242.3" y="84.0" width="15.3" height="38.0" fill="#ff8e7c"/></g><clipPath id="c8"><rect x="275.7" y="141.0" width="15.3" height="19.0" rx="4"/></clipPath><g clip-path="url(#c8)"><rect x="275.7" y="141.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c9"><rect x="309.0" y="141.0" width="15.3" height="19.0" rx="4"/></clipPath><g clip-path="url(#c9)"><rect x="309.0" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/></g><clipPath id="c10"><rect x="342.3" y="103.0" width="15.3" height="57.0" rx="4"/></clipPath><g clip-path="url(#c10)"><rect x="342.3" y="122.0" width="15.3" height="38.0" fill="#f1bb63"/><rect x="342.3" y="103.0" width="15.3" height="19.0" fill="#f1677d"/></g><clipPath id="c11"><rect x="375.7" y="65.0" width="15.3" height="95.0" rx="4"/></clipPath><g clip-path="url(#c11)"><rect x="375.7" y="84.0" width="15.3" height="76.0" fill="#f1bb63"/><rect x="375.7" y="65.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c12"><rect x="409.0" y="65.0" width="15.3" height="95.0" rx="4"/></clipPath><g clip-path="url(#c12)"><rect x="409.0" y="103.0" width="15.3" height="57.0" fill="#f1bb63"/><rect x="409.0" y="65.0" width="15.3" height="38.0" fill="#ff8e7c"/></g><clipPath id="c13"><rect x="442.3" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c13)"><rect x="442.3" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/><rect x="442.3" y="122.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c14"><rect x="475.7" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c14)"><rect x="475.7" y="122.0" width="15.3" height="38.0" fill="#f1bb63"/></g><clipPath id="c15"><rect x="509.0" y="141.0" width="15.3" height="19.0" rx="4"/></clipPath><g clip-path="url(#c15)"><rect x="509.0" y="141.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c16"><rect x="542.3" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c16)"><rect x="542.3" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/><rect x="542.3" y="122.0" width="15.3" height="19.0" fill="#f1677d"/></g><clipPath id="c17"><rect x="575.7" y="65.0" width="15.3" height="95.0" rx="4"/></clipPath><g clip-path="url(#c17)"><rect x="575.7" y="103.0" width="15.3" height="57.0" fill="#f1bb63"/><rect x="575.7" y="65.0" width="15.3" height="38.0" fill="#ff8e7c"/></g><clipPath id="c18"><rect x="609.0" y="65.0" width="15.3" height="95.0" rx="4"/></clipPath><g clip-path="url(#c18)"><rect x="609.0" y="122.0" width="15.3" height="38.0" fill="#f1bb63"/><rect x="609.0" y="65.0" width="15.3" height="57.0" fill="#ff8e7c"/></g><clipPath id="c19"><rect x="642.3" y="8.0" width="15.3" height="152.0" rx="4"/></clipPath><g clip-path="url(#c19)"><rect x="642.3" y="65.0" width="15.3" height="95.0" fill="#f1bb63"/><rect x="642.3" y="27.0" width="15.3" height="38.0" fill="#ff8e7c"/><rect x="642.3" y="8.0" width="15.3" height="19.0" fill="#f1677d"/></g><clipPath id="c20"><rect x="675.7" y="65.0" width="15.3" height="95.0" rx="4"/></clipPath><g clip-path="url(#c20)"><rect x="675.7" y="84.0" width="15.3" height="76.0" fill="#f1bb63"/><rect x="675.7" y="65.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c21"><rect x="709.0" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c21)"><rect x="709.0" y="122.0" width="15.3" height="38.0" fill="#f1bb63"/></g><clipPath id="c22"><rect x="742.3" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c22)"><rect x="742.3" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/><rect x="742.3" y="122.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c23"><rect x="775.7" y="65.0" width="15.3" height="95.0" rx="4"/></clipPath><g clip-path="url(#c23)"><rect x="775.7" y="103.0" width="15.3" height="57.0" fill="#f1bb63"/><rect x="775.7" y="65.0" width="15.3" height="38.0" fill="#ff8e7c"/></g><clipPath id="c24"><rect x="809.0" y="84.0" width="15.3" height="76.0" rx="4"/></clipPath><g clip-path="url(#c24)"><rect x="809.0" y="122.0" width="15.3" height="38.0" fill="#f1bb63"/><rect x="809.0" y="103.0" width="15.3" height="19.0" fill="#ff8e7c"/><rect x="809.0" y="84.0" width="15.3" height="19.0" fill="#f1677d"/></g><clipPath id="c25"><rect x="842.3" y="27.0" width="15.3" height="133.0" rx="4"/></clipPath><g clip-path="url(#c25)"><rect x="842.3" y="84.0" width="15.3" height="76.0" fill="#f1bb63"/><rect x="842.3" y="27.0" width="15.3" height="57.0" fill="#ff8e7c"/></g><clipPath id="c26"><rect x="875.7" y="65.0" width="15.3" height="95.0" rx="4"/></clipPath><g clip-path="url(#c26)"><rect x="875.7" y="103.0" width="15.3" height="57.0" fill="#f1bb63"/><rect x="875.7" y="65.0" width="15.3" height="38.0" fill="#ff8e7c"/></g><clipPath id="c27"><rect x="909.0" y="122.0" width="15.3" height="38.0" rx="4"/></clipPath><g clip-path="url(#c27)"><rect x="909.0" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/><rect x="909.0" y="122.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c28"><rect x="942.3" y="103.0" width="15.3" height="57.0" rx="4"/></clipPath><g clip-path="url(#c28)"><rect x="942.3" y="122.0" width="15.3" height="38.0" fill="#f1bb63"/><rect x="942.3" y="103.0" width="15.3" height="19.0" fill="#ff8e7c"/></g><clipPath id="c29"><rect x="975.7" y="84.0" width="15.3" height="76.0" rx="4"/></clipPath><g clip-path="url(#c29)"><rect x="975.7" y="141.0" width="15.3" height="19.0" fill="#f1bb63"/><rect x="975.7" y="103.0" width="15.3" height="38.0" fill="#ff8e7c"/><rect x="975.7" y="84.0" width="15.3" height="19.0" fill="#f1677d"/></g></svg>
+        <div class="axis"><span>Sep 5</span><span>Sep 12</span><span>Sep 19</span><span>Sep 26</span><span>Today</span></div>
+      </div>
+
+      <div class="low">
+        <div class="card">
+          <div class="ct"><h3>Needs your review</h3><span class="link">Open inbox</span></div>
+          <div class="q"><span class="av">R</span><div><div class="n">Revolut</div><div class="sb">Your card has been temporarily blocked</div></div><span class="sc" style="color:var(--phish-2);background:rgb(241 103 125 / 0.13)">100</span></div>
+          <div class="q"><span class="av">E</span><div><div class="n">eToll Services</div><div class="sb">Unpaid toll invoice, final reminder</div></div><span class="sc" style="color:var(--phish-2);background:rgb(241 103 125 / 0.13)">88</span></div>
+          <div class="q"><span class="av">M</span><div><div class="n">Microsoft Account Team</div><div class="sb">Unusual sign-in attempt blocked</div></div><span class="sc" style="color:var(--phish);background:rgb(255 142 124 / 0.12)">83</span></div>
+          <div class="q"><span class="av">N</span><div><div class="n">Netflix</div><div class="sb">Your membership has been suspended</div></div><span class="sc" style="color:var(--phish);background:rgb(255 142 124 / 0.12)">83</span></div>
+        </div>
+        <div class="card">
+          <div class="ct"><h3>Where it came from</h3></div>
+          <div class="src"><div class="top"><b>dhl-express-tracking.com</b><span>12</span></div><div class="bar2"><i style="width:50%;background:var(--susp)"></i><i style="width:33%;background:var(--phish)"></i><i style="width:17%;background:var(--phish-2)"></i></div></div>
+          <div class="src"><div class="top"><b>paypa1-alerts.com</b><span>7</span></div><div class="bar2" style="width:58%"><i style="width:43%;background:var(--susp)"></i><i style="width:43%;background:var(--phish)"></i><i style="width:14%;background:var(--phish-2)"></i></div></div>
+          <div class="src"><div class="top"><b>microsoft-verify.net</b><span>7</span></div><div class="bar2" style="width:58%"><i style="width:57%;background:var(--susp)"></i><i style="width:29%;background:var(--phish)"></i><i style="width:14%;background:var(--phish-2)"></i></div></div>
+          <div class="src"><div class="top"><b>corp-benefits-portal.com</b><span>5</span></div><div class="bar2" style="width:42%"><i style="width:80%;background:var(--susp)"></i><i style="width:20%;background:var(--phish)"></i></div></div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</section>
+</body>
+</html>

@@ -19,7 +19,7 @@ describe('ReviewActions', () => {
     const onReviewed = vi.fn();
     render(<ReviewActions email={{ id: 'e1' }} onReviewed={onReviewed} />);
 
-    await userEvent.click(screen.getByRole('button', { name: /mark safe/i }));
+    await userEvent.click(screen.getByRole('button', { name: /mark as safe/i }));
 
     expect(actionsApi.markEmailSafe).toHaveBeenCalledWith('e1');
     await waitFor(() => expect(onReviewed).toHaveBeenCalledTimes(1));
@@ -28,7 +28,7 @@ describe('ReviewActions', () => {
   it('marks an email as phishing', async () => {
     render(<ReviewActions email={{ id: 'e2' }} onReviewed={vi.fn()} />);
 
-    await userEvent.click(screen.getByRole('button', { name: /mark phishing/i }));
+    await userEvent.click(screen.getByRole('button', { name: /mark as phishing/i }));
 
     expect(actionsApi.markEmailPhishing).toHaveBeenCalledWith('e2');
   });
@@ -36,6 +36,6 @@ describe('ReviewActions', () => {
   it('disables a button once the email has that verdict', () => {
     render(<ReviewActions email={{ id: 'e3', userVerdict: 'safe' }} onReviewed={vi.fn()} />);
 
-    expect(screen.getByRole('button', { name: /marked safe/i })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /marked as safe/i })).toBeDisabled();
   });
 });

@@ -1,31 +1,32 @@
 // ─────────────────────────────────────────────────────────────────────────────
 // scoreScale.js — the continuous 0–100 colour ramp shared by the dashboard
-// gauge and the inbox risk score.
+// gauge and every risk score in the inbox.
 //
-// Why this exists alongside risk.js: risk.js maps a CATEGORY (safe /
-// needs_review / quarantine / …) to a colour, and that stays the single source
-// of truth for badges, charts and filters. But a *number* wants a continuous
-// ramp — 68 and 71 should not look identical just because they land in the same
-// bucket. This file owns that ramp and nothing else, so risk.js is untouched.
+// risk.js maps a CATEGORY (safe / needs_review / quarantine / …) to a colour and
+// stays the single source of truth for badges, charts and filters. A *number*
+// wants a continuous ramp instead — 68 and 71 should not look identical just
+// because they share a bucket. This file owns that ramp and nothing else.
 //
-// Direction matters, and the two screens run OPPOSITE ways:
-//   - dashboard "safe rate": 100 is GOOD  -> getHealthColor(100) = green
-//   - inbox "risk score":    100 is BAD   -> getRiskColor(100)   = red
-// getRiskColor is literally getHealthColor(100 - score), so a single ramp keeps
-// "green = good, red = bad" true on both screens.
+// The ramp runs mint, amber, coral, rose: the same four colours as the
+// severity buckets in risk.js, so a number and the word beside it agree.
+//
+// Two screens read the ramp in opposite directions:
+//   - dashboard safe rate: 100 is GOOD  -> getHealthColor(100) = bone
+//   - inbox risk score:    100 is BAD   -> getRiskColor(100)   = red
+// getRiskColor is literally getHealthColor(100 - score).
 // ─────────────────────────────────────────────────────────────────────────────
 
-// The ramp, healthiest first. Deliberately 7 stops rather than 3: the middle of
-// the range is where a user actually has to make a judgement call, so amber and
-// orange get their own steps instead of being a single wide "warning" band.
+// Healthiest first. The stops sit on the backend's verdict thresholds (30 =
+// suspicious, 60 = likely phishing, read as 70 / 40 on the health axis) so the
+// colour of a number agrees with the word next to it.
 const STOPS = [
-  { at: 100, hex: '#4ade80' }, // deep green  — nothing to do
-  { at: 85, hex: '#86d96a' }, // green
-  { at: 70, hex: '#b8cf55' }, // lime        — still healthy, but drifting
-  { at: 55, hex: '#e0b750' }, // amber       — worth a look
-  { at: 40, hex: '#e8964a' }, // orange
-  { at: 25, hex: '#e5704f' }, // red-orange
-  { at: 0, hex: '#dc5555' }, // red         — act now
+  { at: 100, hex: '#8ccbb0' }, // mint        — nothing to do
+  { at: 85, hex: '#b5c78f' },
+  { at: 70, hex: '#f1bb63' }, // amber       — suspicious begins here
+  { at: 55, hex: '#f8a46f' },
+  { at: 40, hex: '#ff8e7c' }, // coral       — likely phishing begins here
+  { at: 20, hex: '#f77a7d' },
+  { at: 0, hex: '#f1677d' }, // rose        — act now
 ];
 
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
@@ -40,21 +41,19 @@ const toHex = (rgb) =>
   `#${rgb.map((c) => clamp(Math.round(c), 0, 255).toString(16).padStart(2, '0')).join('')}`;
 
 /**
- * Colour for a 0–100 "health" value where 100 is best.
- * Blends linearly between the two neighbouring stops, so the ramp is smooth
- * rather than stepped — a score sliding from 71 to 69 shifts colour gradually.
+ * Colour for a 0–100 "health" value where 100 is best. Blends linearly between
+ * the two neighbouring stops, so a value sliding from 71 to 69 shifts colour
+ * gradually instead of snapping.
  */
 export function getHealthColor(value) {
   const v = Number.isFinite(value) ? clamp(value, 0, 100) : 0;
 
-  // STOPS runs high -> low, so the first stop we are at-or-above is the upper
-  // bound of the segment we sit in.
   for (let i = 0; i < STOPS.length - 1; i += 1) {
     const hi = STOPS[i];
     const lo = STOPS[i + 1];
     if (v <= hi.at && v >= lo.at) {
       const span = hi.at - lo.at;
-      const t = span === 0 ? 0 : (v - lo.at) / span; // 0 at lo, 1 at hi
+      const t = span === 0 ? 0 : (v - lo.at) / span;
       const a = toRgb(lo.hex);
       const b = toRgb(hi.hex);
       return toHex([0, 1, 2].map((c) => a[c] + (b[c] - a[c]) * t));
@@ -64,13 +63,11 @@ export function getHealthColor(value) {
 }
 
 /**
- * Colour for a 0–100 RISK score where 100 is worst. Mirrors the health ramp so
- * both screens obey "green = good, red = bad".
+ * Colour for a 0–100 RISK score where 100 is worst.
  *
- * CAREFUL: an unscanned message has score `null`, and "no risk recorded" is not
- * the same claim as "this is safe" — painting it green would tell the user
- * something we have not actually checked. Callers must test `isScored()` first
- * and fall back to UNSCORED_COLOR.
+ * An unscanned message has score `null`, and "no risk recorded" is not the same
+ * claim as "this is safe". Callers must test `isScored()` first and fall back
+ * to UNSCORED_COLOR.
  */
 export const getRiskColor = (score) =>
   getHealthColor(100 - (Number.isFinite(score) ? clamp(score, 0, 100) : 0));
@@ -82,13 +79,11 @@ export const isScored = (score) => Number.isFinite(score);
 export const UNSCORED_COLOR = 'var(--color-risk-unscanned)';
 
 // ── Contrast ────────────────────────────────────────────────────────────────
-// The ramp colours are used as large tinted NUMERALS on the charcoal canvas,
-// so they have to stay legible rather than just look nice. These helpers keep
-// that guarantee in code instead of in a comment that can rot.
+// Ramp colours are used as large tinted numerals on the canvas; they have to
+// stay legible, and the guarantee lives in code rather than in a comment.
 
-// Must track --color-background in index.css. It is duplicated here because
-// ensureReadable() runs during render and cannot read a CSS custom property.
-const BACKGROUND = '#121319'; // --color-background
+// Numbers are drawn on the raised panel; must track --color-panel in index.css.
+const BACKGROUND = '#1c1c21';
 
 const relativeLuminance = (hex) => {
   const [r, g, b] = toRgb(hex).map((c) => {
@@ -107,8 +102,8 @@ export const contrastRatio = (fg, bg = BACKGROUND) => {
 
 /**
  * Nudges a colour toward white until it clears `min` contrast on the page
- * background. Every stop in the ramp already passes 4.5:1 today, so this is a
- * guard, not a transform — it only bites if someone retunes a stop darker.
+ * background. Every stop already passes 4.5:1 on the panel; this is a guard that
+ * only bites if someone retunes a stop darker.
  */
 export function ensureReadable(hex, min = 4.5, bg = BACKGROUND) {
   let out = hex;
@@ -119,16 +114,15 @@ export function ensureReadable(hex, min = 4.5, bg = BACKGROUND) {
   return out;
 }
 
-/** Health ramp colour, guaranteed readable as text/numerals on the canvas. */
+/** Health ramp colour, guaranteed readable as text on the canvas. */
 export const getHealthTextColor = (value) => ensureReadable(getHealthColor(value));
 
-/** Risk ramp colour, guaranteed readable as text/numerals on the canvas. */
+/** Risk ramp colour, guaranteed readable as text on the canvas. */
 export const getRiskTextColor = (score) => ensureReadable(getRiskColor(score));
 
 /**
- * A short, plain-language reading of a safe rate. Used so the dashboard states
- * a conclusion ("Your inbox is healthy") rather than leaving the user to
- * interpret a bare percentage.
+ * A short, plain-language reading of a safe rate, so the dashboard states a
+ * conclusion instead of leaving the user to interpret a bare percentage.
  */
 export function getPostureLabel(safeRate) {
   const v = Number.isFinite(safeRate) ? clamp(safeRate, 0, 100) : 0;
