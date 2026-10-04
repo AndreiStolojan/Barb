@@ -65,6 +65,12 @@ jobs:
           test "$(stat -c %a "$env_file")" = 600
           docker compose --env-file "$env_file" config --quiet
           DB_URI=mongodb+srv://ci.example/secureinbox FRONTEND_APP_URL=https://example.test TUNNEL_TOKEN=ci docker compose --env-file "$env_file" -f docker-compose.yml -f docker-compose.prod.yml config --quiet
+          # nginx.prod.conf resolves `cloudflared` at startup, so the tunnel must
+          # never wait for the frontend: that cycle left production without a
+          # frontend on the first consolidated deployment. `nginx -t` below
+          # cannot see it because it fakes the host with --add-host.
+          DB_URI=mongodb+srv://ci.example/secureinbox FRONTEND_APP_URL=https://example.test TUNNEL_TOKEN=ci docker compose --env-file "$env_file" -f docker-compose.yml -f docker-compose.prod.yml config --format json \
+            | jq -e '(.services.cloudflared.depends_on // {}) | has("frontend") | not' > /dev/null
           (
             cd backend
             if NODE_ENV=production PORT=5500 DB_URI=mongodb://example.test/db JWT_SECRET=x JWT_EXPIRES_IN=1h MAIL_TOKEN_ENCRYPTION_KEY=x node --input-type=module -e "await import('./src/config/env.js')"; then exit 1; fi
