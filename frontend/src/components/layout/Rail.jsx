@@ -148,7 +148,7 @@ export function MobileTabs() {
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-border bg-background/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex items-stretch border-t border-border bg-background pb-[env(safe-area-inset-bottom)] md:hidden"
     >
       {NAV.map(({ to, label, icon: Icon }) => (
         <NavLink
@@ -169,7 +169,7 @@ export function MobileTabs() {
 /* Mobile top bar: mark, screen title, account. */
 export function MobileTopbar({ title, onOpenPalette, onOpenSupport }) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2.5 bg-background/95 px-4 backdrop-blur md:hidden">
+    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2.5 bg-background px-4 md:hidden">
       <Mark className="h-5 w-5" />
       <span className="min-w-0 flex-1 truncate text-base font-semibold">{title}</span>
       <AccountMenu onOpenPalette={onOpenPalette} onOpenSupport={onOpenSupport} side="bottom" align="end" />

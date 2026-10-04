@@ -404,16 +404,15 @@ export function MessagePane({ id, onReviewed, onBack, onMove }) {
         </div>
 
         {/* 4 ─ the message */}
-        <section aria-label="Message" className="relative mt-9 rounded-[1.125rem] bg-well px-5 pb-6 pt-5 md:px-8 md:pb-7 md:pt-6">
-          <span className="float-right ml-4 inline-flex items-center gap-1.5 text-xs text-muted-foreground-subtle">
+        <section aria-label="Message" className="mt-9 rounded-[1.125rem] bg-well p-3 sm:p-4 md:p-5">
+          {/* Its own row: a float here narrowed the whole email beside it. */}
+          <p className="mb-3 flex items-center justify-end gap-1.5 px-1 text-xs text-muted-foreground-subtle">
             <Lock className="h-3 w-3" />
             Links disabled
-          </span>
-          <div className="max-w-[68ch]">
-            <EmailBody htmlBody={raw?.htmlBody} textBody={raw?.textBody} riskBucket={email.riskBucket} />
-          </div>
+          </p>
+          <EmailBody htmlBody={raw?.htmlBody} textBody={raw?.textBody} riskBucket={email.riskBucket} />
           {attachments.length > 0 && (
-            <ul className="mt-5 grid gap-2 border-t border-border pt-4">
+            <ul className="mt-4 grid gap-2 border-t border-border px-1 pt-4">
               {attachments.map((attachment, i) => {
                 const analysis = analysisItems.find((item) => item?.attachmentIndex === i);
                 const findings = Array.isArray(analysis?.findings) ? analysis.findings : [];
