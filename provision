@@ -52,9 +52,6 @@ load_runtime_values() {
       ;;
     *) fail "NODE_ENV must be development or production." ;;
   esac
-  if [[ ",$profiles," == *,monitoring,* ]]; then
-    load_required_env_value GRAFANA_ADMIN_PASSWORD
-  fi
 }
 
 require_docker() {
@@ -89,7 +86,6 @@ create_env() {
   dotenv_set_if_missing JWT_SECRET "$(openssl rand -hex 32)" "${ENV_FILE}"
   dotenv_set_if_missing MAIL_TOKEN_ENCRYPTION_KEY "$(openssl rand -hex 32)" "${ENV_FILE}"
   dotenv_set_if_missing DEMO_USER_PASSWORD "$(openssl rand -hex 12)" "${ENV_FILE}"
-  dotenv_set_if_missing GRAFANA_ADMIN_PASSWORD "$(openssl rand -hex 16)" "${ENV_FILE}"
 
   local app_port redirect_uri default_redirect_uri
   app_port="$(dotenv_get APP_PORT "${ENV_FILE}")"

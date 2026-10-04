@@ -40,7 +40,7 @@ and shows the reasoning behind each verdict instead of a black-box score.
   an auditable, independently-failable signal-provider engine.
 - Explains why a message was marked safe, suspicious, or likely phishing.
 - Supports trusted and blocked sender rules plus manual review decisions.
-- Runs locally with Docker, MongoDB, Ollama, Prometheus, and Grafana.
+- Runs locally with Docker, MongoDB and optional Ollama.
 
 ## Architecture
 
@@ -50,8 +50,6 @@ Browser -> nginx / React -> Express -> MongoDB
                               +-> optional Gmail OAuth, history sync, push (Pub/Sub)
                               +-> local Ollama
                               +-> DNS (DMARC), Web Risk, URLhaus, RDAP, MalwareBazaar
-
-Prometheus -> Express /metrics -> Grafana
 ```
 
 The backend owns authentication, synchronization, scoring, reports, and data.
@@ -93,7 +91,7 @@ curl --fail http://127.0.0.1:8080/api/v1/ready
 The same source and command support development with local MongoDB or Atlas,
 and production with Atlas. Only the root environment configuration changes.
 See [development and deployment](docs/environments.md) for native hot reload,
-optional Ollama/monitoring, and running both environments on one Pi.
+optional Ollama, and running both environments on one Pi.
 
 ## Optional Gmail connection
 
@@ -197,7 +195,7 @@ Stop the application while preserving all data:
 docker compose down
 ```
 
-To erase MongoDB, Grafana, Prometheus, and the downloaded Ollama model:
+To erase MongoDB and the downloaded Ollama model:
 
 ```bash
 docker compose down --volumes

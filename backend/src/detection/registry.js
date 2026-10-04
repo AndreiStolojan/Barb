@@ -153,7 +153,11 @@ export const runProviders = async (
     for (const provider of providers) {
         try {
             const result = validateProviderResult(
-                await provider.analyze(ctx),
+                // Rule signals collected so far, so the AI provider can skip
+                // a model call that could not change the verdict.
+                await provider.analyze(ctx, {
+                    priorSignals: signals.filter(({ kind }) => kind === 'rule'),
+                }),
                 provider
             );
             const status = ['error', 'skipped'].includes(result.status)

@@ -9,6 +9,7 @@ const DEFAULT_MAX_RAW_BYTES = 32 * 1024 * 1024;
 const DEFAULT_MAX_CONCURRENCY = 2;
 const DEFAULT_MAX_QUEUE = 32;
 const DEFAULT_MIN_BIT_LENGTH = 1024;
+const DEFAULT_WORKER_IDLE_MS = 60_000;
 const WORKER_URL = new URL('./dkim-verifier.worker.js', import.meta.url);
 
 const readPositiveInteger = (value, fallback, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) => {
@@ -101,14 +102,7 @@ const unavailableResult = (failureReason) => ({
     },
 });
 
-const createDefaultWorker = ({ rawMessage, minBitLength }) => new Worker(WORKER_URL, {
-    type: 'module',
-    workerData: {
-        rawMessage,
-        minBitLength,
-    },
-    transferList: [rawMessage],
-});
+const createDefaultWorker = () => new Worker(WORKER_URL, { type: 'module' });
 
 const terminateWorker = (worker) => {
     try {
@@ -118,82 +112,141 @@ const terminateWorker = (worker) => {
     }
 };
 
-const runWorker = ({
-    rawMessage,
-    timeoutMs,
-    minBitLength,
-    workerFactory,
-}) => new Promise((resolve) => {
-    // Copy into an exact-sized transferable buffer. Buffer instances may use a
-    // shared pool whose backing ArrayBuffer cannot safely be transferred.
-    const transferableMessage = Uint8Array.from(rawMessage).buffer;
-    let worker;
+// Reuses verification workers instead of starting one per message. Starting a
+// worker loads mailauth's module graph: ~0.4 s of CPU on the Pi, against
+// ~0.5 ms for the verification itself. Each worker handles one message at a
+// time (the limiter bounds how many exist), is discarded after a timeout or
+// crash, and exits after `idleMs` without work so an idle server holds none.
+export const createDkimWorkerPool = ({
+    workerFactory = createDefaultWorker,
+    idleMs = DEFAULT_WORKER_IDLE_MS,
+} = {}) => {
+    const idle = [];
+    let nextId = 0;
 
-    try {
-        worker = workerFactory({
-            rawMessage: transferableMessage,
-            minBitLength,
-        });
-    } catch {
-        resolve(unavailableResult('mailauth_worker_failed'));
-        return;
-    }
-
-    let settled = false;
-    const settle = (result) => {
-        if (settled) {
-            return;
-        }
-
-        settled = true;
-        clearTimeout(timeoutId);
-        terminateWorker(worker);
-        resolve(result);
+    const retire = (entry) => {
+        const index = idle.indexOf(entry);
+        if (index >= 0) idle.splice(index, 1);
+        clearTimeout(entry.idleTimer);
+        terminateWorker(entry.worker);
     };
 
-    const timeoutId = setTimeout(() => {
-        settle(unavailableResult('mailauth_timeout'));
-    }, timeoutMs);
+    const release = (entry) => {
+        idle.push(entry);
+        entry.idleTimer = setTimeout(() => retire(entry), idleMs);
+        entry.idleTimer.unref?.();
+    };
 
-    worker.once('message', (message) => {
-        if (!message?.ok || !message.result?.dkim || !message.result?.arc) {
-            settle(unavailableResult('mailauth_verification_failed'));
-            return;
-        }
-        if (message.result.signatureLimitExceeded) {
-            settle(unavailableResult('mailauth_signature_limit'));
-            return;
+    const acquire = () => {
+        const entry = idle.pop();
+        if (entry) {
+            clearTimeout(entry.idleTimer);
+            return entry;
         }
 
-        const hasTemporaryDnsFailure =
-            message.result.dkim.result === 'temperror' ||
-            message.result.dkim.signatures.some(
-                (signature) => signature.result === 'temperror'
-            );
-        settle({
-            status: hasTemporaryDnsFailure ? 'unavailable' : 'ok',
-            failureReason: hasTemporaryDnsFailure ? 'mailauth_dns_failure' : null,
-            ...message.result,
+        const created = { worker: workerFactory(), idleTimer: null };
+        // Never keep the process alive just for an idle verifier, and forget a
+        // worker that dies while idle so it is not handed out again.
+        created.worker.unref?.();
+        // An idle worker's crash has no request to fail; `exit` follows it.
+        created.worker.on('error', () => {});
+        created.worker.once('exit', () => {
+            const index = idle.indexOf(created);
+            if (index >= 0) idle.splice(index, 1);
+            clearTimeout(created.idleTimer);
         });
-    });
-    worker.once('error', () => {
-        settle(unavailableResult('mailauth_worker_failed'));
-    });
-    worker.once('exit', (code) => {
-        if (code !== 0) {
+        return created;
+    };
+
+    const run = ({ rawMessage, timeoutMs, minBitLength }) => new Promise((resolve) => {
+        let entry;
+
+        try {
+            entry = acquire();
+        } catch {
+            resolve(unavailableResult('mailauth_worker_failed'));
+            return;
+        }
+
+        const { worker } = entry;
+        const id = ++nextId;
+        let settled = false;
+
+        const onMessage = (message) => {
+            if (message?.id !== id) return;
+            settle(toVerificationResult(message), { reusable: true });
+        };
+        const onError = () => settle(unavailableResult('mailauth_worker_failed'));
+        const onExit = (code) => settle(unavailableResult(
+            code === 0 ? 'mailauth_worker_exited' : 'mailauth_worker_failed'
+        ));
+
+        function settle(result, { reusable = false } = {}) {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timeoutId);
+            worker.off('message', onMessage);
+            worker.off('error', onError);
+            worker.off('exit', onExit);
+            if (reusable) release(entry);
+            else retire(entry);
+            resolve(result);
+        }
+
+        const timeoutId = setTimeout(() => {
+            settle(unavailableResult('mailauth_timeout'));
+        }, timeoutMs);
+
+        worker.on('message', onMessage);
+        worker.on('error', onError);
+        worker.on('exit', onExit);
+
+        try {
+            // Copy into an exact-sized transferable buffer. Buffer instances may
+            // use a shared pool whose backing ArrayBuffer cannot safely be
+            // transferred.
+            const transferableMessage = Uint8Array.from(rawMessage).buffer;
+            worker.postMessage(
+                { id, rawMessage: transferableMessage, minBitLength },
+                [transferableMessage]
+            );
+        } catch {
             settle(unavailableResult('mailauth_worker_failed'));
-        } else {
-            settle(unavailableResult('mailauth_worker_exited'));
         }
     });
-});
+
+    return { run };
+};
+
+const toVerificationResult = (message) => {
+    if (!message?.ok || !message.result?.dkim || !message.result?.arc) {
+        return unavailableResult('mailauth_verification_failed');
+    }
+    if (message.result.signatureLimitExceeded) {
+        return unavailableResult('mailauth_signature_limit');
+    }
+
+    const hasTemporaryDnsFailure =
+        message.result.dkim.result === 'temperror' ||
+        message.result.dkim.signatures.some(
+            (signature) => signature.result === 'temperror'
+        );
+
+    return {
+        status: hasTemporaryDnsFailure ? 'unavailable' : 'ok',
+        failureReason: hasTemporaryDnsFailure ? 'mailauth_dns_failure' : null,
+        ...message.result,
+    };
+};
+
+const defaultPool = createDkimWorkerPool();
 
 export const verifyDkimAndArc = async (rawMessage, {
     timeoutMs = configuredTimeoutMs,
     maxRawBytes = configuredMaxRawBytes,
     minBitLength = DEFAULT_MIN_BIT_LENGTH,
     limiter = defaultLimiter,
-    workerFactory = createDefaultWorker,
+    pool = defaultPool,
 } = {}) => {
     if (!rawMessage || (!Buffer.isBuffer(rawMessage) && !(rawMessage instanceof Uint8Array))) {
         return unavailableResult('raw_message_missing');
@@ -223,11 +276,10 @@ export const verifyDkimAndArc = async (rawMessage, {
 
     try {
         const remainingTimeoutMs = Math.max(1, safeTimeoutMs - (Date.now() - startedAt));
-        return await runWorker({
+        return await pool.run({
             rawMessage,
             timeoutMs: remainingTimeoutMs,
             minBitLength,
-            workerFactory,
         });
     } finally {
         release();

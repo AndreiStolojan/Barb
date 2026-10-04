@@ -1,6 +1,9 @@
 // Local semantic evidence. The raw analyzer response is carried in result meta
 // for persistence and explanation generation; emitted evidence stays point-free.
 
+import { RISK_THRESHOLDS } from '../../config/scoring.config.js';
+import { scoreSignals } from '../scorer.js';
+
 export const meta = Object.freeze({
     id: 'ai-semantic',
     version: 1,
@@ -15,6 +18,22 @@ const buildAiDisabledSignals = () => ({
     latencyMs: 0,
     evaluatedAt: new Date(),
     disabledReason: 'ai_disabled',
+});
+
+// Rules alone already fix the verdict, so a model call cannot change it: with
+// no rule evidence AI is capped below `suspicious`, and at `likelyPhishing` it
+// can only add points to a verdict that is already the highest. On the Pi each
+// call is tens of seconds at 100% CPU, so these scans skip it.
+const isVerdictDecidedByRules = (ruleScore) =>
+    ruleScore === 0 || ruleScore >= RISK_THRESHOLDS.likelyPhishing;
+
+const buildAiNotNeededSignals = () => ({
+    status: 'skipped',
+    provider: 'ollama',
+    mode: 'local',
+    latencyMs: 0,
+    evaluatedAt: new Date(),
+    skippedReason: 'verdict_decided_by_rules',
 });
 
 // Signals that accuse the sender of intent rather than describe a surface
@@ -121,13 +140,28 @@ export const collectAiSemanticSignals = (aiSignals) => {
 export const collectSignals = collectAiSemanticSignals;
 export const collectAiSignals = collectAiSemanticSignals;
 
-export const analyze = async (ctx = {}) => {
+// `priorSignals` are the rule signals of the providers that ran before this
+// one (see registry.js). Without them, as in direct calls, AI always runs.
+export const analyze = async (ctx = {}, { priorSignals } = {}) => {
     if (!ctx.userSettings?.aiEnabled) {
         return {
             status: 'skipped',
             signals: [],
             meta: {
                 aiSignals: buildAiDisabledSignals(),
+            },
+        };
+    }
+
+    if (
+        Array.isArray(priorSignals) &&
+        isVerdictDecidedByRules(scoreSignals(priorSignals, ctx.scanContext).ruleScore)
+    ) {
+        return {
+            status: 'skipped',
+            signals: [],
+            meta: {
+                aiSignals: buildAiNotNeededSignals(),
             },
         };
     }

@@ -18,6 +18,7 @@ export const RULE_SCORE_MAX = SCORE_MAX;
 // asupra unui scan. getAiStatus() decide care dintre aceste mesaje se arată.
 const AI_MESSAGES = {
   disabled: 'AI analysis is turned off. Showing the rule-based score only.',
+  skipped: 'The rules decided this verdict on their own, so the AI model was not run.',
   unavailable: 'AI analysis is unavailable right now. Showing the rule-based score.',
   timeout: 'AI analysis timed out. Showing the rule-based score — results may be incomplete.',
   error: "AI analysis couldn't be completed. Showing the rule-based score.",
@@ -26,24 +27,22 @@ const AI_MESSAGES = {
 // getAiStatus(scan) — analizează metadatele salvate ale unui scan și decide ce
 // mesaj despre AI să arate UI-ul.
 // Întoarce { state, message }: `message` e null când AI a funcționat normal.
+// Lista de emailuri trimite doar `aiExplanationMeta`, deci motivul se citește
+// de acolo dacă `aiSignals` lipsește. Explicația vine din șablon (`template`)
+// sau, la scanări vechi, de la model (`generated`); ambele sunt normale.
 export function getAiStatus(scan) {
   if (!scan) return { state: 'ok', message: null };
 
   const meta = scan.aiExplanationMeta || {};
   const signals = scan.aiSignals || {};
-
-  // Succes: modelul a generat o explicație, iar pasul semantic nu a eșuat.
-  if (meta.status === 'generated' && signals.status !== 'failed') {
-    return { state: 'ok', message: null };
-  }
-
-  // Extrage motivul eșecului din cea mai "bogată" sursă disponibilă (mai întâi
-  // explanation meta, apoi semnalele AI).
   const reason = String(
     meta.fallbackReason || signals.disabledReason || signals.error || ''
   ).toLowerCase();
 
-  if (reason.includes('ai_disabled') || reason.includes('disabled') || signals.status === 'disabled') {
+  if (signals.status === 'skipped' || reason === 'ai_not_needed') {
+    return { state: 'skipped', message: AI_MESSAGES.skipped };
+  }
+  if (reason.includes('disabled') || signals.status === 'disabled') {
     return { state: 'disabled', message: AI_MESSAGES.disabled };
   }
   if (reason.includes('timeout')) {
@@ -53,11 +52,9 @@ export function getAiStatus(scan) {
     return { state: 'unavailable', message: AI_MESSAGES.unavailable };
   }
   if (
-    reason.includes('invalid') ||
-    reason.includes('http') ||
-    reason.includes('failed') ||
+    reason ||
     signals.status === 'failed' ||
-    (meta.status && meta.status !== 'generated')
+    (meta.status && !['generated', 'template'].includes(meta.status))
   ) {
     return { state: 'error', message: AI_MESSAGES.error };
   }

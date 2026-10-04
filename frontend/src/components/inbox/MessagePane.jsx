@@ -453,7 +453,7 @@ export function MessagePane({ id, onReviewed, onBack, onMove }) {
             <div className="grid gap-6 sm:grid-cols-3">
               <ScoreFigure label="Rules" value={ruleScore} max={RULE_SCORE_MAX} note={`${rules.length} ${rules.length === 1 ? 'rule' : 'rules'} fired`} />
               {aiOff ? (
-                <ScoreFigure label="AI model" value={null} max={AI_SCORE_MAX} valueLabel={ai.state === 'disabled' ? 'Off' : 'Unavailable'} note="The rule score stands alone" />
+                <ScoreFigure label="AI model" value={null} max={AI_SCORE_MAX} valueLabel={{ disabled: 'Off', skipped: 'Not needed' }[ai.state] || 'Unavailable'} note="The rule score stands alone" />
               ) : (
                 <ScoreFigure label="AI model" value={aiScore} max={AI_SCORE_MAX} note={`Capped at ${AI_SCORE_MAX}; never enough alone`} />
               )}
@@ -479,7 +479,7 @@ export function MessagePane({ id, onReviewed, onBack, onMove }) {
                 )}
               </DetailBlock>
 
-              <DetailBlock title="What the AI read">
+              <DetailBlock title="Explanation">
                 <p className="text-sm leading-relaxed text-muted-foreground break-words">{summary || ai.message || 'The model did not produce a reading for this scan.'}</p>
                 {aiOff && summary && <p className="mt-2 text-[0.8125rem] text-muted-foreground-subtle">{ai.message}</p>}
               </DetailBlock>

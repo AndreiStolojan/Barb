@@ -79,3 +79,21 @@ test('AI body prefers normalized plain text without reading the HTML fallback', 
     const email = { textBody: '  Plain\n text  ', get htmlBody() { throw new Error('Unused fallback was read'); } };
     assert.equal(buildAiAnalysisInput(email).body, 'Plain text');
 });
+
+test('hostile unclosed markup is stripped in linear time', () => {
+    // Regex stripping rescanned to the end of the document from every unclosed
+    // opener; 60 KB of '<!--' took seconds of CPU on the Pi.
+    for (const opener of ['<!--', '<a ', '<style>']) {
+        const startedAt = performance.now();
+        const { body } = buildAiAnalysisInput({ htmlBody: `Visible text ${opener.repeat(50_000)}` });
+
+        assert.equal(body, 'Visible text', `leaked from: ${opener}`);
+        assert.ok(performance.now() - startedAt < 250, `${opener} took too long`);
+    }
+});
+
+test('a lone less-than sign stays text', () => {
+    const { body } = buildAiAnalysisInput({ htmlBody: '<p>Price < 5 lei</p>' });
+
+    assert.equal(body, 'Price < 5 lei');
+});

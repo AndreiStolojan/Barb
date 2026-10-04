@@ -11,6 +11,7 @@ import { collectEmailAuthSignals } from '../../src/detection/providers/email-aut
 import { verifyWithMailauth } from '../../src/services/email-auth/mailauth-verifier.core.js';
 import {
     createVerificationLimiter,
+    createDkimWorkerPool,
     verifyDkimAndArc,
 } from '../../src/services/email-auth/dkim-verifier.service.js';
 
@@ -162,6 +163,8 @@ test('terminates a hung verification worker at the hard deadline', async () => {
     let terminated = false;
 
     class HangingWorker extends EventEmitter {
+        postMessage() {}
+
         terminate() {
             terminated = true;
             return Promise.resolve(1);
@@ -172,7 +175,7 @@ test('terminates a hung verification worker at the hard deadline', async () => {
     const result = await verifyDkimAndArc(Buffer.from('message'), {
         timeoutMs: 25,
         limiter: createVerificationLimiter({ concurrency: 1 }),
-        workerFactory: () => new HangingWorker(),
+        pool: createDkimWorkerPool({ workerFactory: () => new HangingWorker() }),
     });
 
     assert.equal(result.status, 'unavailable');
@@ -183,9 +186,9 @@ test('terminates a hung verification worker at the hard deadline', async () => {
 
 test('fails open when mailauth reports a temporary DNS verification error', async () => {
     class ReportingWorker extends EventEmitter {
-        constructor() {
-            super();
+        postMessage({ id }) {
             queueMicrotask(() => this.emit('message', {
+                id,
                 ok: true,
                 result: {
                     dkim: {
@@ -209,7 +212,7 @@ test('fails open when mailauth reports a temporary DNS verification error', asyn
     const result = await verifyDkimAndArc(Buffer.from('message'), {
         timeoutMs: 100,
         limiter: createVerificationLimiter({ concurrency: 1 }),
-        workerFactory: () => new ReportingWorker(),
+        pool: createDkimWorkerPool({ workerFactory: () => new ReportingWorker() }),
     });
 
     assert.equal(result.status, 'unavailable');
@@ -219,10 +222,10 @@ test('fails open when mailauth reports a temporary DNS verification error', asyn
 
 test('fails open when the verified signature set exceeds the persisted bound', async () => {
     class ReportingWorker extends EventEmitter {
-        constructor() {
-            super();
+        postMessage({ id }) {
             queueMicrotask(() =>
                 this.emit('message', {
+                    id,
                     ok: true,
                     result: {
                         dkim: {
@@ -248,7 +251,7 @@ test('fails open when the verified signature set exceeds the persisted bound', a
     const result = await verifyDkimAndArc(Buffer.from('message'), {
         timeoutMs: 100,
         limiter: createVerificationLimiter({ concurrency: 1 }),
-        workerFactory: () => new ReportingWorker(),
+        pool: createDkimWorkerPool({ workerFactory: () => new ReportingWorker() }),
     });
 
     assert.equal(result.status, 'unavailable');
@@ -264,10 +267,11 @@ test('rejects missing and oversized raw messages before starting a worker', asyn
         throw new Error('Worker must not start');
     };
 
-    const missing = await verifyDkimAndArc(null, { workerFactory });
+    const pool = createDkimWorkerPool({ workerFactory });
+    const missing = await verifyDkimAndArc(null, { pool });
     const oversized = await verifyDkimAndArc(Buffer.alloc(5), {
         maxRawBytes: 4,
-        workerFactory,
+        pool,
     });
 
     assert.equal(missing.failureReason, 'raw_message_missing');
@@ -288,4 +292,71 @@ test('bounds the worker queue instead of allowing unbounded verification jobs', 
     releaseFirst();
     const releaseSecond = await queued;
     releaseSecond();
+});
+
+// Answers every request with an empty, passing verification. `hang` makes it
+// ignore requests so the caller's deadline fires.
+class PooledWorker extends EventEmitter {
+    constructor(log) {
+        super();
+        this.log = log;
+        this.hang = false;
+        log.started += 1;
+    }
+
+    postMessage({ id }) {
+        if (this.hang) return;
+        queueMicrotask(() => this.emit('message', {
+            id,
+            ok: true,
+            result: {
+                dkim: { result: 'none', signatures: [] },
+                arc: { result: 'none', chainLength: 0 },
+            },
+        }));
+    }
+
+    terminate() {
+        this.log.terminated += 1;
+        queueMicrotask(() => this.emit('exit', 1));
+        return Promise.resolve(1);
+    }
+}
+
+test('reuses one verification worker across sequential messages', async () => {
+    const log = { started: 0, terminated: 0 };
+    const pool = createDkimWorkerPool({ workerFactory: () => new PooledWorker(log) });
+
+    for (let index = 0; index < 3; index += 1) {
+        const result = await verifyDkimAndArc(Buffer.from('message'), { pool });
+        assert.equal(result.status, 'ok');
+    }
+
+    assert.equal(log.started, 1);
+    assert.equal(log.terminated, 0);
+});
+
+test('replaces a worker that timed out and retires idle workers', async () => {
+    const log = { started: 0, terminated: 0 };
+    let next = null;
+    const pool = createDkimWorkerPool({
+        idleMs: 20,
+        workerFactory: () => {
+            next = new PooledWorker(log);
+            return next;
+        },
+    });
+
+    await verifyDkimAndArc(Buffer.from('message'), { pool });
+    next.hang = true;
+    const timedOut = await verifyDkimAndArc(Buffer.from('message'), { pool, timeoutMs: 100 });
+    assert.equal(timedOut.failureReason, 'mailauth_timeout');
+    assert.equal(log.terminated, 1);
+
+    const recovered = await verifyDkimAndArc(Buffer.from('message'), { pool });
+    assert.equal(recovered.status, 'ok');
+    assert.equal(log.started, 2);
+
+    await new Promise((resolve) => setTimeout(resolve, 60));
+    assert.equal(log.terminated, 2);
 });
