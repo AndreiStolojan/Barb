@@ -65,4 +65,20 @@ describe('sanitizeEmailHtml', () => {
     expect(html).toContain('color: red');
     expect(blockedImages).toBe(1);
   });
+
+  // Browsers resolve these to https:// too; a prefix check alone let them load.
+  it('blocks protocol-relative and escaped remote images when blocking', () => {
+    const { html, blockedImages } = sanitizeEmailHtml(
+      '<img src="//evil.example/a.png">' +
+        '<img src="\\\\evil.example/b.png">' +
+        '<img src="data:image/png;base64,AAAA">' +
+        '<p style="background: image-set(\'https://evil.example/c.png\' 1x)">x</p>' +
+        '<p style="background: \\75 rl(https://evil.example/d.png); color: blue">y</p>',
+      { blockImages: true }
+    );
+    expect(html).not.toMatch(/evil\.example/);
+    expect(html).toContain('data:image/png');
+    expect(html).toContain('color: blue');
+    expect(blockedImages).toBe(4);
+  });
 });

@@ -151,8 +151,9 @@ result privately. Do not put account numbers or payment data in this repository.
 
 These commands apply after the shared-environment release in PR #95 is promoted.
 Before deployment, take the backup in
-[raspberry-pi-deployment.md](raspberry-pi-deployment.md#back-up-before-every-deployment):
-it dumps the database, copies the configuration and tags the running images.
+[raspberry-pi-deployment.md](raspberry-pi-deployment.md#1-back-up-before-changing-anything):
+it dumps the database, checks the archive, copies the configuration and tags
+the running images.
 The isolated restore drill in #77 is recovery evidence, not a gate for
 deploying reviewed code: holding back a release also holds back its fixes.
 

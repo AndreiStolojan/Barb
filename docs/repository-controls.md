@@ -10,13 +10,15 @@ Both branches require pull requests, current Quality and CodeQL checks, and
 resolved review conversations. Force pushes and branch deletion are disabled.
 The rules also apply to repository administrators.
 
-Required check contexts:
+Required check contexts on both branches:
 
 - `backend`
 - `frontend`
 - `infra`
 - `integration`
 - `CodeQL`
+
+`prod` also requires `promotion-record` (`.github/workflows/promotion.yml`).
 
 Neither branch requires an approving review while the repository has one human
 maintainer. GitHub never lets the author approve their own pull request, so a
@@ -25,12 +27,15 @@ which is what the former emergency procedure did each time. A rule that is
 always bypassed protects nothing and teaches that bypassing is normal.
 
 The human gate for production is the promotion pull request from `main` into
-`prod`. Its description must record, before it is merged:
+`prod`, and CI enforces it: the required `promotion-record` check fails until
+the description has a `## Release record` section with a `Rollback target` line
+and a `Backup` line, and it re-runs whenever the description is edited. The
+record states:
 
 - the release contents (the pull requests it carries) and anything deliberately
   left out;
 - that the pre-deployment backup in
-  [raspberry-pi-deployment.md](raspberry-pi-deployment.md#back-up-before-every-deployment)
+  [raspberry-pi-deployment.md](raspberry-pi-deployment.md#1-back-up-before-changing-anything)
   will be taken, and the exact rollback revision;
 - any configuration migration the release needs.
 
@@ -75,8 +80,9 @@ gh api --method PATCH \
   -F require_last_push_approval=false
 ```
 
-Required pull requests, required checks, administrator enforcement, and the
-force-push and deletion protections stay on regardless of the review count.
+Required pull requests, required checks (including `promotion-record`),
+administrator enforcement, and the force-push and deletion protections stay on
+regardless of the review count.
 
 ## Resuming development
 

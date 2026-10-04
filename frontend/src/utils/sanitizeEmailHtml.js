@@ -33,9 +33,17 @@ const hardenLinks = (documentNode) => {
   }
 };
 
-// Verifică dacă o valoare (ex: un URL de imagine) e o adresă "remote", deci
-// încărcată de pe internet (http/https), nu inline (ex: data:image/...).
-const isRemote = (value) => /^https?:/i.test(value || '');
+// O sursă e "locală" doar dacă e inline (data:) sau o parte a mesajului
+// (cid:). Orice altceva e tratat ca remote: browserele rezolvă și "//host",
+// "\\host" sau "/\\host" la https://host, deci nu ne bazăm pe prefixul http.
+const isRemote = (value) => {
+  const v = String(value || '').trim();
+  return v.length > 0 && !/^(data|cid):/i.test(v);
+};
+
+// O declarație CSS care poate încărca ceva: url(...), image-set(...), sau
+// orice escape cu backslash (un "\\75 rl(" este tot url( pentru browser).
+const LOADS_RESOURCE = /url\s*\(|image-set\s*\(|\\/i;
 
 /**
  * Strip remote images and background images (common tracking-pixel vectors) and
@@ -56,15 +64,15 @@ const blockRemoteImages = (documentNode) => {
     }
   }
 
-  // Pasul 2: orice declarație din atributul "style" care încarcă un URL extern
-  // (background, list-style-image, border-image, cursor...) e scoasă, fără a
-  // atinge restul stilurilor elementului.
+  // Pasul 2: orice declarație din atributul "style" care poate încărca o
+  // resursă (background, list-style-image, border-image, cursor...) e scoasă,
+  // fără a atinge restul stilurilor elementului.
   for (const el of Array.from(documentNode.querySelectorAll('[style]'))) {
     const style = el.getAttribute('style') || '';
-    if (/url\(\s*['"]?\s*(https?:)?\/\//i.test(style)) {
+    if (LOADS_RESOURCE.test(style)) {
       const kept = style
         .split(';')
-        .filter((declaration) => !/url\(\s*['"]?\s*(https?:)?\/\//i.test(declaration))
+        .filter((declaration) => !LOADS_RESOURCE.test(declaration))
         .join(';');
       el.setAttribute('style', kept);
       blocked += 1;

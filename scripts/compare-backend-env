@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+# Compare the environment the running backend container has with the one the
+# current configuration would give it after `docker compose up`.
+#
+# Prints NAMES only, never values. Values are compared by SHA-256, because a
+# name-only comparison cannot catch the dangerous case: Compose supplies a
+# default for every flag, so a forgotten THREAT_INTEL_ENABLED still exists
+# after migration, just silently set to false.
+#
+# Usage: scripts/compare-backend-env [container] [env-file]
+# Exit status: 0 when nothing the backend relies on is lost or changed, 1 otherwise.
+set -Eeuo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "${ROOT}"
+
+container="${1:-secureinbox-backend-1}"
+env_file="${2:-.env}"
+work="$(mktemp -d)"
+trap 'rm -rf "${work}"' EXIT
+
+docker exec "${container}" printenv -0 > "${work}/before"
+docker compose --env-file "${env_file}" config --format json > "${work}/after.json"
+
+node - "${work}/before" "${work}/after.json" <<'NODE'
+const { createHash } = require('node:crypto');
+const { readFileSync } = require('node:fs');
+
+const [beforeFile, afterFile] = process.argv.slice(2);
+const hash = (value) => createHash('sha256').update(String(value ?? '')).digest('hex');
+
+// Set by the image or the shell, not by our configuration.
+const IGNORED = new Set(['PATH', 'HOSTNAME', 'HOME', 'NODE_VERSION', 'YARN_VERSION', 'TERM']);
+
+const before = new Map();
+for (const entry of readFileSync(beforeFile, 'utf8').split('\0')) {
+  const at = entry.indexOf('=');
+  if (at > 0 && !IGNORED.has(entry.slice(0, at))) before.set(entry.slice(0, at), hash(entry.slice(at + 1)));
+}
+
+const environment = JSON.parse(readFileSync(afterFile, 'utf8')).services?.backend?.environment ?? {};
+const after = new Map(Object.entries(environment).map(([name, value]) => [name, hash(value)]));
+
+const byName = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+const missing = [...before.keys()].filter((name) => !after.has(name)).sort(byName);
+const changed = [...before.keys()].filter((name) => after.has(name) && after.get(name) !== before.get(name)).sort(byName);
+const added = [...after.keys()].filter((name) => !before.has(name)).sort(byName);
+
+const report = (title, names) => console.log(`${title} (${names.length})${names.length ? `: ${names.join(' ')}` : ''}`);
+report('missing after', missing);
+report('value changes', changed);
+report('new', added);
+process.exit(missing.length + changed.length > 0 ? 1 : 0);
+NODE

@@ -165,8 +165,11 @@ export function InboxPage() {
     if (checkedIds.size === 0) return;
     setBulkBusy(true);
     try {
-      await Promise.all([...checkedIds].map((id) => fn(id)));
+      const results = await Promise.all([...checkedIds].map((id) => fn(id)));
       toast.success(`${checkedIds.size} ${checkedIds.size === 1 ? 'message' : 'messages'} ${label}`);
+      // The verdicts are saved either way; a failed move to Spam is said.
+      const notMoved = results.filter((r) => r?.providerAction?.status === 'failed').length;
+      if (notMoved > 0) toast.warning(`Gmail did not move ${notMoved} of them to Spam. They are still in your Gmail inbox.`);
       exitSelectMode();
       afterReview();
     } catch (err) {
