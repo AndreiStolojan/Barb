@@ -1,4 +1,13 @@
 #!/usr/bin/env bash
+# Build and start SecureInbox with Docker Compose from one env file.
+#
+#   ./provision                                   uses ./.env, creating it if needed
+#   PROVISION_ENV_FILE=/path/to/prod.env ./provision
+#
+# A development env file is created from .env.example and gets fresh secrets.
+# A production env file is only validated: the script never generates secrets
+# into it. Both modes are checked for isolation before any container starts.
+# docs/environments.md explains each step and check.
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,6 +23,7 @@ compose() {
   docker compose --env-file "${ENV_FILE}" "$@"
 }
 
+# Read KEY from the env file into a shell variable of the same name, or stop.
 load_required_env_value() {
   local key="$1" value
   value="$(dotenv_get "${key}" "${ENV_FILE}" || true)"
@@ -23,7 +33,14 @@ load_required_env_value() {
 
 # Validate isolation before any containers or demo data are changed.
 load_runtime_values() {
-  local key profiles db_uri compose_files
+  local key shell_value profiles db_uri compose_files
+  # Compose prefers exported shell variables over the env file, so an exported
+  # DB_URI or COMPOSE_FILE would silently bypass every check below.
+  for key in NODE_ENV COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES DB_URI SEED_DEMO; do
+    if shell_value="$(printenv "$key")" && [[ "$shell_value" != "$(dotenv_get "$key" "$ENV_FILE" || true)" ]]; then
+      fail "$key is exported in this shell and would override ${ENV_FILE}. Unset it or put the value in the file."
+    fi
+  done
   for key in NODE_ENV COMPOSE_PROJECT_NAME APP_PORT; do
     load_required_env_value "$key"
   done
@@ -36,6 +53,9 @@ load_runtime_values() {
       [[ "$compose_files" == docker-compose.yml:docker-compose.prod.yml ]] || fail "Production requires the production Compose overlay."
       [[ ",$profiles," != *,local-db,* ]] || fail "Production cannot start the development MongoDB."
       [[ "$db_uri" == mongodb+srv://* ]] || fail "Production requires an Atlas DB_URI."
+      for key in FRONTEND_APP_URL GOOGLE_REDIRECT_URI; do
+        [[ "$(dotenv_get "$key" "$ENV_FILE" || true)" == https://* ]] || fail "Production requires an HTTPS $key."
+      done
       [[ "$(dotenv_get SEED_DEMO "$ENV_FILE" || true)" != true ]] || fail "Disable SEED_DEMO in production."
       for key in JWT_SECRET MAIL_TOKEN_ENCRYPTION_KEY FRONTEND_APP_URL GOOGLE_CLIENT_ID GOOGLE_CLIENT_SECRET GOOGLE_REDIRECT_URI EMAIL_FROM EMAIL_PASSWORD TUNNEL_TOKEN; do
         load_required_env_value "$key"
@@ -54,12 +74,26 @@ load_runtime_values() {
   esac
 }
 
+# Stop early with a readable message when Docker cannot be used.
 require_docker() {
   command -v docker >/dev/null 2>&1 || fail "Docker Engine and Docker Compose are required."
   docker info >/dev/null 2>&1 || fail "Docker is not running or this user cannot access it."
   docker compose version >/dev/null 2>&1 || fail "Docker Compose plugin is required."
 }
 
+# Point a URL that is empty or still on the example's localhost:8080 at APP_PORT.
+# Any other value (a Vite origin, a real hostname) is left alone.
+follow_app_port() {
+  local key="$1" path="$2" app_port="$3" current target
+  current="$(dotenv_get "${key}" "${ENV_FILE}" || true)"
+  target="http://localhost:${app_port}${path}"
+  if [[ -z "${current}" || "${current}" == "http://localhost:8080${path}" ]] && [[ "${current}" != "${target}" ]]; then
+    dotenv_set "${key}" "${target}" "${ENV_FILE}"
+  fi
+}
+
+# Create or complete a development env file. A production file is only locked
+# down to mode 0600; its secrets must already be there.
 create_env() {
   if [[ -f "$ENV_FILE" && "$(dotenv_get NODE_ENV "$ENV_FILE" || true)" == production ]]; then
     chmod 0600 "$ENV_FILE"
@@ -86,20 +120,16 @@ create_env() {
   dotenv_set_if_missing JWT_SECRET "$(openssl rand -hex 32)" "${ENV_FILE}"
   dotenv_set_if_missing MAIL_TOKEN_ENCRYPTION_KEY "$(openssl rand -hex 32)" "${ENV_FILE}"
   dotenv_set_if_missing DEMO_USER_PASSWORD "$(openssl rand -hex 12)" "${ENV_FILE}"
+  dotenv_set_if_missing APP_PORT 8080 "${ENV_FILE}"
 
-  local app_port redirect_uri default_redirect_uri
+  local app_port
   app_port="$(dotenv_get APP_PORT "${ENV_FILE}")"
-  redirect_uri="$(dotenv_get GOOGLE_REDIRECT_URI "${ENV_FILE}" || true)"
-  default_redirect_uri="http://localhost:8080/api/v1/mail-accounts/google/callback"
-  if [[ -z "${redirect_uri}" || "${redirect_uri}" == "${default_redirect_uri}" ]]; then
-    dotenv_set_if_missing GOOGLE_REDIRECT_URI "http://localhost:${app_port}/api/v1/mail-accounts/google/callback" "${ENV_FILE}"
-    if [[ "${redirect_uri}" == "${default_redirect_uri}" && "${app_port}" != 8080 ]]; then
-      dotenv_set GOOGLE_REDIRECT_URI "http://localhost:${app_port}/api/v1/mail-accounts/google/callback" "${ENV_FILE}"
-    fi
-  fi
+  follow_app_port FRONTEND_APP_URL "" "${app_port}"
+  follow_app_port GOOGLE_REDIRECT_URI /api/v1/mail-accounts/google/callback "${app_port}"
   chmod 0600 "${ENV_FILE}"
 }
 
+# Validate, build, start, then pull the Ollama model and seed demo data when enabled.
 main() {
   require_docker
   create_env
