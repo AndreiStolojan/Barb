@@ -1,7 +1,7 @@
 import { FRONTEND_APP_URL } from '../../src/config/env.js';
 
 /*
-  SecureInbox transactional emails — one shared, on-brand, bulletproof shell used
+  Barb transactional emails — one shared, on-brand, bulletproof shell used
   by the welcome, monthly digest, daily digest, and phishing alert messages. Dark by default to
   mirror the app, with every colour set inline so it renders consistently across
   Gmail, Apple Mail, and Outlook. Hexes mirror frontend/src/index.css.
@@ -119,9 +119,9 @@ const shell = ({ preheader, accent = C.primary, title, eyebrow, body }) => `
               <table role="presentation" cellpadding="0" cellspacing="0" border="0">
                 <tr>
                   <td style="padding-right:10px;vertical-align:middle;">
-                    <img src="${APP_URL}/logo.png" alt="SecureInbox" width="40" height="40" style="display:block;border:0;border-radius:8px;" />
+                    <img src="${APP_URL}/logo.png" alt="Barb" width="40" height="40" style="display:block;border:0;border-radius:8px;" />
                   </td>
-                  <td style="font-family:${FONT};font-size:16px;font-weight:600;color:${C.fg};vertical-align:middle;">SecureInbox</td>
+                  <td style="font-family:${FONT};font-size:16px;font-weight:600;color:${C.fg};vertical-align:middle;">Barb</td>
                 </tr>
               </table>
             </td>
@@ -144,10 +144,10 @@ const shell = ({ preheader, accent = C.primary, title, eyebrow, body }) => `
           <!-- Footer -->
           <tr>
             <td style="padding:20px 8px;text-align:center;font-family:${FONT};font-size:12px;line-height:1.6;color:${C.subtle};">
-              SecureInbox — a security layer for your inbox.<br>
-              <a href="${APP_URL}/dashboard" target="_blank" style="color:${C.muted};text-decoration:underline;">Open SecureInbox</a>
+              Barb — a security layer for your inbox.<br>
+              <a href="${APP_URL}/dashboard" target="_blank" style="color:${C.muted};text-decoration:underline;">Open Barb</a>
               &nbsp;·&nbsp; Manage emails in Settings → Notifications<br>
-              © ${new Date().getFullYear()} SecureInbox
+              © ${new Date().getFullYear()} Barb
             </td>
           </tr>
         </table>
@@ -164,16 +164,16 @@ const mutedLine = (html) =>
   `<p style="margin:14px 0 0;font-family:${FONT};font-size:13px;line-height:1.6;color:${C.subtle};">${html}</p>`;
 
 const welcomeTemplate = (userName, createdAt) => ({
-  subject: `Welcome to SecureInbox, ${userName}`,
+  subject: `Welcome to Barb, ${userName}`,
   html: shell({
-    preheader: 'Your SecureInbox account is ready — connect Gmail to start scanning.',
+    preheader: 'Your Barb account is ready — connect Gmail to start scanning.',
     accent: C.primary,
     eyebrow: 'Welcome',
     title: `You're all set, ${escapeHtml(userName)}`,
     body: `
-      ${paragraph('Your account is ready. SecureInbox sits on top of your Gmail, scans every message for phishing signs, and gives each one a clear risk rating — so you can read your inbox with confidence.')}
+      ${paragraph('Your account is ready. Barb sits on top of your Gmail, scans every message for phishing signs, and gives each one a clear risk rating — so you can read your inbox with confidence.')}
       ${paragraph('Connect your Gmail to start syncing and scanning.')}
-      ${ctaButton('Open SecureInbox', `${APP_URL}/dashboard`)}
+      ${ctaButton('Open Barb', `${APP_URL}/dashboard`)}
       ${mutedLine(`Account created ${escapeHtml(createdAt)}.`)}
     `,
   }),
@@ -312,14 +312,14 @@ export const monthlyDigestTemplate = ({ summary }) => {
   const aiLine = `AI evaluated <strong style="color:${C.fg};">${formatNumber(ai.evaluated)}</strong> emails (${aiPct}%).${aiFailedPart}${aiDisabledPart}`;
 
   return {
-    subject: `Your SecureInbox report — ${periodLabel}`,
+    subject: `Your Barb report — ${periodLabel}`,
     html: shell({
       preheader: `${safeRate}% safe · ${formatNumber(threats)} threat${threats !== 1 ? 's' : ''} found · ${escapeHtml(periodLabel)}.`,
       accent: heroAccent,
       eyebrow: isMonthPeriod ? 'Monthly security briefing' : 'Security briefing',
       title: `Security report — ${periodLabel}`,
       body: `
-        ${paragraph(`SecureInbox scanned ${formatNumber(scanned)} of ${formatNumber(synced)} synced emails ${isMonthPeriod ? `in ${escapeHtml(periodLabel)}` : `in the selected period (${escapeHtml(periodLabel)})`} — here's what it found.`)}
+        ${paragraph(`Barb scanned ${formatNumber(scanned)} of ${formatNumber(synced)} synced emails ${isMonthPeriod ? `in ${escapeHtml(periodLabel)}` : `in the selected period (${escapeHtml(periodLabel)})`} — here's what it found.`)}
 
         <!-- Hero: safe rate banner -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.inner};border:1px solid ${C.border};border-radius:12px;margin:4px 0 20px;">
@@ -405,17 +405,17 @@ export const dailyDigestTemplate = ({ summary, userName }) => {
 
   return {
     subject: allClear
-      ? '[SecureInbox] Your inbox is clear today'
-      : `[SecureInbox] ${needsReview} email${needsReview !== 1 ? 's' : ''} to review from the last 24 hours`,
+      ? '[Barb] Your inbox is clear today'
+      : `[Barb] ${needsReview} email${needsReview !== 1 ? 's' : ''} to review from the last 24 hours`,
     html: shell({
       preheader: allClear
         ? `All ${formatNumber(scanned)} email${scanned !== 1 ? 's' : ''} scanned in the last 24 hours look safe.`
-        : `${reviewLabel} — open SecureInbox to check ${needsReview === 1 ? 'it' : 'them'}.`,
+        : `${reviewLabel} — open Barb to check ${needsReview === 1 ? 'it' : 'them'}.`,
       accent: heroAccent,
       eyebrow: 'Daily digest',
       title: 'Your inbox — last 24 hours',
       body: `
-        ${paragraph(`Hi ${escapeHtml(userName || 'there')}, here's what SecureInbox checked in your inbox over the last 24 hours.`)}
+        ${paragraph(`Hi ${escapeHtml(userName || 'there')}, here's what Barb checked in your inbox over the last 24 hours.`)}
 
         <!-- Hero: attention-first -->
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.inner};border:1px solid ${C.border};border-radius:12px;margin:4px 0 20px;">
@@ -456,8 +456,8 @@ export const phishingAlertTemplate = ({ userName, emails, detectedAt }) => {
   const emailCount = emails.length;
   const subject =
     emailCount === 1
-      ? '[SecureInbox] Phishing email detected in your inbox'
-      : `[SecureInbox] ${emailCount} phishing emails detected in your inbox`;
+      ? '[Barb] Phishing email detected in your inbox'
+      : `[Barb] ${emailCount} phishing emails detected in your inbox`;
 
   const rows = emails
     .map(
@@ -493,13 +493,13 @@ export const phishingAlertTemplate = ({ userName, emails, detectedAt }) => {
   return {
     subject,
     html: shell({
-      preheader: `Action needed: SecureInbox flagged ${emailCount} phishing message${emailCount > 1 ? 's' : ''} — do not interact until reviewed.`,
+      preheader: `Action needed: Barb flagged ${emailCount} phishing message${emailCount > 1 ? 's' : ''} — do not interact until reviewed.`,
       accent: C.quarantine,
       eyebrow: 'Phishing alert',
       title: `⚠ Phishing detected in your inbox`,
       body: `
-        ${paragraph(`Hi ${escapeHtml(userName)}, SecureInbox flagged <strong style="color:${C.quarantine};">${emailCount} message${emailCount > 1 ? 's' : ''}</strong> as likely phishing during the latest sync on ${escapeHtml(detectedAt)}.`)}
-        ${paragraph(`<strong>Do not click any links or download attachments</strong> from these messages until you have reviewed them in SecureInbox.`)}
+        ${paragraph(`Hi ${escapeHtml(userName)}, Barb flagged <strong style="color:${C.quarantine};">${emailCount} message${emailCount > 1 ? 's' : ''}</strong> as likely phishing during the latest sync on ${escapeHtml(detectedAt)}.`)}
+        ${paragraph(`<strong>Do not click any links or download attachments</strong> from these messages until you have reviewed them in Barb.`)}
 
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background:${C.inner};border:1px solid ${C.border};border-radius:12px;overflow:hidden;margin:4px 0 16px;">
           ${rows}
