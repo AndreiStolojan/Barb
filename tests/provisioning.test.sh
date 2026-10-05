@@ -84,6 +84,8 @@ if DB_URI=mongodb+srv://example.test/secureinbox PROVISION_ENV_FILE="$env_file" 
   exit 1
 fi
 
+COMPOSE_PROJECT_NAME=secureinbox-dev PROVISION_ENV_FILE="$env_file" bash -c 'source ./provision; load_runtime_values'
+
 cp "$env_file" "$temp_dir/atlas.env"
 printf '%s\n' 'COMPOSE_PROFILES=' 'DB_URI=mongodb+srv://example.test/secureinbox_test' >> "$temp_dir/atlas.env"
 PROVISION_ENV_FILE="$temp_dir/atlas.env" bash -c 'source ./provision; load_runtime_values'
