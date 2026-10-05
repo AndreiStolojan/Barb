@@ -1,0 +1,240 @@
+<!doctype html>
+<!--
+  Barb landing page, served at / and /install by nginx (the dashboard lives at
+  /dashboard and /inbox). Static and script-free so it fits the site CSP; the
+  only behavior is CSS, e.g. phones get the iPhone steps instead of the Mac download.
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#000000" />
+    <title>Barb: see the hook before you bite</title>
+    <meta name="description" content="Barb checks every Gmail message against real evidence and shows you why it looks like phishing." />
+    <meta property="og:title" content="Barb" />
+    <meta property="og:description" content="Phishing triage for Gmail that shows its work." />
+    <meta property="og:image" content="https://secure-inbox.app/landing/og-v1.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="apple-mobile-web-app-title" content="Barb" />
+    <link rel="preload" href="/fonts/InterVariable.woff2" as="font" type="font/woff2" crossorigin />
+    <style>
+      @font-face { font-family: Inter; font-weight: 100 900; font-display: swap; src: url('/fonts/InterVariable.woff2') format('woff2'); }
+      @font-face { font-family: 'IBM Plex Mono'; font-weight: 400; font-display: swap; src: url('/fonts/plex/IBMPlexMono-Roman-400-latin.woff2') format('woff2'); }
+
+      :root { --line: rgb(255 255 255 / 0.09); --soft: #a1a1a6; --red: #ff4d4d; }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { background: #000; color: #fff; font: 15px/1.55 Inter, -apple-system, system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+      a { color: inherit; text-decoration: none; }
+      img { display: block; max-width: 100%; height: auto; }
+      .wrap { max-width: 1120px; margin-inline: auto; padding-inline: 24px; }
+      .mono { font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; }
+
+      /* Header */
+      .nav { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+      .brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.01em; }
+      .nav-links { display: flex; align-items: center; gap: 22px; font-size: 13px; color: var(--soft); }
+      .nav-links a:hover { color: #fff; }
+      .pill-link { color: #fff; border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; }
+
+      /* Hero: a static grid that fades out, plus a few chips naming the checks Barb runs. */
+      .hero { position: relative; text-align: center; padding-block: 88px 72px; }
+      .hero::before {
+        content: ''; position: absolute; inset: -64px 0 0; z-index: -1;
+        background-image: linear-gradient(var(--line) 1px, transparent 1px), linear-gradient(90deg, var(--line) 1px, transparent 1px);
+        background-size: 56px 56px; opacity: 0.45;
+        -webkit-mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+        mask-image: radial-gradient(ellipse 70% 60% at 50% 30%, #000 20%, transparent 75%);
+      }
+      .chip {
+        position: absolute; font-size: 12px; color: #d4d4d8; background: #0c0c0e; border: 1px solid var(--line);
+        border-radius: 10px; padding: 8px 12px; box-shadow: 0 10px 30px rgb(0 0 0 / 0.6);
+      }
+      .chip b { color: var(--red); font-weight: 400; }
+      .chip.ok b { color: #7ee2b0; }
+      h1 { font-size: clamp(44px, 7.4vw, 84px); line-height: 0.98; letter-spacing: -0.045em; font-weight: 600; }
+      .lede { max-width: 560px; margin: 24px auto 0; font-size: 17px; color: var(--soft); }
+      .cta { margin-top: 36px; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+      .btn {
+        display: inline-flex; align-items: center; gap: 10px; background: #fff; color: #000; font-weight: 600;
+        font-size: 15px; padding: 13px 22px; border-radius: 12px;
+      }
+      .btn:hover { background: #e9e9ec; }
+      .cmd {
+        font-size: 13px; color: #e4e4e7; border: 1px solid var(--line); border-radius: 10px; padding: 9px 14px;
+        user-select: all; -webkit-user-select: all; cursor: text; max-width: 100%; overflow-x: auto; white-space: nowrap;
+      }
+      .cmd span { color: var(--soft); user-select: none; -webkit-user-select: none; }
+      .fine { font-size: 13px; color: var(--soft); }
+      .fine a { color: #fff; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgb(255 255 255 / 0.35); }
+      .phone-only { display: none; }
+
+      /* Product shot with a faint brand-red glow behind it. */
+      .shot { position: relative; margin-top: 8px; }
+      .shot::before {
+        content: ''; position: absolute; inset: 8% 10% auto; height: 60%; z-index: -1;
+        background: radial-gradient(ellipse at center, rgb(255 77 77 / 0.16), transparent 70%); filter: blur(40px);
+      }
+      .frame { border: 1px solid var(--line); border-radius: 14px; overflow: hidden; box-shadow: 0 40px 120px rgb(0 0 0 / 0.9); }
+
+      /* Sections */
+      section { margin-top: 140px; }
+      h2 { font-size: clamp(32px, 4.6vw, 48px); line-height: 1.04; letter-spacing: -0.035em; font-weight: 600; }
+      .sub { margin-top: 16px; max-width: 560px; font-size: 17px; color: var(--soft); }
+      .signals { margin-top: 48px; display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+      .signal { padding: 24px 22px 26px; }
+      .signal + .signal { border-left: 1px solid var(--line); }
+      .signal h3 { font-size: 15px; font-weight: 600; letter-spacing: -0.01em; }
+      .signal p { margin-top: 8px; font-size: 14px; color: var(--soft); }
+      .signal .mono { margin-top: 14px; font-size: 12px; color: #d4d4d8; }
+      .ticks { margin-top: 22px; display: flex; flex-wrap: wrap; gap: 10px 28px; font-size: 13px; color: var(--soft); }
+      .ticks li { list-style: none; display: flex; align-items: center; gap: 8px; }
+      .ticks li::before { content: '✓'; color: #7ee2b0; }
+
+      .split { display: grid; grid-template-columns: 1.15fr 1fr; gap: 64px; align-items: center; }
+      .steps { margin-top: 28px; counter-reset: step; display: grid; gap: 14px; }
+      .steps li { list-style: none; counter-increment: step; display: grid; grid-template-columns: 30px 1fr; align-items: baseline; font-size: 16px; }
+      .steps li::before { content: counter(step); font: 13px 'IBM Plex Mono', monospace; color: var(--soft); }
+      .phone { width: 300px; justify-self: center; border: 1px solid var(--line); border-radius: 40px; padding: 10px; background: #0a0a0b; box-shadow: 0 40px 120px rgb(0 0 0 / 0.9); }
+      .phone img { border-radius: 30px; }
+
+      .final { text-align: center; padding-block: 140px 120px; }
+      .final .cta { margin-top: 28px; }
+      footer { border-top: 1px solid var(--line); padding: 28px 0 40px; font-size: 13px; color: var(--soft); }
+      footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+      footer a:hover { color: #fff; }
+
+      @media (max-width: 860px) {
+        .chip { display: none; }
+        .signals { grid-template-columns: 1fr 1fr; }
+        .signal:nth-child(3) { border-left: 0; }
+        .signal:nth-child(n + 3) { border-top: 1px solid var(--line); }
+        .split { grid-template-columns: 1fr; gap: 48px; }
+      }
+      /* Phones: lead with the iPhone steps, since the Mac download is no use there. */
+      @media (max-width: 640px) {
+        .hero { padding-top: 56px; }
+        .mac-only { display: none; }
+        .phone-only { display: inline-flex; }
+        .nav-links .hide-sm { display: none; }
+        .signals { grid-template-columns: 1fr; }
+        .signal + .signal { border-left: 0; border-top: 1px solid var(--line); }
+        section { margin-top: 96px; }
+        .phone { width: 260px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="wrap nav">
+      <a class="brand" href="/">
+        <img src="/favicon.svg" width="28" height="28" alt="" />
+        Barb
+      </a>
+      <nav class="nav-links">
+        <a class="hide-sm" href="#how">How it works</a>
+        <a class="hide-sm" href="https://github.com/AndreiStolojan/SecureInbox">Source</a>
+        <a class="pill-link" href="/inbox">Open Barb</a>
+      </nav>
+    </header>
+
+    <main>
+      <div class="wrap hero">
+        <span class="chip mono" style="left: 2%; top: 70px; rotate: -6deg">dmarc=<b>fail</b></span>
+        <span class="chip mono ok" style="right: 3%; top: 54px; rotate: 5deg">dkim=<b>pass</b></span>
+        <span class="chip mono" style="left: 8%; top: 300px; rotate: 4deg">reply-to <b>≠</b> sender</span>
+        <span class="chip mono" style="right: 6%; top: 290px; rotate: -4deg">urlhaus: <b>listed</b></span>
+
+        <h1>See the hook<br />before you bite.</h1>
+        <p class="lede">Barb checks every Gmail message against real evidence and shows you exactly why it looks like phishing.</p>
+
+        <div class="cta">
+          <a class="btn mac-only" href="/downloads/Barb-macos-arm64.zip">
+            <svg width="16" height="18" viewBox="0 0 17 20" aria-hidden="true"><path fill="currentColor" d="M14.1 10.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.7-2-1.6-.2-3.1.9-3.9.9-.8 0-2-.9-3.4-.9C3.6 4.8 2 5.8 1.1 7.3c-1.9 3.2-.5 8 1.3 10.6.9 1.3 1.9 2.7 3.3 2.6 1.3-.1 1.8-.8 3.4-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.9-1.1-3-4.3ZM11.5 3c.7-.9 1.2-2 1.1-3.2-1 0-2.3.7-3 1.6-.7.8-1.3 2-1.1 3.1 1.1.1 2.3-.6 3-1.5Z"/></svg>
+            Download for macOS
+          </a>
+          <code class="cmd mono mac-only"><span>$ </span>curl -fsSL https://secure-inbox.app/install.sh | sh</code>
+          <a class="btn phone-only" href="#iphone">Add Barb to your iPhone</a>
+          <p class="fine mac-only">Apple Silicon. The Terminal line skips the Gatekeeper prompt. Also on <a href="#iphone">iPhone</a>.</p>
+        </div>
+      </div>
+
+      <div class="wrap shot">
+        <div class="frame"><img src="/landing/inbox-v1.webp" width="1440" height="900" alt="Barb showing why a fake Microsoft sign-in alert scored 83 out of 100" /></div>
+      </div>
+
+      <section id="how" class="wrap">
+        <h2>Every verdict<br />shows its work.</h2>
+        <p class="sub">A score is only useful if you can check it. Barb lists each rule that fired, the evidence behind it, and how much it weighed.</p>
+        <div class="signals">
+          <div class="signal">
+            <h3>Sender identity</h3>
+            <p>Checked independently, so a spoofed brand cannot outscore a real one.</p>
+            <div class="mono">spf · dkim · dmarc · arc</div>
+          </div>
+          <div class="signal">
+            <h3>Links</h3>
+            <p>Every redirect hop resolved and checked against threat feeds and domain age.</p>
+            <div class="mono">web risk · urlhaus · rdap</div>
+          </div>
+          <div class="signal">
+            <h3>Attachments</h3>
+            <p>Read by content, not by name. Macros, encrypted archives and PDF actions surface.</p>
+            <div class="mono">zip · ooxml · pdf · sha-256</div>
+          </div>
+          <div class="signal">
+            <h3>Local AI</h3>
+            <p>A bounded second opinion. It can never call a message phishing on its own.</p>
+            <div class="mono">ollama · runs locally</div>
+          </div>
+        </div>
+        <ul class="ticks">
+          <li>Reads Gmail, never sends from it</li>
+          <li>Attachments never touch disk</li>
+          <li>Runs on a Raspberry Pi</li>
+          <li>Open source</li>
+        </ul>
+      </section>
+
+      <section class="wrap">
+        <h2>Know where you stand.</h2>
+        <p class="sub">One briefing for the last 30 days: what got flagged, where it came from, and what still needs you.</p>
+        <div class="shot" style="margin-top: 48px">
+          <div class="frame"><img src="/landing/briefing-v1.webp" width="1440" height="1010" alt="The Barb briefing: 7 messages look like phishing, with a 30 day chart and sources" loading="lazy" /></div>
+        </div>
+      </section>
+
+      <section id="iphone" class="wrap split">
+        <div>
+          <h2>In your pocket.</h2>
+          <p class="sub">Barb installs on your iPhone straight from Safari. No App Store, no expiry.</p>
+          <ol class="steps">
+            <li>Open secure-inbox.app in Safari.</li>
+            <li>Tap Share.</li>
+            <li>Tap Add to Home Screen.</li>
+          </ol>
+        </div>
+        <div class="phone"><img src="/landing/phone-v1.webp" width="390" height="844" alt="Barb on iPhone explaining why a message was flagged" loading="lazy" /></div>
+      </section>
+
+      <div class="wrap final">
+        <h2>Stop guessing.<br />Start reading the evidence.</h2>
+        <div class="cta">
+          <a class="btn mac-only" href="/downloads/Barb-macos-arm64.zip">Download for macOS</a>
+          <a class="btn phone-only" href="#iphone">Add Barb to your iPhone</a>
+          <p class="fine">Or <a href="/inbox">open it in the browser</a>.</p>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <span>Barb · phishing triage for Gmail</span>
+        <span><a href="https://github.com/AndreiStolojan/SecureInbox">Source</a> · <a href="https://www.linkedin.com/in/andrei-stolojan/">Andrei Stolojan</a></span>
+      </div>
+    </footer>
+  </body>
+</html>
