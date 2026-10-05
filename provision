@@ -36,7 +36,8 @@ load_runtime_values() {
   local key shell_value profiles db_uri compose_files
   # Compose prefers exported shell variables over the env file, so an exported
   # DB_URI or COMPOSE_FILE would silently bypass every check below.
-  for key in NODE_ENV COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES DB_URI SEED_DEMO; do
+  for key in NODE_ENV COMPOSE_PROJECT_NAME COMPOSE_FILE COMPOSE_PROFILES DB_URI SEED_DEMO \
+    FRONTEND_APP_URL GOOGLE_REDIRECT_URI; do
     if shell_value="$(printenv "$key")" && [[ "$shell_value" != "$(dotenv_get "$key" "$ENV_FILE" || true)" ]]; then
       fail "$key is exported in this shell and would override ${ENV_FILE}. Unset it or put the value in the file."
     fi

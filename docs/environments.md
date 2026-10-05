@@ -27,7 +27,7 @@ and updates the demo account and its demo messages. Other data stays.
 
 | Mode | Check | Why |
 | --- | --- | --- |
-| Both | `NODE_ENV`, `COMPOSE_FILE`, `COMPOSE_PROFILES`, `COMPOSE_PROJECT_NAME`, `DB_URI` and `SEED_DEMO` are not exported in the shell with a different value | Compose prefers shell variables over the env file, so they would skip every check below |
+| Both | `NODE_ENV`, `COMPOSE_FILE`, `COMPOSE_PROFILES`, `COMPOSE_PROJECT_NAME`, `DB_URI`, `SEED_DEMO`, `FRONTEND_APP_URL` and `GOOGLE_REDIRECT_URI` are not exported in the shell with a different value | Compose prefers shell variables over the env file, so they would skip every check below |
 | Development | Project name ends in `-dev` or `-test` | Keeps development containers and volumes apart from production |
 | Development | `COMPOSE_FILE=docker-compose.yml` | Development never loads the production overlay |
 | Development | Exactly one of `DB_URI` or the `local-db` profile | One database, chosen on purpose |

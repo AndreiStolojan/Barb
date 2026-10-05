@@ -115,6 +115,10 @@ printf '%s\n' NODE_ENV=production COMPOSE_PROJECT_NAME=secureinbox \
 prod_hash="$(shasum -a 256 "$temp_dir/prod.env" | awk '{print $1}')"
 PROVISION_ENV_FILE="$temp_dir/prod.env" bash -c 'source ./provision; create_env; load_runtime_values'
 test "${prod_hash}" = "$(shasum -a 256 "$temp_dir/prod.env" | awk '{print $1}')"
+if FRONTEND_APP_URL=http://example.test PROVISION_ENV_FILE="$temp_dir/prod.env" bash -c 'source ./provision; load_runtime_values' >/dev/null 2>&1; then
+  echo 'Expected rejection of an exported HTTP FRONTEND_APP_URL' >&2
+  exit 1
+fi
 printf '%s\n' FRONTEND_APP_URL=http://example.test >> "$temp_dir/prod.env"
 if PROVISION_ENV_FILE="$temp_dir/prod.env" bash -c 'source ./provision; load_runtime_values' >/dev/null 2>&1; then
   echo 'Expected rejection of an HTTP production URL' >&2
