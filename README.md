@@ -1,77 +1,69 @@
-# SecureInbox
-
-[![Quality](https://github.com/AndreiStolojan/SecureInbox/actions/workflows/quality.yml/badge.svg)](https://github.com/AndreiStolojan/SecureInbox/actions/workflows/quality.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-
-SecureInbox is an explainable phishing triage application for Gmail. It scores
-every message from real evidence — verified sender identity, link and
-attachment reputation, deterministic rules, and a bounded local AI signal —
-and shows the reasoning behind each verdict instead of a black-box score.
-
-> **Maintenance status:** Active feature development paused on 2026-08-13.
-> The repository remains available as a portfolio and learning reference, but
-> there is no support or security-response SLA. Current deployment availability
-> is not guaranteed. See the [project handoff](docs/project-handoff.md) before
-> operating or extending it.
-
 <p align="center">
-  <img src="assets/screenshots/inbox.png" alt="SecureInbox inbox: message list beside the verdict and evidence pane" width="900" />
+  <img src="frontend/public/favicon.svg" width="72" alt="" />
 </p>
 
-## What it does
+<h1 align="center">Barb</h1>
 
-- Synchronizes Gmail incrementally via the history API, with optional
-  real-time ingestion through Gmail push notifications (Cloud Pub/Sub).
-- Authenticates the sender: SPF (via Gmail's own `Authentication-Results`),
-  DKIM (re-verified independently from the raw MIME), DMARC (evaluated live
-  against DNS), and ARC for forwarded and mailing-list mail. Brand
-  verification is gated on this result, so a spoofed sender can no longer
-  outscore an unverified one.
-- When threat intelligence is enabled, checks links against Google Web Risk
-  and URLhaus, resolves redirects with SSRF-hardened, resolved-IP validation on
-  every hop, and factors in domain age via RDAP.
-- When attachment verification is enabled, inspects attachments by content,
-  not filename: magic-byte type detection, in-memory ZIP/OOXML/PDF structural
-  analysis for encrypted archives, macros, and auto-executing PDF actions, and
-  optional SHA-256 lookups against MalwareBazaar. Bytes are never written to
-  disk or persisted.
-- Combines all of the above with deterministic rules and a bounded local
-  Ollama AI signal — AI alone can never declare a message phishing — through
-  an auditable, independently-failable signal-provider engine.
-- Explains why a message was marked safe, suspicious, or likely phishing.
-- Supports trusted and blocked sender rules plus manual review decisions.
-- Runs locally with Docker, MongoDB and optional Ollama.
+<p align="center">
+  <b>See the hook before you bite.</b><br />
+  Phishing triage for Gmail that shows its work.
+</p>
 
-## Architecture
+<p align="center">
+  <a href="https://secure-inbox.app/install">Install</a> ·
+  <a href="https://secure-inbox.app/inbox">Open in the browser</a> ·
+  <a href="docs/detection-engine.md">How detection works</a>
+</p>
 
-```text
-Browser -> nginx / React -> Express -> MongoDB
-                              |
-                              +-> optional Gmail OAuth, history sync, push (Pub/Sub)
-                              +-> local Ollama
-                              +-> DNS (DMARC), Web Risk, URLhaus, RDAP, MalwareBazaar
+<p align="center">
+  <img src="assets/screenshots/inbox-details.png" alt="Barb explaining why a fake Microsoft sign-in alert scored 83 out of 100" width="900" />
+</p>
+
+Most filters tell you a message is suspicious and stop there. Barb tells you why: the DMARC check that failed, the reply-to that points somewhere else, the link that's already on URLhaus. Every rule that fires shows up next to the message with the points it added, so you can check the reasoning instead of trusting a number.
+
+## What it looks at
+
+- **Who sent it.** SPF, DKIM, DMARC and ARC, checked against the raw message and live DNS. A spoofed "Microsoft" can't outscore the real one.
+- **Where the links go.** Every redirect hop, Google Web Risk, URLhaus, and how old the domain is.
+- **What's attached.** Files are read by content, not by name: macros, encrypted zips, PDFs that run something on open. Nothing touches disk.
+- **How it's worded.** A local model (Ollama) gives a second opinion. It can never call a message phishing on its own.
+
+You stay in charge. Mark a message safe, confirm it as phishing (Barb moves it to Spam), or trust and block senders. Barb reads your mail and never sends from your account.
+
+One honest caveat: Barb hasn't been measured against a labeled dataset yet, so there are no precision or recall numbers. Treat it as a sharp second pair of eyes.
+
+<table>
+  <tr>
+    <td><img src="assets/screenshots/briefing.png" alt="The briefing: what got flagged in the last 30 days and where it came from" /></td>
+    <td><img src="assets/screenshots/mac-app.png" alt="Barb running as a Mac app" /></td>
+  </tr>
+  <tr>
+    <td align="center">The briefing: your last 30 days at a glance</td>
+    <td align="center">The Mac app</td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="assets/screenshots/mobile-inbox.png" width="240" alt="Inbox on iPhone" />
+  <img src="assets/screenshots/mobile-message.png" width="240" alt="A flagged message on iPhone, with the reasons" />
+  <img src="assets/screenshots/mobile-briefing.png" width="240" alt="Briefing on iPhone" />
+</p>
+
+## Get it
+
+**Mac** (Apple Silicon). Paste into Terminal:
+
+```bash
+curl -fsSL https://secure-inbox.app/install.sh | sh
 ```
 
-The backend owns authentication, synchronization, scoring, reports, and data.
-The frontend talks to it through the nginx reverse proxy. Detection itself is
-a registry of independent signal providers — each new signal (authentication,
-threat intel, attachments) is its own module with its own weights, isolated
-so that one provider's failure or external dependency never blocks a scan.
-See [architecture.md](docs/architecture.md) and
-[detection-engine.md](docs/detection-engine.md) for the deeper design. The
-[project handoff](docs/project-handoff.md) records operational entry points,
-evidence limits, lessons learned, and a safe restart order.
+**iPhone.** Open [secure-inbox.app](https://secure-inbox.app) in Safari, tap Share, then Add to Home Screen.
 
-Repository branch gates, dependency maintenance, and the production emergency
-procedure are documented in [repository-controls.md](docs/repository-controls.md).
+**Anywhere else.** It's a web app: [secure-inbox.app](https://secure-inbox.app/inbox).
 
-## Quick start
+## Run your own
 
-Requirements:
-
-- Docker Engine or Docker Desktop with the Docker Compose plugin, running and
-  accessible without `sudo`.
-- OpenSSL, used to generate the local secrets.
+You need Docker and OpenSSL.
 
 ```bash
 git clone https://github.com/AndreiStolojan/SecureInbox.git
@@ -79,168 +71,26 @@ cd SecureInbox
 ./provision
 ```
 
-`./provision` creates a root `.env`, generates development secrets, starts the
-application and local MongoDB, and seeds six demo messages. Passwords stay in
-`.env`. Open `http://localhost:8080` and sign in as `demo@secureinbox.test`.
+Open http://localhost:8080 and sign in as `demo@secureinbox.test` (the password is in `.env`). Six demo messages are already seeded, so you can poke around before connecting Gmail.
 
-```bash
-docker compose ps
-curl --fail http://127.0.0.1:8080/api/v1/ready
-```
+Connecting Gmail, the optional threat feeds, backups and the rest are in the [self-hosting guide](docs/self-hosting.md). The production instance runs on a Raspberry Pi; that setup is in [raspberry-pi-deployment.md](docs/raspberry-pi-deployment.md).
 
-The same source and command support development with local MongoDB or Atlas,
-and production with Atlas. Only the root environment configuration changes.
-See [development and deployment](docs/environments.md) for native hot reload,
-optional Ollama, and running both environments on one Pi.
+## Under the hood
 
-## Optional Gmail connection
+React and Vite in front, Express and MongoDB behind, nginx in between, Ollama on the side if you want it. The Mac app is a small Tauri shell around the same frontend. Each detection signal is its own provider with its own weights, so one that fails or times out never blocks a scan. The details are in [architecture.md](docs/architecture.md) and [detection-engine.md](docs/detection-engine.md).
 
-The local application starts without Google, email, or Arcjet credentials.
-Features that need a missing integration return a clear message only when used.
+(The repo is still called SecureInbox. The app got a better name.)
 
-To connect Gmail, add these values to `.env`:
+## Contributing
 
-```dotenv
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URI=http://localhost:8080/api/v1/mail-accounts/google/callback
-```
+PRs are welcome. Small fixes can go straight to a pull request; for bigger changes, open an issue first so we can agree on the shape. Good places to start:
 
-Add the same redirect URI to the OAuth client in Google Cloud, then run
-`./provision` again:
+- a phishing email Barb got wrong (send the headers and the verdict, not the whole message),
+- a new detection signal,
+- the Android app, which doesn't exist yet.
 
-```bash
-nano .env
-./provision
-```
+[CONTRIBUTING.md](CONTRIBUTING.md) has the setup and the checks to run. Found a security issue? Please report it privately, see [SECURITY.md](SECURITY.md).
 
-SMTP and Arcjet variables are documented in `.env.example` and are optional.
+## License
 
-## Optional detection integrations
-
-Every integration below is off or degraded by default and fails independently:
-a missing key or an unreachable service never blocks a scan, but the missing
-signal is not evidence that the message is safe. Common Compose variables are
-documented with their defaults in `.env.example`; backend-only bounds remain in
-`backend/src/config/env.js`.
-
-| Feature | Env vars | Without it |
-| --- | --- | --- |
-| Gmail push notifications | `GMAIL_PUSH_ENABLED`, `GOOGLE_CLOUD_PROJECT_ID`, `GMAIL_PUBSUB_TOPIC`, `GMAIL_PUSH_AUDIENCE` | Falls back to incremental history polling |
-| Threat intelligence (Web Risk, URLhaus, domain age) | `THREAT_INTEL_ENABLED`; keys configure Web Risk and URLhaus | Link scoring stays lexical while disabled; enabled RDAP needs no API key |
-| Attachment verification | `ATTACHMENT_ANALYSIS_ENABLED` | Attachments are scored by extension only |
-
-Enabling threat intelligence sends bounded URLs to Google Web Risk and URLhaus,
-registrable domains to RDAP registries, and DNS queries to the configured
-resolver path. Enabling MalwareBazaar reputation sends only attachment SHA-256
-hashes, not attachment bytes. Review those providers' privacy and retention
-terms before using real mailbox data.
-
-Gmail push notifications additionally need a public HTTPS endpoint (the
-Cloudflare Tunnel used in the production deployment) and are not meant to be
-exercised on a bare local install; incremental history sync is what runs
-out of the box.
-
-## Local operations
-
-Show status and logs:
-
-```bash
-docker compose ps
-docker compose logs --tail=100
-docker compose logs --follow backend
-```
-
-Restart the application:
-
-```bash
-docker compose restart
-```
-
-Update the local installation:
-
-```bash
-git pull --ff-only origin main
-./provision
-```
-
-Create a validated MongoDB backup:
-
-```bash
-./scripts/backup
-ls -lh backups
-```
-
-The archive contains email content and encrypted OAuth tokens. Store it with
-restricted access and encrypt any copy that leaves the machine.
-
-Restore the latest backup:
-
-```bash
-LATEST_BACKUP="$(find backups -name '*.archive.gz' -type f | sort | tail -1)"
-test -n "$LATEST_BACKUP" || { echo "No backup archive found" >&2; exit 1; }
-./scripts/restore "$LATEST_BACKUP" --confirm-replace
-```
-
-Restore is destructive: it verifies the timestamped archive and manifest, then
-replaces the configured local database. Backup names use a zero-padded UTC
-timestamp, so their lexical order is chronological.
-
-Keep an encrypted backup of `.env` with every MongoDB backup. In particular,
-`MAIL_TOKEN_ENCRYPTION_KEY` is required to decrypt restored Gmail tokens.
-
-Stop the application while preserving all data:
-
-```bash
-docker compose down
-```
-
-To erase MongoDB and the downloaded Ollama model:
-
-```bash
-docker compose down --volumes
-```
-
-That command is destructive and cannot be undone without a backup.
-
-## Development checks
-
-Development checks require Node.js `24.20.0` and npm, matching CI.
-
-```bash
-npm --prefix backend install
-npm --prefix frontend install
-npm --prefix backend run lint
-npm --prefix backend test
-npm --prefix frontend test
-npm --prefix frontend run build
-```
-
-### Automated review
-
-Two coding agents review pull requests on request. Neither runs automatically,
-and neither appears in the GitHub reviewer list; both start from a pull request
-comment. Their shared rules live in `AGENTS.md`, which `CLAUDE.md` imports.
-
-| Agent  | Review only                | Change the pull request branch                         |
-| ------ | -------------------------- | ------------------------------------------------------ |
-| Codex  | `@codex review`            | `@codex fix the reported issue and push the changes`   |
-| Claude | `@claude review this PR`   | `@claude fix the reported issue and push to this branch` |
-
-## Limitations
-
-- Gmail OAuth requires a Google Cloud client and configured test users.
-- Real-time push ingestion needs a public HTTPS endpoint and a Cloud Pub/Sub
-  topic; a bare local install synchronizes via incremental history polling.
-- Threat intelligence and attachment hash reputation depend on third-party
-  services (Google Web Risk, URLhaus, MalwareBazaar) and degrade to the
-  underlying deterministic rules if those are unreachable or unconfigured.
-- Local AI is a secondary signal and cannot declare phishing on its own.
-- SecureInbox does not claim precision or recall without a labeled evaluation dataset.
-
-## Author and license
-
-Andrei Stolojan — [GitHub](https://github.com/AndreiStolojan) ·
-[LinkedIn](https://www.linkedin.com/in/andrei-stolojan/)
-
-Released under the [MIT License](LICENSE).
+[MIT](LICENSE). Built by [Andrei Stolojan](https://github.com/AndreiStolojan) · [LinkedIn](https://www.linkedin.com/in/andrei-stolojan/).
