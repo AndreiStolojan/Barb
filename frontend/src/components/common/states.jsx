@@ -53,7 +53,14 @@ export function EmptyState({ icon: Icon, title, description, action, className }
   );
 }
 
-/* Starts the Google OAuth flow. Used on the first-run screen and in Settings. */
+// Set by `vite build --mode native` for the Tauri and Capacitor app shells.
+const NATIVE_SHELL = import.meta.env.VITE_NATIVE_SHELL === 'true';
+
+/*
+  Starts the Google OAuth flow. Used on the first-run screen and in Settings.
+  Google refuses its sign-in inside app WebViews, so the native shells point to
+  the website instead. The Gmail link lives on the server, so it carries over.
+*/
 export function ConnectGmailButton({ size = 'md', className, children = 'Connect Gmail' }) {
   const connect = useAsyncAction(async () => {
     const result = await getGoogleConnectUrl();
@@ -61,6 +68,14 @@ export function ConnectGmailButton({ size = 'md', className, children = 'Connect
     if (!url) throw new Error('Google sign-in is not configured on this server.');
     window.location.href = url;
   });
+
+  if (NATIVE_SHELL) {
+    return (
+      <p className={cn('text-sm text-muted-foreground', className)}>
+        Connect Gmail from {new URL(import.meta.env.VITE_API_BASE_URL).host} in a browser, then reopen the app.
+      </p>
+    );
+  }
 
   return (
     <Button
