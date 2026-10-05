@@ -1,11 +1,31 @@
 # Project retrospective and handoff
 
-Original snapshot: 2026-08-13. Operational update: 2026-09-11.
+Original snapshot: 2026-08-13. Operational update: 2026-09-11. Status update:
+2026-10-06.
 
-Development has resumed. PR #110 integrated the application audit and shared
-environments; measurements are in [pi-workspace-review.md](pi-workspace-review.md).
-Production remains at `dd7b89f` pending #95 and the rollout checks in #74.
-The [recovery runbook](hibernation-recovery-runbook.md) preserves the historical
+## Current status
+
+The project is in active development and accepts contributions; see
+[CONTRIBUTING.md](../CONTRIBUTING.md). The app is now called Barb; the
+repository keeps the SecureInbox name, and internal identifiers (the token
+storage key, database names, the `secure-inbox.app` domain) are unchanged.
+
+Production runs the `prod` branch on the Pi at
+[secure-inbox.app](https://secure-inbox.app), which now opens on a landing page;
+the dashboard lives under `/inbox`. Every promotion PR into `prod` carries a
+release record with the deployed revision, rollback target and backup, so read
+the latest one for the live state. Besides the web app, Barb ships as a Tauri
+Mac app (`scripts/build-mac-app.sh`, published with `scripts/publish-mac-app.sh`)
+and installs on iPhone as a home-screen web app.
+
+The Quality and Promotion workflows are disabled for now. Run the checks in
+[CONTRIBUTING.md](../CONTRIBUTING.md) locally before opening a pull request.
+
+## History
+
+PR #110 integrated the application audit and shared environments; measurements
+are in [pi-workspace-review.md](pi-workspace-review.md). The
+[recovery runbook](hibernation-recovery-runbook.md) preserves the historical
 Atlas drill and lists the remaining #77 evidence. Hibernation is optional.
 
 Native development and shared-data inspection now use the same backend with an
@@ -16,8 +36,8 @@ The sections below retain historical implementation/test evidence. For current
 startup and configuration commands use [environments.md](environments.md) and
 [raspberry-pi-deployment.md](raspberry-pi-deployment.md).
 
-SecureInbox remains public as a portfolio and learning reference. There is no
-support or security-response SLA, and repository documentation does not prove
+There is no support or security-response SLA; [SECURITY.md](../SECURITY.md)
+explains how to report vulnerabilities. Repository documentation does not prove
 that a production deployment is currently online, healthy, or configured as
 described. Verify live state before operating it.
 
