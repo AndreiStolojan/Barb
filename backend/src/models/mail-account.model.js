@@ -90,6 +90,11 @@ const mailAccountSchema = new mongoose.Schema(
             type: String,
             default: null,
         },
+        // Oldest receive date the current backfill lists; never before connection.
+        backfillAfter: {
+            type: Date,
+            default: null,
+        },
         backfillCompletedAt: {
             type: Date,
             default: null,
