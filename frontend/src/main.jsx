@@ -17,6 +17,8 @@ createRoot(document.getElementById('root')).render(
           <App />
           <Toaster
             position="bottom-right"
+            // Phones: sit above the tab bar instead of covering it.
+            mobileOffset={{ bottom: 'calc(4.75rem + env(safe-area-inset-bottom))' }}
             duration={3200}
             theme="dark"
             toastOptions={{

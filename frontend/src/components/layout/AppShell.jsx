@@ -53,7 +53,8 @@ export function AppShell() {
         <div className="flex min-h-dvh bg-background md:h-dvh md:overflow-hidden">
           <Rail onOpenPalette={() => setPalette(true)} onOpenSupport={() => setSupport(true)} />
 
-          <div className="flex min-w-0 flex-1 flex-col pb-16 md:py-2.5 md:pb-2.5 md:pr-2.5">
+          {/* Phones: room for the tab bar, which grows by the home-indicator inset. */}
+          <div className="flex min-w-0 flex-1 flex-col pb-[calc(4rem+env(safe-area-inset-bottom))] md:py-2.5 md:pb-2.5 md:pr-2.5">
             <MobileTopbar title={titleFor(location.pathname)} onOpenPalette={() => setPalette(true)} onOpenSupport={() => setSupport(true)} />
             <main className="flex min-h-0 min-w-0 flex-1 flex-col">
               <Suspense fallback={<LoadingState />}>

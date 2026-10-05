@@ -136,15 +136,16 @@ function Hero({ counts, total, scanned, safeRate }) {
   }
 
   return (
-    <section className="card flex min-w-0 flex-col justify-between gap-7 p-6 md:px-8 md:py-7">
-      <div>
+    // Phones: centred, so the verdict reads as the one thing on the screen.
+    <section className="card flex min-w-0 flex-col justify-between gap-6 p-6 max-md:items-center max-md:text-center md:gap-7 md:px-8 md:py-7">
+      <div className="max-md:flex max-md:flex-col max-md:items-center">
         <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl" style={{ color: tone, backgroundColor: `color-mix(in srgb, ${tone} 13%, transparent)` }}>
           <Icon className="h-5 w-5" strokeWidth={1.7} />
         </span>
-        <h2 className="text-display font-medium">{headline}</h2>
+        <h2 className="text-h2 font-medium text-balance md:text-display">{headline}</h2>
         <p className="mt-2 text-[0.96875rem] text-muted-foreground">{detail}</p>
       </div>
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2 max-md:justify-center">
         {reviewTo && (
           <Button asChild variant="primary" size="lg">
             <Link to={reviewTo}>Review {plural(reviewCount, 'it', 'them')}</Link>
@@ -182,8 +183,8 @@ function Breakdown({ counts, total, scanned, safeRate }) {
 
   return (
     <section className="card flex min-w-0 flex-col justify-center p-6 md:px-8">
-      <div className="grid items-center gap-7 sm:grid-cols-[148px_minmax(0,1fr)]">
-        <div className="relative mx-auto h-[148px] w-[148px]" role="img" aria-label={`Safe rate ${safeRate} percent. ${scanned === 0 ? 'Nothing scanned yet' : getPostureLabel(safeRate)}.`}>
+      <div className="grid items-center gap-5 min-[360px]:grid-cols-[112px_minmax(0,1fr)] sm:grid-cols-[148px_minmax(0,1fr)] sm:gap-7">
+        <div className="relative mx-auto h-[112px] w-[112px] sm:h-[148px] sm:w-[148px]" role="img" aria-label={`Safe rate ${safeRate} percent. ${scanned === 0 ? 'Nothing scanned yet' : getPostureLabel(safeRate)}.`}>
           <svg viewBox="0 0 148 148" className="h-full w-full -rotate-90">
             <circle cx="74" cy="74" r="62" fill="none" stroke="rgb(255 255 255 / 0.06)" strokeWidth="12" />
             {arcs.map((a) => (
@@ -191,7 +192,7 @@ function Breakdown({ counts, total, scanned, safeRate }) {
             ))}
           </svg>
           <div className="absolute inset-0 flex flex-col items-center justify-center">
-            <span className="data text-[2.125rem] font-medium leading-none tracking-[-0.03em]">{scanned === 0 ? '–' : `${safeRate}%`}</span>
+            <span className="data text-[1.625rem] font-medium leading-none tracking-[-0.03em] sm:text-[2.125rem]">{scanned === 0 ? '–' : `${safeRate}%`}</span>
             <span className="mt-1 text-[0.8125rem] text-muted-foreground-subtle">safe</span>
           </div>
         </div>
@@ -460,9 +461,10 @@ export function DashboardPage() {
 
   return (
     <PagePanel>
-      <div className="mx-auto w-full max-w-[90rem] px-5 pb-12 pt-6 md:px-11 md:pt-9">
+      <div className="mx-auto w-full max-w-[90rem] px-4 pb-8 pt-2 md:px-11 md:pb-12 md:pt-9">
+        {/* Phones: just the controls, so the verdict is on the first screen. The top bar names the page. */}
         <header className="flex flex-wrap items-end justify-between gap-4">
-          <div>
+          <div className="max-md:sr-only">
             <h1 className="text-h1 font-medium">
               {greeting()}, {firstName}
             </h1>
@@ -484,19 +486,19 @@ export function DashboardPage() {
         {!isConnected ? (
           <ConnectGmailState compact />
         ) : statsQuery.loading ? (
-          <div className="mt-7">
+          <div className="mt-4 md:mt-7">
             <BriefingSkeleton />
           </div>
         ) : statsQuery.error ? (
           <ErrorState message={statsQuery.error} onRetry={statsQuery.reload} />
         ) : (
-          <div className="mt-7 grid gap-4">
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+          <div className="mt-4 grid gap-3 md:mt-7 md:gap-4">
+            <div className="grid gap-3 md:gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
               <Hero counts={counts} total={total} scanned={scanned} safeRate={safeRate} />
               <Breakdown counts={counts} total={total} scanned={scanned} safeRate={safeRate} />
             </div>
             <FlaggedPerDay data={Array.isArray(trendQuery.data) ? trendQuery.data : []} loading={trendQuery.loading} label={label} />
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
+            <div className="grid gap-3 md:gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
               <ReviewQueue emails={normalizeEmailList(riskyQuery.data)} loading={riskyQuery.loading} />
               <Sources senders={sendersQuery.data} loading={sendersQuery.loading} />
             </div>
