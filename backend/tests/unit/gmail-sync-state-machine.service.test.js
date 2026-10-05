@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createGmailSyncStateMachine } from '../../src/services/gmail-sync-state-machine.service.js';
+import { requestGmailSyncResource } from '../../src/services/mail-account.service.js';
 import MailAccount from '../../src/models/mail-account.model.js';
 
 const account = (overrides = {}) => ({
@@ -310,9 +311,8 @@ test('initial backfill lists only mail received after the account was connected'
     assert.equal(calls.updates.at(-1).patch.backfillAfter, null);
 });
 
-test('resync lists from a day before the last sync, never before connection', async () => {
+test('resync lists from the connection time, not from the expired cursor', async () => {
     const connectedAt = new Date('2026-09-01T00:00:00Z');
-    const lastSyncedAt = new Date('2026-10-01T12:00:00Z');
     const { machine, calls } = makeMachine({
         responses: [{ historyId: 'anchor' }, { messages: [] }],
     });
@@ -322,12 +322,12 @@ test('resync lists from a day before the last sync, never before connection', as
             syncState: 'resync_required',
             lastHistoryId: 'expired',
             createdAt: connectedAt,
-            lastSyncedAt,
+            lastSyncedAt: new Date('2026-10-01T12:00:00Z'),
         }),
         lockOwner: 'lock',
     });
 
-    assert.deepEqual(calls.requests[1].after, new Date('2026-09-30T12:00:00Z'));
+    assert.deepEqual(calls.requests[1].after, connectedAt);
 });
 
 test('an unbounded backfill from before the floor restarts bounded instead of resuming', async () => {
@@ -349,4 +349,28 @@ test('an unbounded backfill from before the floor restarts bounded instead of re
     assert.deepEqual(calls.requests.map(({ type }) => type), ['profile', 'messages.list']);
     assert.equal(calls.requests[1].pageToken, null);
     assert.deepEqual(calls.requests[1].after, connectedAt);
+});
+
+test('messages.list sends the floor to Gmail as an after: query in epoch seconds', async () => {
+    const originalFetch = globalThis.fetch;
+    let requestedUrl;
+    try {
+        globalThis.fetch = async (url) => {
+            requestedUrl = new URL(url);
+            return { ok: true, status: 200, json: async () => ({ messages: [] }) };
+        };
+
+        await requestGmailSyncResource({
+            type: 'messages.list',
+            mailAccount: { _id: 'account-1', accessToken: 'plain-test-token' },
+            maxResults: 10,
+            labelIds: ['INBOX'],
+            after: new Date('2026-10-01T08:00:00.900Z'),
+        });
+
+        assert.equal(requestedUrl.searchParams.get('q'), 'after:1790841600');
+        assert.deepEqual(requestedUrl.searchParams.getAll('labelIds'), ['INBOX']);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });

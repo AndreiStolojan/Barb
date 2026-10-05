@@ -21,10 +21,6 @@ const isInboxLabelChange = (change) =>
 
 const isHistoryGap = (error) => error?.statusCode === 404 || error?.status === 404;
 
-// A history gap is recovered by listing mail received shortly before the last
-// successful sync, so the overlap absorbs messages delivered late.
-const RESYNC_OVERLAP_MS = 24 * 60 * 60 * 1000;
-
 const clockMs = (clock) => {
     const value = clock();
     return value instanceof Date ? value.getTime() : Number(value);
@@ -151,15 +147,6 @@ export const createGmailSyncStateMachine = (deps) => {
         };
     };
 
-    // SecureInbox only reads mail received after the account was connected. A
-    // resync narrows that further to just before the last successful sync.
-    const listFloor = (account, mode) => {
-        const connectedAtMs = account.createdAt ? new Date(account.createdAt).getTime() : clockMs(clock);
-        const lastSyncedAtMs = account.lastSyncedAt ? new Date(account.lastSyncedAt).getTime() : null;
-        if (mode !== 'resync' || lastSyncedAtMs === null) return new Date(connectedAtMs);
-        return new Date(Math.max(connectedAtMs, lastSyncedAtMs - RESYNC_OVERLAP_MS));
-    };
-
     // Lists INBOX messages newer than backfillAfter, then hands off to history
     // sync. The floor is stored so a capped run resumes the same bounded query.
     const runBackfill = async ({ mailAccount, lockOwner, mode, resetAnchor }) => {
@@ -177,7 +164,9 @@ export const createGmailSyncStateMachine = (deps) => {
                     syncState: 'backfilling',
                     lastHistoryId: historyId,
                     backfillPageToken: null,
-                    backfillAfter: listFloor(account, mode),
+                    // SecureInbox never reads mail received before the account
+                    // was connected. Already stored messages are skipped below.
+                    backfillAfter: new Date(account.createdAt ?? clockMs(clock)),
                     backfillCompletedAt: null,
                 },
             });
@@ -406,8 +395,6 @@ export const createGmailSyncStateMachine = (deps) => {
                 }
 
                 const state = mailAccount.syncState || 'never_synced';
-                // Backfills started before the floor existed walk the whole
-                // mailbox; restart them as a bounded backfill instead.
                 if (state === 'backfilling' && mailAccount.backfillAfter) {
                     attemptedMode = 'backfill';
                     return runBackfill({
@@ -417,6 +404,8 @@ export const createGmailSyncStateMachine = (deps) => {
                         resetAnchor: false,
                     });
                 }
+                // A 'backfilling' account without a floor started before the
+                // floor existed and walks the whole mailbox; restart it bounded.
                 if (forceBackfill || ['never_synced', 'backfilling', 'resync_required'].includes(state)) {
                     const mode = state === 'resync_required' ? 'resync' : 'backfill';
                     attemptedMode = mode;
