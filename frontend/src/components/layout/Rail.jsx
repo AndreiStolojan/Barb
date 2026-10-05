@@ -37,18 +37,15 @@ export const initials = (name, fallback = '?') => {
   return (words[0]?.[0] || '?').toUpperCase();
 };
 
-/* The mark: a shield with a check, drawn so it follows the tokens. */
+/* The mark: the Barb fishhook. The hook follows the text color; the barb stays brand red. */
 export function Mark({ className }) {
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" className={cn('h-5 w-5', className)}>
-      <path
-        d="M12 2.75 4.75 5.6v5.5c0 4.36 2.94 8.43 7.25 9.65 4.31-1.22 7.25-5.29 7.25-9.65V5.6L12 2.75Z"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinejoin="round"
-      />
-      <path d="m8.9 11.9 2.2 2.2 4-4.4" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 2.5 52 52" aria-hidden="true" className={cn('h-5 w-5', className)}>
+      <g fill="none" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="36" cy="10" r="4" stroke="currentColor" />
+        <path d="M36 14 V40 A11 11 0 0 1 14 40 V34" stroke="currentColor" />
+        <path d="M14 26 V34 M14 26 L21 33" stroke="#ff4d4d" />
+      </g>
     </svg>
   );
 }
@@ -118,7 +115,7 @@ function AccountMenu({ onOpenPalette, onOpenSupport, side = 'right', align = 'en
 export function Rail({ onOpenPalette, onOpenSupport }) {
   return (
     <aside aria-label="Primary" className="sticky top-0 hidden h-dvh w-[68px] shrink-0 flex-col items-center gap-1 py-[18px] md:flex">
-      <NavLink to="/dashboard" aria-label="SecureInbox" className="focus-ring mb-5 flex h-[42px] w-[42px] items-center justify-center rounded-xl text-foreground">
+      <NavLink to="/dashboard" aria-label="Barb" className="focus-ring mb-5 flex h-[42px] w-[42px] items-center justify-center rounded-xl text-foreground">
         <Mark />
       </NavLink>
 

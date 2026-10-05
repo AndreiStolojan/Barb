@@ -19,7 +19,7 @@ import './LoginPage.css';
 
 const THEME = {
   id: 'graphite',
-  description: 'Your inbox should feel simple and safe. SecureInbox highlights what deserves your attention before you open, click, or reply.',
+  description: 'Your inbox should feel simple and safe. Barb highlights what deserves your attention before you open, click, or reply.',
   loginKicker: 'Protected session',
   loginTitle: 'Return to your inbox',
   loginIntro: 'Continue to an AI-reviewed, sanitized view of every message.',
@@ -173,7 +173,7 @@ export function LoginPage() {
       <header className="si-topbar">
         <div className="si-brand si-brand-code">
           <span className="si-code-logo">
-            <strong>SecureInbox</strong>
+            <strong>Barb</strong>
           </span>
         </div>
       </header>
@@ -232,7 +232,7 @@ export function LoginPage() {
               <h2 id="auth-title">{isRegistering ? 'Create your account' : theme.loginTitle}</h2>
               <p className="si-panel-intro">
                 {isRegistering
-                  ? 'Set up your SecureInbox profile in a few seconds.'
+                  ? 'Set up your Barb profile in a few seconds.'
                   : theme.loginIntro}
               </p>
             </motion.div>
@@ -381,7 +381,7 @@ export function LoginPage() {
       </section>
 
       <footer className="si-footer">
-        <span>© {new Date().getFullYear()} SecureInbox</span>
+        <span>© {new Date().getFullYear()} Barb</span>
         <span className="si-footer-line" />
         <span>Designed for clarity under pressure</span>
       </footer>

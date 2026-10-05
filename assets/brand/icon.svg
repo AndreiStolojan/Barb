@@ -1,0 +1,11 @@
+<!-- Barb app icon: a fishhook whose barb, the part that makes it dangerous, is red. Full-bleed square; platforms round the corners themselves. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" fill="#0d0d0d"/>
+  <g transform="translate(32 32) scale(0.82) translate(-26 -28.5)" fill="none" stroke-linecap="round" stroke-linejoin="round" stroke-width="3.5">
+    <g stroke="#ffffff">
+      <circle cx="36" cy="10" r="4"/>
+      <path d="M36 14 V40 A11 11 0 0 1 14 40 V34"/>
+    </g>
+    <path d="M14 26 V34 M14 26 L21 33" stroke="#ff4d4d"/>
+  </g>
+</svg>

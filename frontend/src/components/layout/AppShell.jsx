@@ -23,7 +23,7 @@ import { MobileTabs, MobileTopbar, NAV, Rail } from './Rail';
 import { ShortcutsHelp } from './ShortcutsHelp';
 import { SupportDialog } from './SupportDialog';
 
-const titleFor = (pathname) => NAV.find((n) => pathname.startsWith(n.to))?.label || 'SecureInbox';
+const titleFor = (pathname) => NAV.find((n) => pathname.startsWith(n.to))?.label || 'Barb';
 
 export function AppShell() {
   const location = useLocation();
