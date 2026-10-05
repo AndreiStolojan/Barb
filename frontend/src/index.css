@@ -427,3 +427,14 @@
     font-size: 16px !important;
   }
 }
+
+/*
+  Toasts sit above the phone tab bar. Sonner sets its offset inline and only
+  switches to its mobile offset below 600px, so the whole phone layout is
+  covered here.
+*/
+@media (width < 48rem) {
+  [data-sonner-toaster][data-y-position='bottom'] {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom)) !important;
+  }
+}
