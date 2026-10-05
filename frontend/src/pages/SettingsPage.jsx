@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SettingsPage.jsx — account, the mailbox being scanned, and when SecureInbox
+// SettingsPage.jsx — account, the mailbox being scanned, and when Barb
 // reaches out. One column of sections; on wide screens each section puts its
 // title and purpose on the left and its controls on the right.
 //
@@ -184,11 +184,11 @@ export function SettingsPage() {
       <div className="mx-auto w-full max-w-[64rem] px-5 pb-12 pt-6 md:px-11 md:pt-9">
         <header>
           <h1 className="text-h1 font-medium">Settings</h1>
-          <p className="mt-1 text-[0.9375rem] text-muted-foreground">Your account, your mailbox, and when SecureInbox writes to you.</p>
+          <p className="mt-1 text-[0.9375rem] text-muted-foreground">Your account, your mailbox, and when Barb writes to you.</p>
         </header>
 
         <div className="mt-7 grid gap-4">
-          <Section title="Profile" purpose="How SecureInbox addresses you in the emails it sends.">
+          <Section title="Profile" purpose="How Barb addresses you in the emails it sends.">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="grid content-start gap-1.5">
                 <Label htmlFor="name">Name</Label>
@@ -205,7 +205,7 @@ export function SettingsPage() {
             </div>
           </Section>
 
-          <Section title="Gmail" purpose="The mailbox SecureInbox scans. It never sends mail from your account; marking a message as phishing moves it to Spam.">
+          <Section title="Gmail" purpose="The mailbox Barb scans. It never sends mail from your account; marking a message as phishing moves it to Spam.">
             {isConnected ? (
               <>
                 <Row first label={address} hint={`Connected. Last synced ${formatDateTime(account.lastSyncedAt)}.`}>
@@ -250,7 +250,7 @@ export function SettingsPage() {
             <ToggleRow first id="ai-toggle" label="AI explanations" hint="Adds a plain-language reading of each message on top of the deterministic rules. The model alone can never declare a message phishing." checked={aiEnabled} disabled={toggleAi.loading} onCheckedChange={(next) => toggleAi.run(next).catch(fail('Could not update.'))} />
           </Section>
 
-          <Section title="Notifications" purpose="When SecureInbox emails you.">
+          <Section title="Notifications" purpose="When Barb emails you.">
             <ToggleRow first id="alerts-toggle" label="Instant phishing alerts" hint="Sent the moment a sync turns up a likely phishing message." checked={alertsEnabled} disabled={toggleAlerts.loading} onCheckedChange={(next) => toggleAlerts.run(next).catch(fail('Could not update.'))} />
             <ToggleRow id="digest-toggle" label="Daily digest" hint="One summary a day. Nothing urgent waits for it." checked={digestEnabled} disabled={toggleDigest.loading} onCheckedChange={(next) => toggleDigest.run(next).catch(fail('Could not update.'))} />
             {digestEnabled && (
@@ -289,7 +289,7 @@ export function SettingsPage() {
             )}
           </Section>
 
-          <Section danger title="Delete account" purpose="Removes your profile, every synced message, every scan and your sender rules. No undo, no export. To withdraw Google access as well, remove SecureInbox from your Google Account permissions.">
+          <Section danger title="Delete account" purpose="Removes your profile, every synced message, every scan and your sender rules. No undo, no export. To withdraw Google access as well, remove Barb from your Google Account permissions.">
             <Row first label="You will be signed out immediately.">
               <AlertDialog>
                 <AlertDialogTrigger asChild>

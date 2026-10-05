@@ -1,0 +1,26 @@
+# Barb desktop shell: a Tauri window around the built React app in ../dist.
+[package]
+name = "barb"
+version = "0.1.0"
+description = "Barb: explainable phishing triage for Gmail"
+authors = ["Andrei Stolojan"]
+edition = "2024"
+rust-version = "1.90"
+
+[lib]
+name = "barb_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7.1", features = [] }
+
+[dependencies]
+tauri = { version = "2.12.1", features = [] }
+
+# Smaller, faster release binary. The app has no hot Rust paths to profile.
+[profile.release]
+codegen-units = 1
+lto = true
+opt-level = "s"
+panic = "abort"
+strip = true

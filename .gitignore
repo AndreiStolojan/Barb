@@ -5,6 +5,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# App downloads served by nginx on the Pi (uploaded by scripts/publish-mac-app.sh)
+/downloads/
+
 # Runtime data
 pids
 *.pid
@@ -88,3 +91,6 @@ backups/
 # Per-environment root configuration. Only templates belong in Git.
 /.env.*
 !/.env.example
+
+# Mac app build output (scripts/build-mac-app.sh)
+/build/

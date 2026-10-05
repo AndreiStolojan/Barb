@@ -53,7 +53,14 @@ export function EmptyState({ icon: Icon, title, description, action, className }
   );
 }
 
-/* Starts the Google OAuth flow. Used on the first-run screen and in Settings. */
+// Set by `vite build --mode native` for the Tauri and Capacitor app shells.
+const NATIVE_SHELL = import.meta.env.VITE_NATIVE_SHELL === 'true';
+
+/*
+  Starts the Google OAuth flow. Used on the first-run screen and in Settings.
+  Google refuses its sign-in inside app WebViews, so the native shells point to
+  the website instead. The Gmail link lives on the server, so it carries over.
+*/
 export function ConnectGmailButton({ size = 'md', className, children = 'Connect Gmail' }) {
   const connect = useAsyncAction(async () => {
     const result = await getGoogleConnectUrl();
@@ -61,6 +68,14 @@ export function ConnectGmailButton({ size = 'md', className, children = 'Connect
     if (!url) throw new Error('Google sign-in is not configured on this server.');
     window.location.href = url;
   });
+
+  if (NATIVE_SHELL) {
+    return (
+      <p className={cn('text-sm text-muted-foreground', className)}>
+        Connect Gmail from {new URL(import.meta.env.VITE_API_BASE_URL).host} in a browser, then reopen the app.
+      </p>
+    );
+  }
 
   return (
     <Button
@@ -77,7 +92,7 @@ export function ConnectGmailButton({ size = 'md', className, children = 'Connect
 }
 
 const STEPS = [
-  ['Connect your Gmail', 'SecureInbox reads your mail and never sends from your account. Marking a message as phishing moves it to Spam.'],
+  ['Connect your Gmail', 'Barb reads your mail and never sends from your account. Marking a message as phishing moves it to Spam.'],
   ['Every message is checked', 'Who sent it, where its links go, what it attaches, and how it is worded.'],
   ['You decide on the few that matter', 'Each flagged message shows why, so the call takes seconds.'],
 ];
@@ -91,7 +106,7 @@ export function ConnectGmailState({ compact = false }) {
     <div className={cn('mx-auto w-full max-w-xl px-6', compact ? 'py-10' : 'py-16 md:py-24')}>
       <h2 className="text-h1 font-medium">Connect Gmail to begin</h2>
       <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-muted-foreground">
-        SecureInbox reads your inbox, checks every message, and shows you only what needs a decision.
+        Barb reads your inbox, checks every message, and shows you only what needs a decision.
       </p>
 
       <ol className="mt-8 grid gap-5">
