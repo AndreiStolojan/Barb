@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { createGmailSyncStateMachine } from '../../src/services/gmail-sync-state-machine.service.js';
+import { requestGmailSyncResource } from '../../src/services/mail-account.service.js';
 import MailAccount from '../../src/models/mail-account.model.js';
 
 const account = (overrides = {}) => ({
@@ -208,6 +209,7 @@ test('a backfill resumes at its stored page token without capturing another prof
             syncState: 'backfilling',
             lastHistoryId: 'anchored',
             backfillPageToken: 'resume-page',
+            backfillAfter: new Date('2026-10-01T00:00:00Z'),
         }),
         lockOwner: 'lock',
     });
@@ -215,6 +217,7 @@ test('a backfill resumes at its stored page token without capturing another prof
     assert.equal(result.completed, true);
     assert.deepEqual(calls.requests.map(({ type }) => type), ['messages.list']);
     assert.equal(calls.requests[0].pageToken, 'resume-page');
+    assert.deepEqual(calls.requests[0].after, new Date('2026-10-01T00:00:00Z'));
     assert.equal(calls.processed[0].syncSource, 'gmail_backfill');
 });
 
@@ -228,7 +231,11 @@ test('backfill stops at its wall-clock cap after saving the continuation token',
     });
 
     const result = await machine.run({
-        mailAccount: account({ syncState: 'backfilling', backfillPageToken: 'start-page' }),
+        mailAccount: account({
+            syncState: 'backfilling',
+            backfillPageToken: 'start-page',
+            backfillAfter: new Date(0),
+        }),
         lockOwner: 'lock',
     });
 
@@ -286,4 +293,84 @@ test('initial backfill retains hydrated MailAccount fields after its profile upd
     assert.equal(String(listRequestAccount._id), String(hydratedAccount._id));
     assert.equal(listRequestAccount.accessToken, 'encrypted-access-token');
     assert.equal(listRequestAccount.lastHistoryId, 'anchored-history');
+});
+
+test('initial backfill lists only mail received after the account was connected', async () => {
+    const connectedAt = new Date('2026-10-01T08:00:00Z');
+    const { machine, calls } = makeMachine({
+        responses: [{ historyId: 'anchor' }, { messages: [] }],
+    });
+
+    await machine.run({
+        mailAccount: account({ syncState: 'never_synced', createdAt: connectedAt }),
+        lockOwner: 'lock',
+    });
+
+    assert.deepEqual(calls.updates[0].patch.backfillAfter, connectedAt);
+    assert.deepEqual(calls.requests[1].after, connectedAt);
+    assert.equal(calls.updates.at(-1).patch.backfillAfter, null);
+});
+
+test('resync lists from the connection time, not from the expired cursor', async () => {
+    const connectedAt = new Date('2026-09-01T00:00:00Z');
+    const { machine, calls } = makeMachine({
+        responses: [{ historyId: 'anchor' }, { messages: [] }],
+    });
+
+    await machine.run({
+        mailAccount: account({
+            syncState: 'resync_required',
+            lastHistoryId: 'expired',
+            createdAt: connectedAt,
+            lastSyncedAt: new Date('2026-10-01T12:00:00Z'),
+        }),
+        lockOwner: 'lock',
+    });
+
+    assert.deepEqual(calls.requests[1].after, connectedAt);
+});
+
+test('an unbounded backfill from before the floor restarts bounded instead of resuming', async () => {
+    const connectedAt = new Date('2026-10-01T08:00:00Z');
+    const { machine, calls } = makeMachine({
+        responses: [{ historyId: 'fresh-anchor' }, { messages: [] }],
+    });
+
+    await machine.run({
+        mailAccount: account({
+            syncState: 'backfilling',
+            lastHistoryId: 'old-anchor',
+            backfillPageToken: 'years-old-page',
+            createdAt: connectedAt,
+        }),
+        lockOwner: 'lock',
+    });
+
+    assert.deepEqual(calls.requests.map(({ type }) => type), ['profile', 'messages.list']);
+    assert.equal(calls.requests[1].pageToken, null);
+    assert.deepEqual(calls.requests[1].after, connectedAt);
+});
+
+test('messages.list sends the floor to Gmail as an after: query in epoch seconds', async () => {
+    const originalFetch = globalThis.fetch;
+    let requestedUrl;
+    try {
+        globalThis.fetch = async (url) => {
+            requestedUrl = new URL(url);
+            return { ok: true, status: 200, json: async () => ({ messages: [] }) };
+        };
+
+        await requestGmailSyncResource({
+            type: 'messages.list',
+            mailAccount: { _id: 'account-1', accessToken: 'plain-test-token' },
+            maxResults: 10,
+            labelIds: ['INBOX'],
+            after: new Date('2026-10-01T08:00:00.900Z'),
+        });
+
+        assert.equal(requestedUrl.searchParams.get('q'), 'after:1790841600');
+        assert.deepEqual(requestedUrl.searchParams.getAll('labelIds'), ['INBOX']);
+    } finally {
+        globalThis.fetch = originalFetch;
+    }
 });

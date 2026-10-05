@@ -147,6 +147,8 @@ export const createGmailSyncStateMachine = (deps) => {
         };
     };
 
+    // Lists INBOX messages newer than backfillAfter, then hands off to history
+    // sync. The floor is stored so a capped run resumes the same bounded query.
     const runBackfill = async ({ mailAccount, lockOwner, mode, resetAnchor }) => {
         let account = mailAccount;
         const counts = { fetchedCount: 0, insertedCount: 0, updatedCount: 0, skippedCount: 0 };
@@ -162,6 +164,9 @@ export const createGmailSyncStateMachine = (deps) => {
                     syncState: 'backfilling',
                     lastHistoryId: historyId,
                     backfillPageToken: null,
+                    // SecureInbox never reads mail received before the account
+                    // was connected. Already stored messages are skipped below.
+                    backfillAfter: new Date(account.createdAt ?? clockMs(clock)),
                     backfillCompletedAt: null,
                 },
             });
@@ -186,6 +191,7 @@ export const createGmailSyncStateMachine = (deps) => {
                     remaining
                 ),
                 labelIds: ['INBOX'],
+                after: account.backfillAfter,
             });
             const ids = (page?.messages || []).map(asId).filter(Boolean);
             counts.fetchedCount += ids.length;
@@ -222,6 +228,7 @@ export const createGmailSyncStateMachine = (deps) => {
                     ? {
                           syncState: 'incremental',
                           backfillPageToken: null,
+                          backfillAfter: null,
                           backfillCompletedAt: now,
                           lastFullSyncAt: now,
                           lastSyncedAt: now,
@@ -388,7 +395,7 @@ export const createGmailSyncStateMachine = (deps) => {
                 }
 
                 const state = mailAccount.syncState || 'never_synced';
-                if (forceBackfill && state === 'backfilling') {
+                if (state === 'backfilling' && mailAccount.backfillAfter) {
                     attemptedMode = 'backfill';
                     return runBackfill({
                         mailAccount,
@@ -397,7 +404,9 @@ export const createGmailSyncStateMachine = (deps) => {
                         resetAnchor: false,
                     });
                 }
-                if (forceBackfill || state === 'never_synced' || state === 'resync_required') {
+                // A 'backfilling' account without a floor started before the
+                // floor existed and walks the whole mailbox; restart it bounded.
+                if (forceBackfill || ['never_synced', 'backfilling', 'resync_required'].includes(state)) {
                     const mode = state === 'resync_required' ? 'resync' : 'backfill';
                     attemptedMode = mode;
                     return runBackfill({
@@ -405,15 +414,6 @@ export const createGmailSyncStateMachine = (deps) => {
                         lockOwner,
                         mode,
                         resetAnchor: true,
-                    });
-                }
-                if (state === 'backfilling') {
-                    attemptedMode = 'backfill';
-                    return runBackfill({
-                        mailAccount,
-                        lockOwner,
-                        mode: 'backfill',
-                        resetAnchor: false,
                     });
                 }
                 if (!mailAccount.lastHistoryId) {
