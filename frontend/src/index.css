@@ -218,6 +218,11 @@
 
   html {
     color-scheme: dark;
+    /* Phones: no text inflation on rotate, and no double-tap zoom (pinch still works). */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
@@ -407,4 +412,29 @@
   .email-paper :where(blockquote) { border-left-color: rgb(0 0 0 / 0.15); color: #55555c; }
   .email-paper :where(hr) { border-top-color: rgb(0 0 0 / 0.12); }
   .email-paper :where(pre) { background: rgb(0 0 0 / 0.05); }
+}
+
+/*
+  iOS Safari zooms the whole page when a field under 16px takes focus, and
+  leaves it zoomed and off-centre after the keyboard closes. Touch screens get
+  16px fields. Unlayered and !important so it also beats the sign-in screen's
+  own CSS and any text-* utility on a field.
+*/
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}
+
+/*
+  Toasts sit above the phone tab bar. Sonner sets its offset inline and only
+  switches to its mobile offset below 600px, so the whole phone layout is
+  covered here.
+*/
+@media (width < 48rem) {
+  [data-sonner-toaster][data-y-position='bottom'] {
+    bottom: calc(4.75rem + env(safe-area-inset-bottom)) !important;
+  }
 }

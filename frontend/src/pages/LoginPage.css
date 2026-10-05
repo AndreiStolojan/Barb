@@ -625,15 +625,21 @@ body:has(.si-auth),
 
   .si-topbar {
     width: min(100% - 32px, 620px);
-    padding-top: 18px;
+    padding-top: max(18px, env(safe-area-inset-top));
   }
 
+  /* Phones: the headline, then the form. The pitch lives on the landing page. */
   .si-stage {
     width: min(100% - 32px, 540px);
     min-height: auto;
     grid-template-columns: 1fr;
-    gap: 34px;
-    padding: 58px 0 84px;
+    gap: 28px;
+    padding: 36px 0 84px;
+  }
+
+  .si-description,
+  .si-benefits {
+    display: none;
   }
 
   .si-story {
@@ -642,21 +648,11 @@ body:has(.si-auth),
   }
 
   .si-story h1 {
-    font-size: clamp(2.65rem, 11.5vw, 4rem);
+    font-size: clamp(2.25rem, 10vw, 3.25rem);
   }
 
-  .si-description {
-    margin-inline: auto;
-  }
-
-  .si-benefits {
-    width: fit-content;
-    max-width: 100%;
-    margin-inline: auto;
-    text-align: left;
-  }
-
-  .si-panel {
+  .si-panel,
+  .si-auth.is-registering .si-panel {
     margin-top: 0;
     padding-inline: 24px;
   }
@@ -671,7 +667,7 @@ body:has(.si-auth),
 @media (max-width: 420px) {
   .si-stage {
     width: min(100% - 24px, 540px);
-    padding-top: 44px;
+    padding-top: 28px;
   }
 
   .si-panel {

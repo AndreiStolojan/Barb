@@ -103,7 +103,7 @@ const STEPS = [
 */
 export function ConnectGmailState({ compact = false }) {
   return (
-    <div className={cn('mx-auto w-full max-w-xl px-6', compact ? 'py-10' : 'py-16 md:py-24')}>
+    <div className={cn('mx-auto w-full max-w-xl px-6', compact ? 'py-6 max-md:px-0 md:py-10' : 'py-16 md:py-24')}>
       <h2 className="text-h1 font-medium">Connect Gmail to begin</h2>
       <p className="mt-2 max-w-md text-[0.9375rem] leading-relaxed text-muted-foreground">
         Barb reads your inbox, checks every message, and shows you only what needs a decision.

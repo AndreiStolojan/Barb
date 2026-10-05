@@ -293,7 +293,7 @@ export function InboxPage() {
       </section>
 
       {selectMode && checkedIds.size > 0 && (
-        <div className="fixed bottom-20 left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-2xl bg-popover p-1.5 pl-4 shadow-lg ring-1 ring-white/[0.06] md:bottom-6">
+        <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] left-1/2 z-40 flex -translate-x-1/2 items-center gap-1 rounded-2xl bg-popover p-1.5 pl-4 shadow-lg ring-1 ring-white/[0.06] md:bottom-6">
           <span className="data pr-2 text-sm text-muted-foreground">{checkedIds.size} selected</span>
           <Button variant="ghost" size="sm" disabled={bulkBusy} onClick={() => runBulk(markEmailSafe, 'marked as safe')}>
             <ShieldCheck className="text-risk-safe" />

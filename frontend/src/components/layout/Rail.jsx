@@ -163,10 +163,10 @@ export function MobileTabs() {
   );
 }
 
-/* Mobile top bar: mark, screen title, account. */
+/* Mobile top bar: mark, screen title, account. Clears the notch when the app runs full screen. */
 export function MobileTopbar({ title, onOpenPalette, onOpenSupport }) {
   return (
-    <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center gap-2.5 bg-background px-4 md:hidden">
+    <header className="sticky top-0 z-30 box-content flex h-14 shrink-0 items-center gap-2.5 bg-background px-4 pt-[env(safe-area-inset-top)] md:hidden">
       <Mark className="h-5 w-5" />
       <span className="min-w-0 flex-1 truncate text-base font-semibold">{title}</span>
       <AccountMenu onOpenPalette={onOpenPalette} onOpenSupport={onOpenSupport} side="bottom" align="end" />
