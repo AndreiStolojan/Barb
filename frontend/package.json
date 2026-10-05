@@ -7,9 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "build:native": "vite build --mode native",
+    "build:mac": "tauri build --bundles app",
     "measure:bundle": "node scripts/measure-bundle.mjs",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "tauri": "tauri"
   },
   "dependencies": {
     "@radix-ui/react-alert-dialog": "^1.1.23",
@@ -32,6 +34,7 @@
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2.12.1",
     "@testing-library/jest-dom": "^7.0.1",
     "@testing-library/react": "^16.3.3",
     "@testing-library/user-event": "^14.6.7",

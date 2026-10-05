@@ -88,3 +88,6 @@ backups/
 # Per-environment root configuration. Only templates belong in Git.
 /.env.*
 !/.env.example
+
+# Mac app build output (scripts/build-mac-app.sh)
+/build/
