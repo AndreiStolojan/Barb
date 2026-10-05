@@ -1,0 +1,13 @@
+{
+  "name": "Barb",
+  "short_name": "Barb",
+  "description": "Explainable phishing triage for Gmail.",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#141417",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
