@@ -35,7 +35,10 @@ const app = express();
 app.set('trust proxy', ['loopback', 'linklocal', 'uniquelocal']);
 
 app.use(helmet());
-app.use(cors({ origin: FRONTEND_APP_URL, credentials: true }));
+// The native app shells (Tauri on macOS, Capacitor on iOS) load the dashboard
+// from their own origins and call this API cross-origin with a bearer token.
+const NATIVE_APP_ORIGINS = ['tauri://localhost', 'capacitor://localhost'];
+app.use(cors({ origin: [FRONTEND_APP_URL, ...NATIVE_APP_ORIGINS], credentials: true }));
 app.use(observeHttpRequests);
 app.use(readOnlyMiddleware);
 
