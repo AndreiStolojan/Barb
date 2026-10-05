@@ -21,6 +21,10 @@ const isInboxLabelChange = (change) =>
 
 const isHistoryGap = (error) => error?.statusCode === 404 || error?.status === 404;
 
+// A history gap is recovered by listing mail received shortly before the last
+// successful sync, so the overlap absorbs messages delivered late.
+const RESYNC_OVERLAP_MS = 24 * 60 * 60 * 1000;
+
 const clockMs = (clock) => {
     const value = clock();
     return value instanceof Date ? value.getTime() : Number(value);
@@ -147,6 +151,17 @@ export const createGmailSyncStateMachine = (deps) => {
         };
     };
 
+    // SecureInbox only reads mail received after the account was connected. A
+    // resync narrows that further to just before the last successful sync.
+    const listFloor = (account, mode) => {
+        const connectedAtMs = account.createdAt ? new Date(account.createdAt).getTime() : clockMs(clock);
+        const lastSyncedAtMs = account.lastSyncedAt ? new Date(account.lastSyncedAt).getTime() : null;
+        if (mode !== 'resync' || lastSyncedAtMs === null) return new Date(connectedAtMs);
+        return new Date(Math.max(connectedAtMs, lastSyncedAtMs - RESYNC_OVERLAP_MS));
+    };
+
+    // Lists INBOX messages newer than backfillAfter, then hands off to history
+    // sync. The floor is stored so a capped run resumes the same bounded query.
     const runBackfill = async ({ mailAccount, lockOwner, mode, resetAnchor }) => {
         let account = mailAccount;
         const counts = { fetchedCount: 0, insertedCount: 0, updatedCount: 0, skippedCount: 0 };
@@ -162,6 +177,7 @@ export const createGmailSyncStateMachine = (deps) => {
                     syncState: 'backfilling',
                     lastHistoryId: historyId,
                     backfillPageToken: null,
+                    backfillAfter: listFloor(account, mode),
                     backfillCompletedAt: null,
                 },
             });
@@ -186,6 +202,7 @@ export const createGmailSyncStateMachine = (deps) => {
                     remaining
                 ),
                 labelIds: ['INBOX'],
+                after: account.backfillAfter,
             });
             const ids = (page?.messages || []).map(asId).filter(Boolean);
             counts.fetchedCount += ids.length;
@@ -222,6 +239,7 @@ export const createGmailSyncStateMachine = (deps) => {
                     ? {
                           syncState: 'incremental',
                           backfillPageToken: null,
+                          backfillAfter: null,
                           backfillCompletedAt: now,
                           lastFullSyncAt: now,
                           lastSyncedAt: now,
@@ -388,7 +406,9 @@ export const createGmailSyncStateMachine = (deps) => {
                 }
 
                 const state = mailAccount.syncState || 'never_synced';
-                if (forceBackfill && state === 'backfilling') {
+                // Backfills started before the floor existed walk the whole
+                // mailbox; restart them as a bounded backfill instead.
+                if (state === 'backfilling' && mailAccount.backfillAfter) {
                     attemptedMode = 'backfill';
                     return runBackfill({
                         mailAccount,
@@ -397,7 +417,7 @@ export const createGmailSyncStateMachine = (deps) => {
                         resetAnchor: false,
                     });
                 }
-                if (forceBackfill || state === 'never_synced' || state === 'resync_required') {
+                if (forceBackfill || ['never_synced', 'backfilling', 'resync_required'].includes(state)) {
                     const mode = state === 'resync_required' ? 'resync' : 'backfill';
                     attemptedMode = mode;
                     return runBackfill({
@@ -405,15 +425,6 @@ export const createGmailSyncStateMachine = (deps) => {
                         lockOwner,
                         mode,
                         resetAnchor: true,
-                    });
-                }
-                if (state === 'backfilling') {
-                    attemptedMode = 'backfill';
-                    return runBackfill({
-                        mailAccount,
-                        lockOwner,
-                        mode: 'backfill',
-                        resetAnchor: false,
                     });
                 }
                 if (!mailAccount.lastHistoryId) {

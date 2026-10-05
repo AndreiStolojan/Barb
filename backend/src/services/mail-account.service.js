@@ -1080,6 +1080,7 @@ export const requestGmailSyncResource = async ({
     pageToken,
     maxResults,
     labelIds = [],
+    after,
     labelId,
     startHistoryId,
     historyTypes = [],
@@ -1099,6 +1100,8 @@ export const requestGmailSyncResource = async ({
         const query = new URLSearchParams({ maxResults: String(maxResults) });
         for (const value of labelIds) query.append('labelIds', value);
         if (pageToken) query.set('pageToken', pageToken);
+        // Gmail's after: operator takes epoch seconds.
+        if (after) query.set('q', `after:${Math.floor(new Date(after).getTime() / 1000)}`);
         return requestGoogleJson({
             mailAccount,
             url: `${GMAIL_MESSAGES_LIST_URL}?${query.toString()}`,
