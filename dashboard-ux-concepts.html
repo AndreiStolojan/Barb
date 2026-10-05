@@ -2392,6 +2392,15 @@ Content-Type: multipart/mixed; boundary="===============91823712893=="
       }
     });
 
+    
+    function checkUrlModel() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const modelParam = urlParams.get('model') || window.location.hash.replace('#', '');
+      if (['a', 'b', 'c'].includes(modelParam.toLowerCase())) {
+        switchModel(modelParam.toLowerCase());
+      }
+    }
+
     function switchModel(modelKey) {
       document.querySelectorAll('.model-tab-btn').forEach(btn => btn.classList.remove('active'));
       document.querySelectorAll('.concept-container').forEach(el => el.classList.remove('active'));
@@ -2759,6 +2768,8 @@ Content-Type: multipart/mixed; boundary="===============91823712893=="
         r.style.display = text.includes(val) ? 'block' : 'none';
       });
     }
+
+    checkUrlModel();
   </script>
 </body>
 </html>

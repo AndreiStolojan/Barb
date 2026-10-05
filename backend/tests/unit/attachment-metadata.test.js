@@ -38,6 +38,23 @@ test('captures bounded Gmail attachment metadata without persisting inline bytes
     assert.doesNotMatch(JSON.stringify(payload.attachments), /must-not-be-persisted|data/);
 });
 
+test('bounds MIME tree traversal independently from returned attachment count', () => {
+    const payload = parseGmailMessageToEmailPayload({
+        gmailMessage: {
+            id: 'message-id',
+            payload: {
+                parts: Array.from({ length: 1_001 }, () => ({
+                    parts: [{ filename: 'late.pdf', mimeType: 'application/pdf', body: { size: 1 } }],
+                })),
+            },
+        },
+        mailAccount: { _id: '507f1f77bcf86cd799439011', userId: '507f1f77bcf86cd799439012' },
+        syncSource: 'gmail_initial_sync',
+    });
+
+    assert.deepEqual(payload.attachments, []);
+});
+
 test('Email attachment metadata schema cannot retain undeclared byte fields', () => {
     const email = new Email({
         userId: '507f1f77bcf86cd799439012',

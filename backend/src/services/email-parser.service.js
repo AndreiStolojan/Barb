@@ -113,6 +113,9 @@ const extractAttachmentExtensions = (payload) => {
 };
 
 const MAX_ATTACHMENT_METADATA_ITEMS = 50;
+// Bound traversal separately from returned metadata: a hostile MIME tree can
+// contain millions of parts even when only 50 attachment records are needed.
+const MAX_ATTACHMENT_PARTS_VISITED = 1_000;
 const MAX_ATTACHMENT_ID_CHARS = 2_048;
 const MAX_ATTACHMENT_FILENAME_CHARS = 512;
 const MAX_ATTACHMENT_MIME_CHARS = 255;
@@ -126,9 +129,15 @@ export const extractAttachments = (payload) => {
     const attachments = [];
     const queue = payload ? [payload] : [];
 
-    while (queue.length > 0 && attachments.length < MAX_ATTACHMENT_METADATA_ITEMS) {
+    let partsVisited = 0;
+    while (
+        queue.length > 0
+        && attachments.length < MAX_ATTACHMENT_METADATA_ITEMS
+        && partsVisited < MAX_ATTACHMENT_PARTS_VISITED
+    ) {
         const currentPart = queue.shift();
         if (!currentPart) continue;
+        partsVisited += 1;
 
         if (Array.isArray(currentPart.parts) && currentPart.parts.length > 0) {
             queue.push(...currentPart.parts);

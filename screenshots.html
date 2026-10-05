@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Galerie Designuri SecureInbox</title>
+  <style>
+    body {
+      background: #090d16;
+      color: #f0f6fc;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 30px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 40px;
+    }
+    header {
+      text-align: center;
+      max-width: 800px;
+    }
+    h1 {
+      margin: 0 0 10px 0;
+      font-size: 24px;
+      font-weight: 600;
+    }
+    p {
+      color: #8b949e;
+      margin: 0;
+      font-size: 14px;
+    }
+    .card {
+      background: #0f1523;
+      border: 1px solid #1a2337;
+      border-radius: 8px;
+      overflow: hidden;
+      max-width: 1200px;
+      width: 100%;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    .card-header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #1a2337;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .card-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #38bdf8;
+    }
+    .card-desc {
+      font-size: 13px;
+      color: #8b949e;
+    }
+    .card img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+    a.btn {
+      color: #ffffff;
+      background: #1f293d;
+      border: 1px solid #2e3d5b;
+      padding: 6px 12px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    a.btn:hover {
+      background: #273552;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>SecureInbox — Cele 3 Modele UX</h1>
+    <p>Poți vedea mai jos capturile de ecran complete pentru fiecare model.</p>
+  </header>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Modelul 1 · Triage Queue (Flux Rapid SOC)</div>
+        <div class="card-desc">Carduri clasificate pe risc cu acțiuni rapide la un clic și barometru SOC</div>
+      </div>
+      <a class="btn" href="/design-draft-concept-a.html" target="_blank">Deschide interactiv</a>
+    </div>
+    <img src="/screenshots/concept_a_draft.png" alt="Modelul 1">
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Modelul 2 · Posture & Telemetry Hub (Ansamblu și Analiză)</div>
+        <div class="card-desc">Rată de securitate, grafic dinamic de risc pe intervale de timp și vectori de atac</div>
+      </div>
+      <a class="btn" href="/design-draft-concept-b.html" target="_blank">Deschide interactiv</a>
+    </div>
+    <img src="/screenshots/concept_b_draft.png" alt="Modelul 2">
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div>
+        <div class="card-title">Modelul 3 · Split-Pane Forensic Inspector (Criminalistică Detaliată)</div>
+        <div class="card-desc">Flux master-detail cu matrice SPF/DKIM/DMARC, analiză de fișiere și antete brute</div>
+      </div>
+      <a class="btn" href="/design-draft-concept-c.html" target="_blank">Deschide interactiv</a>
+    </div>
+    <img src="/screenshots/concept_c_draft.png" alt="Modelul 3">
+  </div>
+</body>
+</html>
