@@ -4,6 +4,42 @@ One source tree and one environment schema serve both modes. Production runs
 built images, so editing development source does not change the running release.
 Use a separate `.env` per running environment. Never commit credentials.
 
+## What `./provision` does
+
+`./provision` reads one env file, the root `.env` by default or the path in
+`PROVISION_ENV_FILE`, and runs these steps in order:
+
+1. Checks that Docker runs and the Compose plugin is installed.
+2. Prepares the env file. With no file, it copies `.env.example`. In a
+   development file it fills every `replace-with-a-generated-value` with a
+   random secret and points `localhost:8080` URLs at `APP_PORT`. It never writes
+   to a production file. It refuses a file without `NODE_ENV`, because filling
+   it would replace the keys that decrypt stored Gmail tokens. The file ends
+   with mode `0600`.
+3. Validates isolation, listed in the table below. Nothing starts if a check fails.
+4. Builds the images and starts the stack, then waits up to three minutes for
+   every health check.
+5. Pulls `OLLAMA_MODEL` if the `ai` profile is active and the model is missing.
+6. Seeds the demo account and inbox in development when `SEED_DEMO=true`.
+
+Running it again is safe. It keeps existing secrets, rebuilds changed images
+and updates the demo account and its demo messages. Other data stays.
+
+| Mode | Check | Why |
+| --- | --- | --- |
+| Both | `NODE_ENV`, `COMPOSE_FILE`, `COMPOSE_PROFILES`, `COMPOSE_PROJECT_NAME`, `DB_URI`, `SEED_DEMO`, `FRONTEND_APP_URL` and `GOOGLE_REDIRECT_URI` are not exported in the shell with a different value | Compose prefers shell variables over the env file, so they would skip every check below |
+| Development | Project name ends in `-dev` or `-test` | Keeps development containers and volumes apart from production |
+| Development | `COMPOSE_FILE=docker-compose.yml` | Development never loads the production overlay |
+| Development | Exactly one of `DB_URI` or the `local-db` profile | One database, chosen on purpose |
+| Development | A `DB_URI` database name ends in `_dev`, `-dev`, `_test` or `-test` | Catches a production URI pasted by mistake |
+| Production | Project name without `-dev` or `-test`, and the production overlay | Production runs as its own Compose project |
+| Production | No `local-db` profile, an Atlas `mongodb+srv://` URI, `SEED_DEMO` not `true` | Production data lives only in Atlas and never gets demo data |
+| Production | HTTPS `FRONTEND_APP_URL` and `GOOGLE_REDIRECT_URI` | The app is served through Cloudflare over HTTPS, and Google accepts only HTTPS redirects for public hosts |
+| Production | Secrets, Google OAuth, email and tunnel values are set | A production file must be complete before it starts |
+
+`tests/provisioning.test.sh` covers these paths with a mocked Docker, and the
+`Quality / infra` workflow runs it.
+
 ## Development on Pi or Mac
 
 Run `./provision`. The generated root `.env` selects `secureinbox-dev`, local

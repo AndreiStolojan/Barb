@@ -33,7 +33,10 @@ run_case() {
   grep -F "compose --env-file ${env_file} up -d --build --wait --wait-timeout 180" "${log_file}"
   grep -F "compose --env-file ${env_file} exec -T backend npm run seed:local" "${log_file}"
   if [[ "${present}" == 1 ]]; then
-    ! grep -q 'ollama ollama pull' "${log_file}"
+    if grep -q 'ollama ollama pull' "${log_file}"; then
+      echo 'pulled a model that was already present' >&2
+      return 1
+    fi
   else
     grep -q 'ollama ollama pull' "${log_file}"
   fi
@@ -52,10 +55,12 @@ PROVISION_ENV_FILE="${env_file}" bash -c 'source ./provision; create_env; load_r
 test "${first_hash}" = "$(shasum -a 256 "${env_file}" | awk '{print $1}')"
 
 cp .env.example "${temp_dir}/custom.env"
+# shellcheck disable=SC2016 # the literal $() checks that values are never evaluated
 sed -i.bak 's/^APP_PORT=8080$/APP_PORT=8181/; s|^GOOGLE_REDIRECT_URI=.*$|GOOGLE_REDIRECT_URI=http://localhost:8080/api/v1/mail-accounts/google/callback|; s/^GOOGLE_CLIENT_SECRET=$/GOOGLE_CLIENT_SECRET="literal $() value"/' "${temp_dir}/custom.env"
 rm -f "${temp_dir}/custom.env.bak"
 PROVISION_ENV_FILE="${temp_dir}/custom.env" bash -c 'source ./provision; create_env; test "$(dotenv_get GOOGLE_CLIENT_SECRET "$ENV_FILE")" = "literal \$() value"'
 grep -Fx 'GOOGLE_REDIRECT_URI=http://localhost:8181/api/v1/mail-accounts/google/callback' "${temp_dir}/custom.env"
+grep -Fx 'FRONTEND_APP_URL=http://localhost:8181' "${temp_dir}/custom.env"
 
 if PROVISION_ENV_FILE="${temp_dir}/.env" bash -c 'source ./provision; docker(){ return 1; }; require_docker' >/dev/null 2>&1; then
   echo 'expected Docker prerequisite failure' >&2
@@ -72,6 +77,14 @@ for bad in 'COMPOSE_PROJECT_NAME=secureinbox' 'NODE_ENV=production' 'COMPOSE_PRO
     exit 1
   fi
 done
+
+# Compose prefers exported variables over the env file, so they must not differ.
+if DB_URI=mongodb+srv://example.test/secureinbox PROVISION_ENV_FILE="$env_file" bash -c 'source ./provision; load_runtime_values' >/dev/null 2>&1; then
+  echo 'Expected rejection of an exported DB_URI' >&2
+  exit 1
+fi
+
+COMPOSE_PROJECT_NAME=secureinbox-dev PROVISION_ENV_FILE="$env_file" bash -c 'source ./provision; load_runtime_values'
 
 cp "$env_file" "$temp_dir/atlas.env"
 printf '%s\n' 'COMPOSE_PROFILES=' 'DB_URI=mongodb+srv://example.test/secureinbox_test' >> "$temp_dir/atlas.env"
@@ -91,3 +104,25 @@ if PROVISION_ENV_FILE="$temp_dir/legacy.env" bash -c 'source ./provision; create
   exit 1
 fi
 test "${legacy_hash}" = "$(shasum -a 256 "$temp_dir/legacy.env" | awk '{print $1}')"
+
+# A complete production file passes as is; plain HTTP URLs do not.
+cp "$env_file" "$temp_dir/prod.env"
+printf '%s\n' NODE_ENV=production COMPOSE_PROJECT_NAME=secureinbox \
+  COMPOSE_FILE=docker-compose.yml:docker-compose.prod.yml COMPOSE_PROFILES= \
+  DB_URI=mongodb+srv://example.test/secureinbox SEED_DEMO=false \
+  JWT_SECRET=x MAIL_TOKEN_ENCRYPTION_KEY=x FRONTEND_APP_URL=https://example.test \
+  GOOGLE_CLIENT_ID=x GOOGLE_CLIENT_SECRET=x \
+  GOOGLE_REDIRECT_URI=https://example.test/api/v1/mail-accounts/google/callback \
+  EMAIL_FROM=x EMAIL_PASSWORD=x TUNNEL_TOKEN=x >> "$temp_dir/prod.env"
+prod_hash="$(shasum -a 256 "$temp_dir/prod.env" | awk '{print $1}')"
+PROVISION_ENV_FILE="$temp_dir/prod.env" bash -c 'source ./provision; create_env; load_runtime_values'
+test "${prod_hash}" = "$(shasum -a 256 "$temp_dir/prod.env" | awk '{print $1}')"
+if FRONTEND_APP_URL=http://example.test PROVISION_ENV_FILE="$temp_dir/prod.env" bash -c 'source ./provision; load_runtime_values' >/dev/null 2>&1; then
+  echo 'Expected rejection of an exported HTTP FRONTEND_APP_URL' >&2
+  exit 1
+fi
+printf '%s\n' FRONTEND_APP_URL=http://example.test >> "$temp_dir/prod.env"
+if PROVISION_ENV_FILE="$temp_dir/prod.env" bash -c 'source ./provision; load_runtime_values' >/dev/null 2>&1; then
+  echo 'Expected rejection of an HTTP production URL' >&2
+  exit 1
+fi
