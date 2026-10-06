@@ -46,6 +46,12 @@ const summaryWithUserOverrides = () => ({
     generatedAt: '2026-06-08T09:00:00.000Z',
 });
 
+// The count shown in the legend row for `label`.
+const legendCount = (html, label) => {
+    const row = html.slice(html.indexOf(`>${label}</p>`));
+    return row.match(/font-weight:600;">([\d,]+)<\/p>/)?.[1];
+};
+
 test('report email safe-rate reflects user "mark safe" overrides, not raw scan verdicts', () => {
     const { html, subject } = monthlyDigestTemplate({
         summary: summaryWithUserOverrides(),
@@ -54,32 +60,24 @@ test('report email safe-rate reflects user "mark safe" overrides, not raw scan v
 
     // After marking every risky email safe, the period is 100% safe — matching
     // the dashboard. The buggy version showed 25% (1 raw-safe of 4 scanned).
-    assert.match(html, />100%<\/p>/, 'hero should show 100% safe after overrides');
-    assert.match(html, /100% safe/, 'preheader should show 100% safe');
-    assert.ok(!html.includes('>25%</p>'), 'must not show the raw-scan 25% rate');
+    assert.match(html, />100%<\/span> of your mail was safe/, 'lead should show 100% safe after overrides');
+    assert.match(html, /100% safe, 0 flagged/, 'preheader should show 100% safe');
+    assert.ok(!html.includes('>25%<'), 'must not show the raw-scan 25% rate');
 
     // No outstanding threats once everything risky is marked safe.
-    assert.match(html, /0 threats detected/, 'threat count must drop to 0 after overrides');
-    assert.ok(
-        !subject.includes('undefined'),
-        'subject renders cleanly'
-    );
+    assert.match(html, /Nothing was flagged\./, 'threat count must drop to 0 after overrides');
+    assert.ok(!subject.includes('undefined'), 'subject renders cleanly');
 });
 
-test('report email threat breakdown uses effective counts', () => {
+test('report email verdict breakdown uses effective counts', () => {
     const { html } = monthlyDigestTemplate({
         summary: summaryWithUserOverrides(),
         userName: 'Andrei',
     });
 
-    // "Safe" row should report 4 (effectiveSafe), and the Suspicious / Likely
-    // phishing rows should report 0 — i.e. the bars reflect the reviewed state.
-    const safeRow = html.slice(html.indexOf('>Safe<'), html.indexOf('>Suspicious<'));
-    assert.match(safeRow, />4</, 'Safe breakdown should count the 4 effective-safe emails');
-    assert.match(safeRow, /100%/, 'Safe breakdown should be 100% after overrides');
-
-    const suspiciousRow = html.slice(html.indexOf('>Suspicious<'), html.indexOf('>Likely phishing<'));
-    assert.match(suspiciousRow, /0%/, 'Suspicious breakdown should be 0% after overrides');
+    assert.equal(legendCount(html, 'Safe'), '4', 'Safe row counts the 4 effective-safe emails');
+    assert.equal(legendCount(html, 'Suspicious'), '0', 'Suspicious row is 0 after overrides');
+    assert.equal(legendCount(html, 'Likely phishing'), '0', 'Likely phishing row is 0 after overrides');
 });
 
 test('report email is unchanged when there are no user overrides', () => {
@@ -105,6 +103,15 @@ test('report email is unchanged when there are no user overrides', () => {
     };
 
     const { html } = monthlyDigestTemplate({ summary, userName: 'Andrei' });
-    assert.match(html, />75%<\/p>/, 'hero should show 75% safe');
-    assert.match(html, /1 threat detected/, 'one outstanding suspicious email');
+    assert.match(html, />75%<\/span> of your mail was safe/, 'lead should show 75% safe');
+    assert.match(html, /1 message was flagged\./, 'one outstanding suspicious email');
+    assert.equal(legendCount(html, 'Suspicious'), '1');
+});
+
+test('report email says when the AI layer did not run', () => {
+    const summary = summaryWithUserOverrides();
+    summary.ai = { evaluated: 0, failed: 0, disabled: 4 };
+
+    const { html } = monthlyDigestTemplate({ summary });
+    assert.match(html, /AI analysis is off\. The rule score stands alone\./);
 });
