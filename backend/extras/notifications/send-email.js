@@ -3,6 +3,7 @@ import {
     monthlyDigestTemplate,
     dailyDigestTemplate,
     phishingAlertTemplate,
+    contactMessageTemplate,
 } from './email.template.js';
 import welcomeTemplate from './email.template.js';
 import {
@@ -49,23 +50,6 @@ const buildMissingContactEmailConfigResult = ({ recipient, generatedAt }) => {
     };
 };
 
-const escapeHtml = (value) =>
-    String(value ?? '')
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;')
-        .replaceAll("'", '&#39;');
-
-const formatContactMessageHtml = ({ userName, userEmail, subject, message, generatedAt }) => `
-    <h2>New contact message</h2>
-    <p><strong>From:</strong> ${escapeHtml(userName)} (${escapeHtml(userEmail)})</p>
-    <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
-    <p><strong>Generated at:</strong> ${escapeHtml(generatedAt)}</p>
-    <hr>
-    <p>${escapeHtml(message).replaceAll('\n', '<br>')}</p>
-`;
-
 export const sendWelcomeEmail = async ({ email, userName }) => {
     if (!email) {
         throw new Error('Email is required');
@@ -75,13 +59,7 @@ export const sendWelcomeEmail = async ({ email, userName }) => {
         throw new Error('User name is required');
     }
 
-    const createdAt = new Date().toLocaleDateString('en-GB', {
-        day: 'numeric',
-        month: 'long',
-        year: 'numeric'
-    });
-
-    const { subject, html } = welcomeTemplate(userName, createdAt);
+    const { subject, html } = welcomeTemplate(userName);
 
     const mailOptions = {
         from: EMAIL_FROM,
@@ -217,12 +195,11 @@ export const sendContactMessageEmail = async ({ userName, userEmail, subject, me
                 '',
                 message,
             ].join('\n'),
-            html: formatContactMessageHtml({
+            html: contactMessageTemplate({
                 userName,
                 userEmail,
                 subject: safeSubject,
                 message,
-                generatedAt,
             }),
         });
 
@@ -246,7 +223,7 @@ export const sendContactMessageEmail = async ({ userName, userEmail, subject, me
     }
 };
 
-export const sendPhishingAlertEmail = async ({ recipient, userName, emails }) => {
+export const sendPhishingAlertEmail = async ({ recipient, emails }) => {
     if (!recipient) {
         throw new Error('Recipient email is required');
     }
@@ -265,8 +242,7 @@ export const sendPhishingAlertEmail = async ({ recipient, userName, emails }) =>
         };
     }
 
-    const detectedAt = new Date().toLocaleString('en-GB', { timeZone: 'UTC', dateStyle: 'medium', timeStyle: 'short' });
-    const { subject, html } = phishingAlertTemplate({ userName, emails, detectedAt });
+    const { subject, html } = phishingAlertTemplate({ emails });
     const transporter = createEmailTransporter();
     const info = await transporter.sendMail({
         from: EMAIL_FROM,
