@@ -336,6 +336,7 @@ const getRecentRiskyEmails = async ({ userObjectId, from, to }) =>
                 _id: '$emailId',
                 verdict: { $first: '$verdict' },
                 score: { $first: '$score' },
+                triggeredRules: { $first: '$triggeredRules' },
             },
         },
         {
@@ -362,8 +363,10 @@ const getRecentRiskyEmails = async ({ userObjectId, from, to }) =>
         {
             $project: {
                 _id: 0,
+                emailId: '$_id',
                 verdict: 1,
                 score: 1,
+                triggeredRules: 1,
                 subject: '$email.subject',
                 from: '$email.from',
                 providerMessageId: '$email.providerMessageId',
