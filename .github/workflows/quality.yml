@@ -159,5 +159,11 @@ jobs:
           ./scripts/restore "$archive" --confirm-replace
           counts="$(docker compose exec -T mongodb mongosh --quiet --username secureinbox_root --password "$(awk -F= '/^MONGO_ROOT_PASSWORD=/{print $2}' .env)" --authenticationDatabase admin --eval 'const d=db.getSiblingDB("secureinbox_dev"); print(JSON.stringify({users:d.users.countDocuments({}),emails:d.emails.countDocuments({}),scans:d.scans.countDocuments({})}))')"
           test "$counts" = '{"users":1,"emails":6,"scans":6}'
+      - name: Show why the stack failed
+        if: failure()
+        run: |
+          uname -r
+          docker compose ps --all
+          docker compose logs --no-color --tail 40 mongodb backend
       - if: always()
         run: docker compose --profile "*" down --volumes --remove-orphans
