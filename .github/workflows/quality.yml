@@ -86,7 +86,9 @@ jobs:
           done <<< "$images"
   integration:
     needs: [backend, frontend, infra]
-    runs-on: ubuntu-latest
+    # ubuntu-latest moved to 26.04 on 19 Oct 2026, where mongo:8.0 never turns
+    # healthy (likely the kernel rseq crash in SERVER-121912). Pinned until fixed.
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
