@@ -21,7 +21,7 @@ Then open http://localhost:8080. Native hot reload and the other setups are in [
 
 ## Checks
 
-You need Node.js `24.20.0`. Run these before opening a pull request:
+You need Node.js `24.22.1`. Run these before opening a pull request:
 
 ```bash
 npm --prefix backend install

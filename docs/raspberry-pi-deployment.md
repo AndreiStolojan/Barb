@@ -143,7 +143,7 @@ backups in the [recovery runbook](hibernation-recovery-runbook.md).
   cp -p .env "$backup/root.env"
   if test -f backend/.env.production.local; then cp -p backend/.env.production.local "$backup/backend.env.production.local"; fi
   DB_URI="$(bash -c 'source scripts/dotenv.sh; dotenv_get DB_URI backend/.env.production.local 2>/dev/null || dotenv_get DB_URI .env')" \
-    docker run --rm -e DB_URI mongo:8.0.28 sh -c \
+    docker run --rm -e DB_URI mongo:8.0.34 sh -c \
     'printf "uri: \"%s\"\n" "$DB_URI" > /tmp/dump.yaml && mongodump --config /tmp/dump.yaml --archive --gzip --quiet' \
     > "$backup/db.archive.gz"
   test -s "$backup/db.archive.gz"
@@ -164,7 +164,7 @@ throwaway container with no network and count documents:
 
 ```bash
 backup="$(cat ~/secureinbox-backups/current)"
-docker run -d --name restore-check --network none mongo:8.0.28
+docker run -d --name restore-check --network none mongo:8.0.34
 sleep 5
 docker exec -i restore-check mongorestore --archive --gzip --quiet < "$backup/db.archive.gz"
 docker exec restore-check mongosh --quiet --eval 'db.adminCommand({listDatabases:1}).databases.forEach(d => print(d.name))'
