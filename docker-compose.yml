@@ -9,7 +9,7 @@ services:
     profiles: [local-db]
     ports:
       - "127.0.0.1:${MONGO_PORT:-27018}:27017"
-    image: mongo:8.0.28@sha256:5351bff2b5d1563e3fa603a74b9be85ef9323e10aeb0b45cea933a93876e77fd
+    image: mongo:8.0.34@sha256:4a4ab5d4834207389e0d7270fac988e21ffedccecba77991a552f755df229907
     restart: unless-stopped
     logging: *default-logging
     environment:
