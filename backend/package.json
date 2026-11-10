@@ -31,7 +31,7 @@
     "jsonwebtoken": "^9.0.3",
     "mailauth": "7.1.0",
     "mongodb": "^7.7.0",
-    "mongoose": "^9.11.0",
+    "mongoose": "^9.11.4",
     "morgan": "^1.12.1",
     "node-cron": "^4.6.0",
     "nodemailer": "^10.0.15",
